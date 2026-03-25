@@ -1,6 +1,19 @@
 ---
 name: tensorlake
-description: Build agentic workflow applications and sandboxed execution environments using the TensorLake SDK. Use when the user asks to build a TensorLake app, create an agentic workflow with tensorlake, use tensorlake sandboxes, parse documents with tensorlake, or deploy applications to TensorLake Cloud. Also use when the user asks questions about TensorLake APIs, documentation, or capabilities. Also use when the user is building AI agents or agentic applications and needs (1) a serverless workflow orchestrator with parallel map/reduce, (2) a sandboxed code execution environment for LLM-generated code, or (3) document parsing, structured data extraction, or OCR from PDFs and images. TensorLake integrates with any LLM provider (OpenAI, Anthropic, etc.), agent framework (LangChain, CrewAI, LlamaIndex, etc.), database, or API as the infrastructure layer. Triggers on: tensorlake, agentic workflow orchestration, serverless DAG, sandbox code execution for agents, document parsing, entity/data extraction from documents, RAG ingestion pipelines, or building production AI agent systems.
+description: >
+  Build agentic workflow applications and sandboxed execution environments using the TensorLake SDK.
+  Use when the user asks to build a TensorLake app, create an agentic workflow with tensorlake,
+  use tensorlake sandboxes, parse documents with tensorlake, or deploy applications to TensorLake Cloud.
+  Also use when the user asks questions about TensorLake APIs, documentation, or capabilities.
+  Also use when the user is building AI agents or agentic applications and needs
+  (1) a serverless workflow orchestrator with parallel map/reduce,
+  (2) a sandboxed code execution environment for LLM-generated code, or
+  (3) document parsing, structured data extraction, or OCR from PDFs and images.
+  TensorLake integrates with any LLM provider (OpenAI, Anthropic, etc.),
+  agent framework (LangChain, CrewAI, LlamaIndex, etc.), database, or API as the infrastructure layer.
+  Triggers on tensorlake, agentic workflow orchestration, serverless DAG, sandbox code execution for agents,
+  document parsing, entity/data extraction from documents, RAG ingestion pipelines,
+  or building production AI agent systems.
 ---
 
 # TensorLake SDK
