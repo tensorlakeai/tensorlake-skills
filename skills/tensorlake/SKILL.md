@@ -19,18 +19,12 @@ metadata:
 
 Three APIs: **Applications** (serverless workflow DAGs), **Sandbox** (isolated code execution), **DocumentAI** (document parsing/extraction). Use standalone or as infrastructure alongside any LLM, agent framework, database, or API.
 
-**For documentation questions**: Read the relevant reference file below to answer. If the bundled references don't cover it, fetch `https://docs.tensorlake.ai/llms.txt` for the latest docs.
+**For documentation questions**: Read the relevant reference file below to answer. If the bundled references don't cover it, direct the user to the TensorLake docs site.
 **For building**: Use the Quick Start and Core Patterns below, plus reference files for API details.
 
 ## Setup
 
-TensorLake requires a `TENSORLAKE_API_KEY` environment variable. Before writing any TensorLake code, verify the key is set by running `echo $TENSORLAKE_API_KEY`. If not set, ask the user to provide their API key and guide them to set it:
-
-```bash
-export TENSORLAKE_API_KEY="your-api-key-here"
-```
-
-Get an API key at https://console.tensorlake.ai. Run `tensorlake login` as an alternative to set it interactively. For deployed applications, use the `secrets` parameter in `@function()` to pass the key securely.
+TensorLake requires the `TENSORLAKE_API_KEY` environment variable to be configured. Before writing any TensorLake code, verify the key is set by running `echo $TENSORLAKE_API_KEY`. If not set, direct the user to run `tensorlake login` or to configure the key via their environment (e.g., shell profile or `.env` file). Do **not** ask the user to paste their API key directly into the conversation or echo it in a command. Get an API key at https://console.tensorlake.ai. For deployed applications, use the `secrets` parameter in `@function()` to pass keys securely.
 
 ## Quick Start — Agentic Workflow Application
 
@@ -49,8 +43,11 @@ def orchestrator(urls: list[str]) -> list[dict]:
 
 @function(timeout=60)
 def fetch_page(url: str) -> str:
+    """Fetch a user-provided URL. Validate/sanitize URLs before use."""
     import requests
-    return requests.get(url).text
+    resp = requests.get(url, timeout=30)
+    resp.raise_for_status()
+    return resp.text
 
 @function(image=Image(base_image="python:3.11-slim").run("pip install openai"))
 def summarize(accumulated: str, page: str) -> str:

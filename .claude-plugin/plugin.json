@@ -3,5 +3,8 @@
   "version": "1.0.0",
   "description": "Build agentic workflow applications, sandboxed execution environments, and document processing pipelines using the TensorLake SDK.",
   "author": "TensorLake",
-  "homepage": "https://github.com/tensorlakeai/tensorlake-skills"
+  "homepage": "https://github.com/tensorlakeai/tensorlake-skills",
+  "allowed_urls": [
+    "https://docs.tensorlake.ai/llms.txt"
+  ]
 }
