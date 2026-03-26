@@ -1,15 +1,34 @@
 # TensorLake Skill
 
-The infrastructure skill for building production AI agents. Install this skill and your coding agent gets access to [TensorLake's](https://tensorlake.ai) full agentic platform — workflow orchestration, sandboxed code execution, and document understanding — everything you need to go from prototype to production.
+Build production agent workflows with [TensorLake's](https://tensorlake.ai).
+
+This skill helps coding agents use TensorLake to build real agent systems with orchestration and sandboxed execution. It is designed for modern agent use cases like multi-agent applications, isolated code execution, long-running workflows, and tool-using agents that need a real workspace.
+
+Instead of treating TensorLake as just another API, this skill teaches agents how to use TensorLake as infrastructure: coordinate workflows with the Applications SDK, run tasks in isolated environments with the Sandbox SDK, and compose reliable agent systems for production use.
+
+Use it when you want your coding agent to build:
+- multi-agent applications
+- sandboxed coding or execution workflows
+- agent teams with separate workspaces
+- long-running or stateful agent systems
+- production-ready orchestration patterns
 
 ## What This Skill Does
 
-When installed, this skill teaches AI coding agents how to use TensorLake's platform:
+It guides agents to:
 
-- **Applications** — Serverless workflow orchestration with parallel map/reduce DAGs, auto-scaling, and crash recovery. Build multi-agent pipelines, fan-out/fan-in patterns, and complex agentic workflows that scale automatically.
-- **Sandbox** — Secure, isolated execution environments for running LLM-generated code. Give your agents the ability to write and execute code safely — data analysis, tool use, code interpretation, and more.
-- **DocumentAI** — Document parsing, structured extraction, and OCR. For end-to-end agentic applications that need to understand documents — invoices, contracts, reports, PDFs, images — TensorLake has it built in.
+- use the **Applications SDK** for orchestration, workflow logic, and multi-agent coordination
+- use the **Sandbox SDK** for isolated code execution and real agent workspaces
+- combine both SDKs to build production-style agent systems
+- choose TensorLake patterns that are better than a single-agent or stateless approach
 
+The skill is especially useful for tasks like:
+
+- building agentic applications with an orchestrator and specialist sub-agents
+- running code, scripts, or services inside isolated sandboxes
+- giving each agent its own workspace, files, and execution environment
+- coordinating parallel agents and collecting their outputs
+- building demos and prototypes that show why agent infrastructure matters
 Works with any LLM provider (OpenAI, Anthropic) and any agent framework (LangChain, CrewAI, LlamaIndex). TensorLake is the infrastructure layer — bring your own models and frameworks.
 
 The skill triggers automatically when you ask the agent to:

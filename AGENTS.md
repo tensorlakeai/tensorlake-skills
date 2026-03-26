@@ -10,11 +10,7 @@ Use standalone or as infrastructure alongside any LLM provider, agent framework,
 
 ## Setup
 
-TensorLake requires a `TENSORLAKE_API_KEY` environment variable. Verify it is set before writing TensorLake code. Get an API key at https://console.tensorlake.ai, or run `tensorlake login`.
-
-```bash
-export TENSORLAKE_API_KEY="your-api-key-here"
-```
+TensorLake requires the `TENSORLAKE_API_KEY` environment variable to be configured. Verify it is set before writing TensorLake code. If not set, direct the user to run `tensorlake login` or to configure the key via their environment (e.g., shell profile or `.env` file). Do **not** ask the user to paste their API key directly into the conversation or echo it in a command. Get an API key at https://console.tensorlake.ai.
 
 ## Quick Start
 
@@ -33,8 +29,11 @@ def orchestrator(urls: list[str]) -> list[dict]:
 
 @function(timeout=60)
 def fetch_page(url: str) -> str:
+    """Fetch a user-provided URL. Validate/sanitize URLs before use."""
     import requests
-    return requests.get(url).text
+    resp = requests.get(url, timeout=30)
+    resp.raise_for_status()
+    return resp.text
 
 @function(image=Image(base_image="python:3.11-slim").run("pip install openai"))
 def summarize(accumulated: str, page: str) -> str:
