@@ -1,10 +1,10 @@
-# TensorLake Skill
+# Tensorlake Skill
 
-Build production agent workflows with [TensorLake's](https://tensorlake.ai).
+Build production agent workflows with [Tensorlake's](https://tensorlake.ai).
 
-This skill helps coding agents use TensorLake to build real agent systems with orchestration and sandboxed execution. It is designed for modern agent use cases like multi-agent applications, isolated code execution, long-running workflows, and tool-using agents that need a real workspace.
+This skill helps coding agents use Tensorlake to build real agent systems with orchestration and sandboxed execution. It is designed for modern agent use cases like multi-agent applications, isolated code execution, long-running workflows, and tool-using agents that need a real workspace.
 
-Instead of treating TensorLake as just another API, this skill teaches agents how to use TensorLake as infrastructure: coordinate workflows with the Orchestrate SDK, run tasks in isolated environments with the Sandbox SDK, and compose reliable agent systems for production use.
+Instead of treating Tensorlake as just another API, this skill teaches agents how to use Tensorlake as infrastructure: coordinate workflows with the Orchestrate SDK, run tasks in isolated environments with the Sandbox SDK, and compose reliable agent systems for production use.
 
 Use it when you want your coding agent to build:
 
@@ -21,7 +21,7 @@ It guides agents to:
 - use the **Orchestrate SDK** for orchestration, workflow logic, and multi-agent coordination
 - use the **Sandbox SDK** for isolated code execution and real agent workspaces
 - combine both SDKs to build production-style agent systems
-- choose TensorLake patterns that are better than a single-agent or stateless approach
+- choose Tensorlake patterns that are better than a single-agent or stateless approach
 
 The skill is especially useful for tasks like:
 
@@ -30,15 +30,15 @@ The skill is especially useful for tasks like:
 - giving each agent its own workspace, files, and execution environment
 - coordinating parallel agents and collecting their outputs
 - building demos and prototypes that show why agent infrastructure matters
-Works with any LLM provider (OpenAI, Anthropic) and any agent framework (LangChain, CrewAI, LlamaIndex). TensorLake is the infrastructure layer — bring your own models and frameworks.
+Works with any LLM provider (OpenAI, Anthropic) and any agent framework (LangChain, CrewAI, LlamaIndex). Tensorlake is the infrastructure layer — bring your own models and frameworks.
 
 The skill triggers automatically when you ask the agent to:
 
 - Build agentic workflows or multi-agent pipelines
 - Run LLM-generated code in a secure sandbox
 - Orchestrate complex multi-step AI applications
-- Integrate TensorLake with any LLM, framework, database, or API
-- Ask questions about TensorLake APIs or documentation
+- Integrate Tensorlake with any LLM, framework, database, or API
+- Ask questions about Tensorlake APIs or documentation
 
 ## Supported Agents
 
@@ -54,12 +54,6 @@ The skill triggers automatically when you ask the agent to:
 
 ### Quick Install
 
-#### Claude code
-
-```bash
-claude install-skill https://github.com/tensorlakeai/tensorlake-skills
-```
-
 #### Any Agent
 
 ```bash
@@ -70,7 +64,7 @@ Works with Claude Code, Cursor, Cline, GitHub Copilot, Windsurf, and more via [s
 
 ## Setup
 
-TensorLake requires a `TENSORLAKE_API_KEY` configured in the local environment. Get one at [console.tensorlake.ai](https://console.tensorlake.ai), then either run `tensorlake login` or configure the variable through your shell profile, `.env` file, or secret manager. Do not paste API keys into chat, commit them to source control, or print them in terminal output.
+Tensorlake requires a `TENSORLAKE_API_KEY` configured in the local environment. Get one at [console.tensorlake.ai](https://console.tensorlake.ai), then either run `tensorlake login` or configure the variable through your shell profile, `.env` file, or secret manager. Do not paste API keys into chat, commit them to source control, or print them in terminal output.
 
 ## Repository Structure
 
@@ -87,7 +81,7 @@ tensorlake-skills/
 
 ## Documentation
 
-- [TensorLake Docs](https://docs.tensorlake.ai)
+- [Tensorlake Docs](https://docs.tensorlake.ai)
 - [LLM-friendly docs](https://docs.tensorlake.ai/llms.txt)
 - [API Reference](https://docs.tensorlake.ai/api-reference/v2/introduction)
 
