@@ -1,6 +1,5 @@
 ---
-
-## name: tensorlake  
+name: tensorlake  
 license: MIT  
 description: >  
   Tensorlake SDK for building agentic workflows, sandboxed code execution, and document parsing/extraction.  
