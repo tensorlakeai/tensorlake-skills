@@ -2,8 +2,8 @@
 
 Tensorlake provides three APIs for building agentic applications:
 
-- **Orchestrate** — Serverless workflow DAGs with parallel map/reduce, auto-scaling, and crash recovery (imported as `tensorlake.applications`)
-- **Sandbox** — Isolated code execution environments for running LLM-generated code safely
+- **Sandbox** — Execution environments for agents and isolated tool calls
+- **Orchestrate** — Sandbox-native durable workflow orchestration for agents, with parallel map/reduce, auto-scaling, and crash recovery (imported as `tensorlake.applications`)
 - **DocumentAI** — Document parsing, structured data extraction, and OCR from PDFs/images
 
 Use standalone or as infrastructure alongside any LLM provider, agent framework, database, or API.
@@ -63,7 +63,7 @@ if __name__ == "__main__":
 ## Core Patterns
 
 - **DAG composition**: Chain functions via `.future()`, `.map()`, `.reduce()` to form parallel pipelines
-- **Agentic + Sandbox**: Use Orchestrate for workflow coordination, Sandbox to execute LLM-generated code safely
+- **Agentic + Sandbox**: Use Sandbox for agent execution environments and isolated tool calls, Orchestrate for durable workflow coordination
 - **Document extraction**: Use DocumentAI with Pydantic schemas to extract structured data from PDFs/images
 - **LLM integration**: Use any LLM provider inside `@function()` — install deps via `Image`, pass keys via `secrets`
 - **Framework integration**: Use Sandbox as a code execution tool for LangChain/CrewAI/LlamaIndex agents, or DocumentAI as a document loader for any RAG pipeline
