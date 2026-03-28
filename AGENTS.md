@@ -10,7 +10,7 @@ Use standalone or as infrastructure alongside any LLM provider, agent framework,
 
 ## Setup
 
-Tensorlake requires the `TENSORLAKE_API_KEY` environment variable to be configured before running Tensorlake code. If it is missing, direct the user to run `tensorlake login` or to configure the key through their local environment (for example a shell profile, `.env` file, or secret manager). Do **not** ask the user to paste the key into the conversation, include it in generated code, or print it in terminal output. Get an API key at [console.tensorlake.ai](https://console.tensorlake.ai).
+Tensorlake requires the `TENSORLAKE_API_KEY` environment variable to be configured before running Tensorlake code. If it is missing, direct the user to run `tensorlake login` or to configure the key through their local environment (for example a shell profile, `.env` file, or secret manager). Do **not** ask the user to paste the key into the conversation, include it in generated code, or print it in terminal output. Get an API key at [cloud.tensorlake.ai](https://cloud.tensorlake.ai).
 
 ## Quick Start
 
