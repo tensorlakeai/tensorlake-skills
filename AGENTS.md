@@ -1,10 +1,9 @@
 # Tensorlake SDK
 
-Tensorlake provides three APIs for building agentic applications:
+Tensorlake provides two APIs for building agentic applications:
 
 - **Sandbox** — Execution environments for agents and isolated tool calls
 - **Orchestrate** — Sandbox-native durable workflow orchestration for agents, with parallel map/reduce, auto-scaling, and crash recovery (imported as `tensorlake.applications`)
-- **DocumentAI** — Document parsing, structured data extraction, and OCR from PDFs/images
 
 Use standalone or as infrastructure alongside any LLM provider, agent framework, database, or API.
 

@@ -2,12 +2,11 @@
 name: tensorlake
 license: MIT
 description: >
-  Tensorlake SDK for agent sandboxes, sandbox-native orchestration, and document parsing/extraction.
+  Tensorlake SDK for agent sandboxes and sandbox-native orchestration.
   Use when the user mentions tensorlake, or asks about Tensorlake APIs/docs/capabilities.
   Also use when the user is building AI agents or agentic applications that need
   sandboxed execution environments for agents and isolated tool calls,
-  durable workflow orchestration for agents (parallel map/reduce DAGs),
-  or document parsing, structured extraction, and OCR from PDFs/images.
+  or durable workflow orchestration for agents (parallel map/reduce DAGs).
   Works with any LLM provider (OpenAI, Anthropic), agent framework (LangChain, CrewAI, LlamaIndex),
   database, or API as the infrastructure layer.
 metadata:
@@ -17,7 +16,7 @@ metadata:
 
 # Tensorlake SDK
 
-Three APIs: **Sandbox** (execution environments for agents and isolated tool calls), **Orchestrate** (sandbox-native durable workflow orchestration for agents — imported as `tensorlake.applications`), **DocumentAI** (document parsing/extraction). Use standalone or as infrastructure alongside any LLM, agent framework, database, or API.
+Two APIs: **Sandbox** (execution environments for agents and isolated tool calls), **Orchestrate** (sandbox-native durable workflow orchestration for agents — imported as `tensorlake.applications`). Use standalone or as infrastructure alongside any LLM, agent framework, database, or API.
 
 **For documentation questions**: Read the relevant reference file below to answer. If the bundled references don't cover it, direct the user to the Tensorlake docs site.
 **For building**: Use the Quick Start and Core Patterns below, plus reference files for API details.
