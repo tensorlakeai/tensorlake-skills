@@ -85,10 +85,10 @@ For the latest documentation, refer to the official LLM-friendly Tensorlake docs
 ## CLI Commands
 
 ```bash
-tensorlake deploy path/to/app.py        # Deploy to cloud
-tensorlake parse --file-path doc.pdf     # Parse document
-tensorlake login                         # Authenticate
-tensorlake secrets                       # Manage secrets
+tl deploy path/to/app.py                # Deploy to cloud
+tl parse --file-path doc.pdf            # Parse document
+tl login                                # Authenticate
+tl secrets                              # Manage secrets
 tl sbx new                              # Create a new sandbox
 ```
 
