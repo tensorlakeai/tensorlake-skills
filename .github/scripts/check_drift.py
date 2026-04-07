@@ -48,6 +48,9 @@ TIER2_PATTERNS = [
     # Only inside code blocks (heuristic: lines starting with spaces or containing def/class)
     re.compile(r"\b(\w+)\s*:\s*(?:[A-Z][a-zA-Z]+)"),
     re.compile(r"\b(\w+)\s*=\s*(?:[A-Z\"\'\d\[{(]|True|False|None)"),
+    # Typed parameter with default in a function signature (indented, trailing comma):
+    # Catches `    timeout_secs: int = 0,` that pattern 1 misses (lowercase types)
+    re.compile(r"^\s{4,}(\w+)\s*:\s*(?:int|float|str|bool|bytes|list|dict|set|tuple)\b.*=.*,\s*(?:#.*)?\s*$", re.MULTILINE),
 ]
 
 # Noise: generic tokens that appear everywhere and carry no API signal.
@@ -71,6 +74,7 @@ NOISE = frozenset({
     "pandas", "numpy", "torch", "chromadb", "qdrant", "redis",
     "duckdb", "databricks", "spark", "mongodb",
     # Common example variable names
+    "sdk", "cli",
     "foo", "bar", "baz", "tmp", "temp", "test", "demo", "main",
     "agent", "tool", "prompt", "role", "user", "system", "assistant",
     "source", "target", "dest", "src", "dst", "env", "cmd",
@@ -87,6 +91,21 @@ THIRD_PARTY_CLASSES = frozenset({
     "CitedResponse", "PersonSearchResult", "ProcessingResult",
 })
 
+# Third-party API parameter names found in code examples — not Tensorlake API surface.
+THIRD_PARTY_PARAMS = frozenset({
+    # LLM API parameters (OpenAI, Anthropic, etc.)
+    "max_tokens", "system_prompt", "response_format",
+    "max_retries", "temperature", "top_p", "top_k", "stop_sequences",
+    "frequency_penalty", "presence_penalty", "tool_choice",
+    # Search tool parameters
+    "max_results",
+    # Python stdlib / third-party logging
+    "exc_info", "cache_logger_on_first_use", "capture_output",
+    "stack_info", "stacklevel",
+    # Agent SDK parameters (non-Tensorlake)
+    "permission_mode", "user_id",
+})
+
 # Regex for example variable names: things like agent_a, llm_image, research_image.
 # These are tutorial-specific and not part of the SDK API surface.
 _EXAMPLE_VAR_RE = re.compile(
@@ -96,14 +115,100 @@ _EXAMPLE_VAR_RE = re.compile(
     r"\w+_future|"                       # numbers_future
     r"\w+_name(?:_future)?|"             # capitalized_name
     r"[a-z]+_value|"                     # input_value, query_value
+    r"\w+_client|"                       # sandbox_client, http_client
+    r"\w+_numbers|"                      # doubled_numbers, squared_numbers
     r"OPENAI_API_KEY|AWS_ACCESS_KEY|TENSORLAKE_API_KEY|ANTHROPIC_API_KEY"
     r")$"
 )
 
 
+# Map reference file → owned tensorlake module prefixes.
+# Symbols imported from non-owned tensorlake modules are treated as cross-references.
+_MODULE_OWNERS: dict[str, list[str]] = {
+    "applications_sdk.md": ["tensorlake.applications"],
+    "sandbox_sdk.md": ["tensorlake.sandbox"],
+    "sandbox_advanced.md": ["tensorlake.sandbox"],
+    "documentai_sdk.md": ["tensorlake.document_ai", "tensorlake.documentai", "tensorlake.doc_ai"],
+}
+
+# Object names in method-call patterns → owning tensorlake module.
+_OBJECT_MODULES: dict[str, str] = {
+    "sandbox": "tensorlake.sandbox",
+    "doc_ai": "tensorlake.document_ai",
+    "pool": "tensorlake.sandbox",
+    "proc": "tensorlake.sandbox",
+}
+
+
+def _normalize_imports(text: str) -> str:
+    """Collapse multi-line parenthesized imports into single lines."""
+    return re.sub(
+        r"(from\s+tensorlake[\w.]*\s+import\s+)\(([^)]+)\)",
+        lambda m: m.group(1) + m.group(2).replace("\n", " "),
+        text,
+        flags=re.DOTALL,
+    )
+
+
+def _extract_foreign_symbols(text: str, owned_prefixes: list[str]) -> set[str]:
+    """Find symbols from cross-module tensorlake references.
+
+    Detects foreign tensorlake imports and extracts:
+      1. Directly imported names from foreign modules
+      2. Method calls on objects belonging to foreign modules
+      3. TIER2 parameter names from code blocks containing foreign references
+    """
+    foreign: set[str] = set()
+    normalized = _normalize_imports(text)
+    import_pat = TIER1_PATTERNS[0]
+
+    # 1. Collect foreign-imported names from import lines
+    foreign_modules: set[str] = set()
+    for match in import_pat.finditer(normalized):
+        module = match.group(1)
+        if any(module == p or module.startswith(p + ".") for p in owned_prefixes):
+            continue
+        foreign_modules.add(module)
+        foreign.add(module)
+        imports_str = match.group(2)
+        for token in re.split(r"[,\s]+", imports_str):
+            token = token.strip("()`\"'")
+            if len(token) >= 2:
+                foreign.add(token)
+
+    # 2. Find method calls on foreign objects
+    foreign_obj_names: set[str] = set()
+    for obj, mod in _OBJECT_MODULES.items():
+        if any(mod == p or mod.startswith(p + ".") for p in owned_prefixes):
+            continue
+        foreign_obj_names.add(obj)
+        obj_pat = re.compile(rf"\b{re.escape(obj)}\s*\.\s*(\w+)\s*\(")
+        for match in obj_pat.finditer(text):
+            foreign.add(match.group(1))
+
+    # 3. Extract TIER2 params from code blocks that reference foreign modules
+    if foreign_modules or foreign_obj_names:
+        code_blocks = re.findall(r"```[^\n]*\n(.*?)```", text, re.DOTALL)
+        for block in code_blocks:
+            block_has_foreign = (
+                any(mod in block for mod in foreign_modules)
+                or any(re.search(rf"\b{re.escape(obj)}\b", block)
+                       for obj in foreign_obj_names)
+            )
+            if block_has_foreign:
+                for pat in TIER2_PATTERNS:
+                    for match in pat.finditer(block):
+                        token = match.group(1).strip("()`\"'")
+                        if len(token) >= 4 and "_" in token:
+                            foreign.add(token)
+
+    return foreign
+
+
 def extract_symbols(text: str) -> set[str]:
     """Extract API-relevant symbols from a block of text."""
     symbols: set[str] = set()
+    text = _normalize_imports(text)
 
     # Tier 1: high-signal Tensorlake patterns
     for pat in TIER1_PATTERNS:
@@ -118,6 +223,7 @@ def extract_symbols(text: str) -> set[str]:
                     if (len(token) >= 3
                             and token.lower() not in NOISE
                             and token not in THIRD_PARTY_CLASSES
+                            and token.lower() not in THIRD_PARTY_PARAMS
                             and not _EXAMPLE_VAR_RE.match(token)):
                         symbols.add(token)
 
@@ -129,6 +235,7 @@ def extract_symbols(text: str) -> set[str]:
             if (len(token) >= 4
                     and "_" in token
                     and token.lower() not in NOISE
+                    and token.lower() not in THIRD_PARTY_PARAMS
                     and not token.startswith("_")
                     and not _EXAMPLE_VAR_RE.match(token)):
                 symbols.add(token)
@@ -348,6 +455,12 @@ def main() -> int:
         ref_text = ref_path.read_text(encoding="utf-8")
         ref_symbols = extract_symbols(ref_text)
 
+        # Filter cross-module symbols from both sides
+        owned = _MODULE_OWNERS.get(ref_file)
+        if owned:
+            ref_foreign = _extract_foreign_symbols(ref_text, owned)
+            ref_symbols -= ref_foreign
+
         # Combine all fetched pages for this reference.
         fetched_subdir = fetched / ref_file.replace(".md", "")
         if not fetched_subdir.exists():
@@ -359,6 +472,12 @@ def main() -> int:
             docs_text += "\n" + txt_file.read_text(encoding="utf-8")
 
         docs_symbols = extract_symbols(docs_text)
+
+        # Filter out symbols from cross-module tensorlake references
+        owned = _MODULE_OWNERS.get(ref_file)
+        if owned:
+            foreign = _extract_foreign_symbols(docs_text, owned)
+            docs_symbols -= foreign
 
         in_docs_not_ref = docs_symbols - ref_symbols
         in_ref_not_docs = ref_symbols - docs_symbols

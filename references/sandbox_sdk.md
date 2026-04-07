@@ -56,7 +56,7 @@ client.delete(sandbox_id)              # Terminates the sandbox (idempotent)
 
 ### SandboxInfo Attributes
 
-`sandbox_id`, `name`, `namespace`, `status`, `image`, `resources` (`.cpus`, `.memory_mb`), `secret_names`, `timeout_secs`, `entrypoint`, `created_at`, `terminated_at`
+`sandbox_id`, `name`, `namespace`, `status`, `image`, `resources` (`ContainerResourcesInfo`: `.cpus`, `.memory_mb`), `secret_names`, `timeout_secs`, `entrypoint`, `created_at`, `terminated_at`
 
 ### Ephemeral vs Named Sandboxes
 
@@ -326,6 +326,7 @@ tl sbx cp <id>:/path ./local            # Download file
 tl sbx clone <id>                       # Snapshot + restore
 tl sbx snapshot <id>                    # Create snapshot
 tl sbx suspend <id>                     # Suspend named sandbox
+tl sbx terminate <id>                   # Terminate sandbox (by name or ID)
 tl sbx image create img.py --name NAME  # Build image
 tl sbx port expose <id> 8080            # Expose port
 ```
