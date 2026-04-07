@@ -22,8 +22,11 @@ sandbox_sdk.md:
 applications_sdk.md:
   sources:
     - https://docs.tensorlake.ai/applications/introduction.md
+    - https://docs.tensorlake.ai/applications/quickstart.md
+    - https://docs.tensorlake.ai/applications/architecture.md
     - https://docs.tensorlake.ai/applications/concepts.md
     - https://docs.tensorlake.ai/applications/building-workflows.md
+    - https://docs.tensorlake.ai/applications/error-handling.md
     - https://docs.tensorlake.ai/applications/futures.md
     - https://docs.tensorlake.ai/applications/map-reduce.md
     - https://docs.tensorlake.ai/applications/async-functions.md
