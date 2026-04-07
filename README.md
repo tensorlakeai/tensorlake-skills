@@ -30,7 +30,7 @@ The skill is especially useful for tasks like:
 - building agentic applications with an orchestrator and specialist sub-agents
 - coordinating parallel agents and collecting their outputs
 - building demos and prototypes that show why agent infrastructure matters
-Works with any LLM provider (OpenAI, Anthropic) and any agent framework (LangChain, CrewAI, LlamaIndex). Tensorlake is the infrastructure layer — bring your own models and frameworks.
+Works with any LLM provider (OpenAI, Anthropic) and any agent framework (LangChain, etc.). Tensorlake is the infrastructure layer — bring your own models and frameworks.
 
 The skill triggers automatically when you ask the agent to:
 
@@ -86,7 +86,7 @@ tensorlake-skills/
     ├── applications_sdk.md       # Orchestrate API reference
     ├── sandbox_sdk.md            # Sandbox API reference
     ├── documentai_sdk.md         # DocumentAI API reference
-    ├── integrations.md           # Integration patterns (LangChain, CrewAI, etc.)
+    ├── integrations.md           # Integration patterns (LangChain, OpenAI, ChromaDB, Qdrant, etc.)
     ├── platform.md               # Webhooks, auth, access control, EU data residency
     ├── sandbox_advanced.md       # Skills-in-sandboxes, AI code execution, data analysis, CI/CD
     └── troubleshooting.md        # Common issues, production integration, benchmarks

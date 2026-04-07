@@ -66,16 +66,16 @@ if __name__ == "__main__":
 - **Agentic + Sandbox**: Use Sandbox for agent execution environments and isolated tool calls, Orchestrate for durable workflow coordination
 - **Document extraction**: Use DocumentAI with Pydantic schemas to extract structured data from PDFs/images
 - **LLM integration**: Use any LLM provider inside `@function()` — install deps via `Image`, pass keys via `secrets`
-- **Framework integration**: Use Sandbox as a code execution tool for LangChain/CrewAI/LlamaIndex agents, or DocumentAI as a document loader for any RAG pipeline
+- **Framework integration**: Use Sandbox as a code execution tool for LangChain agents or OpenAI function calling, or DocumentAI as a document loader for any RAG pipeline
 
 ## Reference Documentation
 
 Detailed API docs are in the `references/` directory:
 
 - `references/applications_sdk.md` — Orchestrate SDK: decorators, futures, map/reduce, images, context
-- `references/sandbox_sdk.md` — Create sandboxes, run commands, file ops, snapshots, pools
+- `references/sandbox_sdk.md` — Create sandboxes, run commands, file ops, snapshots
 - `references/documentai_sdk.md` — Parse, extract, classify, options
-- `references/integrations.md` — LangChain, CrewAI, OpenAI tools, RAG pipeline patterns
+- `references/integrations.md` — LangChain, OpenAI, ChromaDB, Qdrant, Databricks, MotherDuck patterns
 - `references/platform.md` — Webhooks, authentication, access control, EU data residency
 - `references/sandbox_advanced.md` — Skills-in-sandboxes, AI code execution, data analysis, CI/CD
 - `references/troubleshooting.md` — Common issues, production integration, benchmarks

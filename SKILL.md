@@ -68,7 +68,7 @@ if __name__ == "__main__":
 - **Agentic + Sandbox**: Use Orchestrate for workflow coordination, Sandbox to execute LLM-generated code safely
 - **Document extraction**: Use DocumentAI with Pydantic schemas to extract structured data from PDFs/images
 - **LLM integration**: Use any LLM provider inside `@function()` — install deps via `Image`, pass keys via `secrets`
-- **Framework integration**: Use Sandbox as a code execution tool for LangChain/CrewAI/LlamaIndex agents, or DocumentAI as a document loader for any RAG pipeline
+- **Framework integration**: Use Sandbox as a code execution tool for LangChain agents or OpenAI function calling, or DocumentAI as a document loader for any RAG pipeline
 
 For integration examples (LangChain, CrewAI, OpenAI function calling, multi-agent orchestration): See [references/integrations.md](references/integrations.md)
 
@@ -88,9 +88,9 @@ For integration examples (LangChain, CrewAI, OpenAI function calling, multi-agen
 Bundled references (use when building with Tensorlake):
 
 - **Orchestrate SDK** (decorators, futures, map/reduce, images, context): See [references/applications_sdk.md](references/applications_sdk.md)
-- **Sandbox SDK** (create, run commands, file ops, snapshots, pools): See [references/sandbox_sdk.md](references/sandbox_sdk.md)
+- **Sandbox SDK** (create, run commands, file ops, snapshots): See [references/sandbox_sdk.md](references/sandbox_sdk.md)
 - **DocumentAI SDK** (parse, extract, classify, options): See [references/documentai_sdk.md](references/documentai_sdk.md)
-- **Integrations** (LangChain, CrewAI, OpenAI tools, RAG pipelines): See [references/integrations.md](references/integrations.md)
+- **Integrations** (LangChain, OpenAI, ChromaDB, Qdrant, Databricks, MotherDuck): See [references/integrations.md](references/integrations.md)
 - **Platform** (webhooks, auth, access control, EU data residency): See [references/platform.md](references/platform.md)
 - **Sandbox Advanced** (skills-in-sandboxes, AI code execution, data analysis, CI/CD): See [references/sandbox_advanced.md](references/sandbox_advanced.md)
 - **Troubleshooting** (common issues, production integration, benchmarks): See [references/troubleshooting.md](references/troubleshooting.md)
