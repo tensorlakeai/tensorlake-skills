@@ -66,6 +66,7 @@ if __name__ == "__main__":
 
 - **DAG composition**: Chain functions via `.future()`, `.map()`, `.reduce()` to form parallel pipelines
 - **Agentic + Sandbox**: Use Sandbox for agent execution environments and isolated tool calls, Orchestrate for durable workflow coordination
+- **Persistent named sandboxes**: Create sandboxes with `name=` when state must survive between steps. Named sandboxes support suspend/resume, can be auto-suspended when idle, and auto-resume on the next sandbox-proxy request.
 - **Document extraction**: Use DocumentAI with Pydantic schemas to extract structured data from PDFs/images
 - **LLM integration**: Use any LLM provider inside `@function()` — install deps via `Image`, pass keys via `secrets`
 - **Framework integration**: Use Sandbox as a code execution tool for LangChain agents or OpenAI function calling, or DocumentAI as a document loader for any RAG pipeline
@@ -105,5 +106,5 @@ tl parse --file-path doc.pdf            # Parse document
 tl login                                # Authenticate
 tl secrets                              # Manage secrets
 tl sbx new                              # Create a new sandbox
+tl sbx image create img.py --name NAME   # Build sandbox image
 ```
-

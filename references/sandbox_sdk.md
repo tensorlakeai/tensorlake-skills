@@ -61,7 +61,7 @@ client.delete(sandbox_id)              # Terminates the sandbox (idempotent)
 ### Ephemeral vs Named Sandboxes
 
 - **Ephemeral**: Created without `name`. Auto-terminate on completion. Cannot be suspended.
-- **Named/Persistent**: Created with `name` parameter. Support suspend/resume.
+- **Named/Persistent**: Created with `name` parameter. Support suspend/resume, can be auto-suspended when idle, and can be referenced by ID or name.
 
 ### Connect to a Sandbox
 
@@ -298,9 +298,11 @@ tl sbx port ls <sandbox-id>
 tl sbx port rm <sandbox-id> 8080
 ```
 
-### Auto-Resume
+### Idle Suspend and Auto-Resume
 
-Requests to a **suspended** named sandbox automatically resume it and wait for the port to become routable.
+- Named sandboxes can be suspended manually or auto-suspended when idle.
+- Requests to a **suspended** named sandbox automatically resume it and wait for the port to become routable.
+- Ephemeral sandboxes do not support suspend/resume.
 
 ## Sandbox Statuses
 
