@@ -135,31 +135,51 @@ Run parallel data analysis and model benchmarking in isolated sandboxes.
 ### Pattern: Parallel Benchmarking
 
 ```python
-import asyncio
+import asyncio, json
 from tensorlake.sandbox import SandboxClient
 
-client = SandboxClient()
-
-async def benchmark_model(model_name, import_path):
-    with client.create_and_connect() as sandbox:
-        sandbox.run("pip", ["install", "scikit-learn", "--break-system-packages"])
+def run_model_benchmark(model_name, sklearn_path):
+    """Synchronous benchmark — one sandbox per model."""
+    client = SandboxClient()
+    sandbox = client.create_and_connect()
+    try:
+        sandbox.run("pip", ["install", "--user", "--break-system-packages", "numpy", "scikit-learn"])
+        module, cls = sklearn_path.rsplit(".", 1)
         code = f"""
-import json
-from {import_path} import {model_name}
-# ... train, evaluate, output JSON
-print(json.dumps(results))
+import json, time
+from {module} import {cls}
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+
+X, y = load_iris(return_X_y=True)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+start = time.time()
+model = {cls}()
+model.fit(X_train, y_train)
+elapsed = time.time() - start
+acc = accuracy_score(y_test, model.predict(X_test))
+print(json.dumps({{"model": "{model_name}", "accuracy": round(acc, 4), "time": round(elapsed, 4)}}))
 """
         result = sandbox.run("python", ["-c", code])
         return json.loads(result.stdout)
+    finally:
+        sandbox.close()
 
 async def main():
-    tasks = {
-        "RandomForest": "sklearn.ensemble",
-        "GradientBoosting": "sklearn.ensemble",
+    models = {
+        "RandomForest": "sklearn.ensemble.RandomForestClassifier",
+        "SVM": "sklearn.svm.SVC",
+        "LogisticRegression": "sklearn.linear_model.LogisticRegression",
     }
     results = await asyncio.gather(*[
-        benchmark_model(name, path) for name, path in tasks.items()
+        asyncio.to_thread(run_model_benchmark, name, path)
+        for name, path in models.items()
     ])
+    for r in results:
+        print(r)
+
+asyncio.run(main())
 ```
 
 Use snapshots to avoid re-installing dependencies on each run.
@@ -173,21 +193,30 @@ Use sandboxes as ephemeral, isolated build containers.
 ### Pattern: Mini-CI Pipeline
 
 ```python
+import os
 from tensorlake.sandbox import SandboxClient
 
-client = SandboxClient()
+def copy_to_sandbox(sandbox, local_dir, sandbox_dir):
+    """Recursively copy a local directory into the sandbox."""
+    for root, dirs, files in os.walk(local_dir):
+        rel = os.path.relpath(root, local_dir)
+        dest = f"{sandbox_dir}/{rel}" if rel != "." else sandbox_dir
+        sandbox.run("mkdir", ["-p", dest])
+        for f in files:
+            with open(os.path.join(root, f), "rb") as fh:
+                sandbox.write_file(f"{dest}/{f}", fh.read())
 
-with client.create_and_connect() as sandbox:
+client = SandboxClient()
+sandbox = client.create_and_connect()
+try:
     # Upload project files
-    sandbox.write_file("/workspace/project/src/app.py", source_bytes)
-    sandbox.write_file("/workspace/project/tests/test_app.py", test_bytes)
-    sandbox.write_file("/workspace/project/requirements.txt", req_bytes)
+    copy_to_sandbox(sandbox, "./my_project", "/workspace/project")
 
     # Install dependencies
-    result = sandbox.run("pip", [
-        "install", "-r", "/workspace/project/requirements.txt",
+    sandbox.run("pip", [
+        "install", "-r", "requirements.txt",
         "--user", "--break-system-packages"
-    ], env={"PYTHONPATH": "/workspace/project/src"})
+    ], working_dir="/workspace/project")
 
     # Run tests
     result = sandbox.run("python", ["-m", "pytest", "tests/"],
@@ -196,11 +225,10 @@ with client.create_and_connect() as sandbox:
     print(f"Exit: {result.exit_code}\nSTDOUT:\n{result.stdout}")
 
     # Build artifacts
-    result = sandbox.run("python", ["-m", "build"],
+    sandbox.run("python", ["setup.py", "sdist", "bdist_wheel"],
         working_dir="/workspace/project")
-
-    # Retrieve artifacts
-    artifact = sandbox.read_file("/workspace/project/dist/package.tar.gz")
+finally:
+    sandbox.close()
 ```
 
 **Key `sandbox.run()` parameters:**

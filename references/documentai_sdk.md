@@ -32,9 +32,7 @@ from tensorlake.documentai import (
     PageClassConfig, MimeType, FormFillingOptions,
     ChunkingStrategy, OcrPipelineProvider, ModelProvider,
     TableOutputMode, TableParsingFormat, PageFragmentType,
-    ParseStatus, PartitionStrategy,
-    PartitionConfig, SimplePartitionStrategy, PatternPartitionStrategy, PatternConfig,
-    DatasetDataFilter,
+    ParseStatus,
 )
 ```
 
@@ -122,11 +120,13 @@ class Invoice(BaseModel):
     vendor_name: str
 
 extraction_id = doc_ai.extract(
-    StructuredExtractionOptions(                # First positional arg
-        schema_name="invoice",
-        json_schema=Invoice,
-    ),
     file_id=file_id,
+    structured_extraction_options=[
+        StructuredExtractionOptions(
+            schema_name="invoice",
+            json_schema=Invoice,
+        ),
+    ],
 )
 
 result = doc_ai.wait_for_completion(extraction_id)
@@ -138,8 +138,10 @@ for data in result.structured_data:
 
 ```python
 classify_id = doc_ai.classify(
-    [PageClassConfig(name="invoice", description="An invoice document")],  # First positional arg
     file_id=file_id,
+    page_classifications=[
+        PageClassConfig(name="invoice", description="An invoice document"),
+    ],
 )
 result = doc_ai.wait_for_completion(classify_id)
 ```
@@ -148,13 +150,13 @@ result = doc_ai.wait_for_completion(classify_id)
 
 ```python
 edit_id = doc_ai.edit(
-    FormFillingOptions(                         # First positional arg
+    file_id=file_id,
+    form_filling=FormFillingOptions(
         fill_prompt="Fill with company name 'Acme Corp'",
         ignore_source_values=False,             # True to overwrite existing values
         no_acroform=False,                      # True to skip PDF AcroForm detection
         no_widget_detection=False,              # True to skip visual widget analysis
     ),
-    file_id=file_id,
 )
 result = doc_ai.wait_for_completion(edit_id)
 # result.filled_pdf_base64, result.form_filling_metadata
@@ -226,9 +228,8 @@ dataset = doc_ai.update_dataset(dataset_id, ...)
 doc_ai.delete_dataset(dataset_id)
 
 # Parse a file into a dataset
-parse_id = doc_ai.parse_dataset_file(dataset, file_id)
-# Or parse and wait:
-result = doc_ai.parse_dataset_file(dataset, file_id, wait_for_completion=True)
+parse_id = doc_ai.parse_dataset_file(dataset=dataset, file=file_id)
+result = doc_ai.wait_for_completion(parse_id)
 
 data = doc_ai.get_dataset_data(dataset)     # -> PaginatedResult[ParseResult]
 ```
@@ -296,23 +297,23 @@ StructuredExtractionOptions(
 - `ModelProvider.SONNET` — Anthropic Claude Sonnet
 - `ModelProvider.GPT4OMINI` — OpenAI GPT-4o Mini
 
-**Partition Strategy:**
+**Partition Strategy** (passed as dict):
 
 ```python
 # Simple strategies
-SimplePartitionStrategy(strategy="none")      # Entire document
-SimplePartitionStrategy(strategy="page")      # Each page separately
-SimplePartitionStrategy(strategy="section")   # Groups by whitespace
-SimplePartitionStrategy(strategy="fragment")  # Individual elements
+{"strategy": "none"}         # Entire document
+{"strategy": "page"}         # Each page separately
+{"strategy": "section"}      # Groups by whitespace
+{"strategy": "fragment"}     # Individual elements
 
 # Pattern-based
-PatternPartitionStrategy(
-    strategy="patterns",
-    patterns=PatternConfig(
-        start_patterns=["Invoice No"],
-        end_patterns=["Total Due"],
-    )
-)
+{
+    "strategy": "patterns",
+    "patterns": {
+        "start_patterns": ["Invoice No"],
+        "end_patterns": ["Total Due"],
+    }
+}
 ```
 
 ## Enrichment Options

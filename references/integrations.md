@@ -21,8 +21,6 @@ Integration examples for using TensorLake as infrastructure alongside LLM provid
 - [Anthropic + TensorLake Applications](#anthropic--tensorlake-applications)
 - [LangChain + TensorLake Sandbox](#langchain--tensorlake-sandbox)
 - [LangChain + TensorLake DocumentAI (Custom)](#langchain--tensorlake-documentai-custom)
-- [CrewAI + TensorLake Sandbox](#crewai--tensorlake-sandbox)
-- [LlamaIndex + TensorLake DocumentAI](#llamaindex--tensorlake-documentai)
 - [OpenAI Function Calling + TensorLake Sandbox](#openai-function-calling--tensorlake-sandbox)
 - [Multi-Agent Orchestration](#multi-agent-orchestration)
 - [ChromaDB + TensorLake DocumentAI](#chromadb--tensorlake-documentai)
@@ -161,15 +159,14 @@ from tensorlake.sandbox import SandboxClient
 def execute_python(code: str) -> str:
     """Execute Python code in a secure TensorLake sandbox. Use for data analysis, calculations, or running scripts."""
     client = SandboxClient()
-    with client.create_and_connect(
-        memory_mb=2048,
-        timeout_secs=120,
-    ) as sandbox:
-        sandbox.write_file("/tmp/script.py", code.encode())
-        result = sandbox.run("python", ["/tmp/script.py"])
+    sandbox = client.create_and_connect(memory_mb=2048, timeout_secs=120)
+    try:
+        result = sandbox.run("python", ["-c", code])
         if result.exit_code != 0:
             return f"Error (exit {result.exit_code}):\n{result.stderr}"
         return result.stdout
+    finally:
+        sandbox.close()
 
 # Use with any LangChain agent
 from langchain_openai import ChatOpenAI
@@ -190,7 +187,6 @@ from tensorlake.sandbox import SandboxClient
 
 client = SandboxClient()
 sandbox = client.create_and_connect(timeout_secs=600)
-sandbox.__enter__()  # Keep sandbox alive across calls
 
 @tool
 def run_python(code: str) -> str:
@@ -251,71 +247,6 @@ vectorstore = FAISS.from_documents(docs, OpenAIEmbeddings())
 retriever = vectorstore.as_retriever()
 ```
 
-## CrewAI + TensorLake Sandbox
-
-Use TensorLake Sandbox as a CrewAI tool:
-
-```python
-from crewai import Agent, Task, Crew
-from crewai.tools import tool
-from tensorlake.sandbox import SandboxClient
-
-@tool
-def sandbox_execute(code: str) -> str:
-    """Execute Python code in a secure TensorLake sandbox for data analysis and computation."""
-    client = SandboxClient()
-    with client.create_and_connect() as sandbox:
-        sandbox.write_file("/tmp/task.py", code.encode())
-        result = sandbox.run("python", ["/tmp/task.py"])
-        if result.exit_code != 0:
-            return f"Error: {result.stderr}"
-        return result.stdout
-
-analyst = Agent(
-    role="Data Analyst",
-    goal="Analyze data and produce insights",
-    tools=[sandbox_execute],
-)
-task = Task(
-    description="Analyze the sales data and find the top 5 products",
-    agent=analyst,
-)
-crew = Crew(agents=[analyst], tasks=[task])
-result = crew.kickoff()
-```
-
-## LlamaIndex + TensorLake DocumentAI
-
-Use TensorLake DocumentAI as a LlamaIndex reader:
-
-```python
-from llama_index.core import VectorStoreIndex
-from llama_index.core.schema import TextNode
-from tensorlake.documentai import DocumentAI, ParsingOptions, ChunkingStrategy
-
-def tensorlake_reader(file_paths: list[str]) -> list[TextNode]:
-    """Parse documents with TensorLake and return LlamaIndex nodes."""
-    doc_ai = DocumentAI()
-    nodes = []
-    for path in file_paths:
-        result = doc_ai.parse_and_wait(
-            file=path,
-            parsing_options=ParsingOptions(
-                chunking_strategy=ChunkingStrategy.SECTION,
-            ),
-        )
-        for chunk in result.chunks:
-            nodes.append(TextNode(
-                text=chunk.content,
-                metadata={"source": path, "page_number": chunk.page_number},
-            ))
-    return nodes
-
-nodes = tensorlake_reader(["quarterly_report.pdf"])
-index = VectorStoreIndex(nodes)
-query_engine = index.as_query_engine()
-```
-
 ## OpenAI Function Calling + TensorLake Sandbox
 
 Wire TensorLake Sandbox directly into OpenAI's tool-use loop:
@@ -340,10 +271,12 @@ tools = [{
 
 def handle_tool_call(code: str) -> str:
     client = SandboxClient()
-    with client.create_and_connect() as sandbox:
-        sandbox.write_file("/tmp/run.py", code.encode())
-        result = sandbox.run("python", ["/tmp/run.py"])
+    sandbox = client.create_and_connect()
+    try:
+        result = sandbox.run("python", ["-c", code])
         return result.stdout if result.exit_code == 0 else f"Error: {result.stderr}"
+    finally:
+        sandbox.close()
 
 # Agent loop
 client = OpenAI()
@@ -404,10 +337,12 @@ def coder(plan: str) -> str:
 @function(timeout=120)
 def executor(code: str) -> str:
     client = SandboxClient()
-    with client.create_and_connect() as sandbox:
-        sandbox.write_file("/tmp/task.py", code.encode())
-        result = sandbox.run("python", ["/tmp/task.py"])
+    sandbox = client.create_and_connect()
+    try:
+        result = sandbox.run("python", ["-c", code])
         return result.stdout if result.exit_code == 0 else f"Error: {result.stderr}"
+    finally:
+        sandbox.close()
 
 @function(image=research_image, secrets=["ANTHROPIC_API_KEY"])
 def reviewer(task: str, output: str) -> str:
@@ -500,7 +435,7 @@ doc_ai = DocumentAI()
 
 parsing_options = ParsingOptions(
     chunking_strategy=ChunkingStrategy.SECTION,
-    table_parsing_format=TableParsingFormat.TSR,
+    table_parsing_strategy=TableParsingFormat.TSR,
     table_output_mode=TableOutputMode.MARKDOWN,
 )
 
@@ -586,15 +521,17 @@ class CompanyInfo(BaseModel):
 
 doc_ai = DocumentAI()
 parse_id = doc_ai.extract(
-    StructuredExtractionOptions(schema_name="CompanyInfo", json_schema=CompanyInfo),
-    file_url="https://example.com/company-report.pdf",
+    file="https://example.com/company-report.pdf",
+    structured_extraction_options=[
+        StructuredExtractionOptions(schema_name="CompanyInfo", json_schema=CompanyInfo),
+    ],
 )
 result = doc_ai.wait_for_completion(parse_id)
 
 records = []
-if result.status == ParseStatus.SUCCESSFUL:
+if result.status == ParseStatus.SUCCESS:
     for data in result.structured_data:
-        records.append(data.data)
+        records.append(data)
 
 df = pd.DataFrame(records)
 # spark.createDataFrame(df).write.mode("append").saveAsTable("companies.company_info")

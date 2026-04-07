@@ -79,8 +79,6 @@ with client.create_and_connect(
 ) as sandbox:
     result = sandbox.run("echo", ["hello"])
 
-# Or connect to existing sandbox
-sandbox = client.connect(sandbox_id)
 ```
 
 ### Snapshots
@@ -136,30 +134,6 @@ curl -X POST https://api.tensorlake.ai/sandboxes/{sandbox_id_or_name}/resume \
 **Status codes (both endpoints):** 400 = cannot suspend/resume in current state (or ephemeral), 401 = invalid credentials, 403 = insufficient permissions, 404 = not found.
 
 Note: Suspend/resume is not available in the Python SDK — use CLI or REST API. However, many sandbox-proxy requests (e.g., hitting the sandbox URL) automatically resume suspended sandboxes.
-
-### Sandbox Pools
-
-```python
-pool = client.create_pool(
-    image: str | None = None,
-    cpus: float = 1.0,
-    memory_mb: int = 2048,
-    secret_names: list[str] | None = None,
-    timeout_secs: int = 0,
-    entrypoint: list[str] | None = None,
-    max_containers: int | None = None,
-    warm_containers: int | None = None,
-)
-pool_id = pool.pool_id
-
-info = client.get_pool(pool_id)        # -> SandboxPoolInfo
-pools = client.list_pools()            # -> list[SandboxPoolInfo]
-info = client.update_pool(pool_id, ...)
-client.delete_pool(pool_id)
-
-# Claim a sandbox from the pool
-response = client.claim(pool_id)
-```
 
 ## Sandbox — Interact with Running Sandbox
 
@@ -265,13 +239,6 @@ session = sandbox.create_pty_session(
     cols=80,
 )
 ws_url = sandbox.pty_ws_url(session["session_id"], session["token"])
-```
-
-### Cleanup
-
-```python
-sandbox.close()       # Close connection, sandbox keeps running
-# client.delete(sandbox_id) to terminate
 ```
 
 ## Sandbox Images

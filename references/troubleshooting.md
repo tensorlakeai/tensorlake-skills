@@ -54,15 +54,16 @@ Last verified: 2026-04-07
 
 ### Response Structure
 
+Parse job status response:
 ```json
 {
-  "chunks": ["...markdown content..."],
-  "pages": [{"bounding_boxes": [...], "reading_order": [...]}],
   "status": "successful"
 }
 ```
 
 Status values: `pending`, `processing`, `successful`, `failure`
+
+Parsed result (on success) contains `chunks` (markdown segments), `pages` (visual structure with bounding boxes), and `labels` (metadata from request).
 
 ### Notification Options
 
