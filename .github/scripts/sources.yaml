@@ -1,0 +1,107 @@
+# Maps each bundled reference file to its upstream doc sources.
+# The drift-check script fetches these URLs and compares against the local file.
+#
+# Fields:
+#   sources     – doc pages consolidated into this reference file
+#   sdk_version – tensorlake SDK version the reference was written for
+#   last_verified – date someone last confirmed the reference matches live docs
+
+sandbox_sdk.md:
+  sources:
+    - https://docs.tensorlake.ai/sandboxes/introduction.md
+    - https://docs.tensorlake.ai/sandboxes/lifecycle.md
+    - https://docs.tensorlake.ai/sandboxes/commands.md
+    - https://docs.tensorlake.ai/sandboxes/file-operations.md
+    - https://docs.tensorlake.ai/sandboxes/snapshots.md
+    - https://docs.tensorlake.ai/sandboxes/processes.md
+    - https://docs.tensorlake.ai/sandboxes/networking.md
+    - https://docs.tensorlake.ai/sandboxes/images.md
+  sdk_version: "0.4.39"
+  last_verified: "2026-04-07"
+
+applications_sdk.md:
+  sources:
+    - https://docs.tensorlake.ai/applications/introduction.md
+    - https://docs.tensorlake.ai/applications/concepts.md
+    - https://docs.tensorlake.ai/applications/building-workflows.md
+    - https://docs.tensorlake.ai/applications/futures.md
+    - https://docs.tensorlake.ai/applications/map-reduce.md
+    - https://docs.tensorlake.ai/applications/async-functions.md
+    - https://docs.tensorlake.ai/applications/images.md
+    - https://docs.tensorlake.ai/applications/durability.md
+    - https://docs.tensorlake.ai/applications/crash-recovery.md
+    - https://docs.tensorlake.ai/applications/retries.md
+    - https://docs.tensorlake.ai/applications/secrets.md
+    - https://docs.tensorlake.ai/applications/timeouts.md
+    - https://docs.tensorlake.ai/applications/scale-out-queuing.md
+    - https://docs.tensorlake.ai/applications/scaling-agents.md
+    - https://docs.tensorlake.ai/applications/observability.md
+    - https://docs.tensorlake.ai/applications/cron-scheduler.md
+    - https://docs.tensorlake.ai/applications/parallel-sub-agents.md
+    - https://docs.tensorlake.ai/applications/sandboxes.md
+    - https://docs.tensorlake.ai/applications/guides/streaming-progress.md
+    - https://docs.tensorlake.ai/applications/guides/logging.md
+  sdk_version: "0.4.39"
+  last_verified: "2026-04-07"
+
+documentai_sdk.md:
+  sources:
+    - https://docs.tensorlake.ai/document-ingestion/overview.md
+    - https://docs.tensorlake.ai/document-ingestion/quickstart.md
+    - https://docs.tensorlake.ai/document-ingestion/parsing/read.md
+    - https://docs.tensorlake.ai/document-ingestion/parsing/structured-extraction.md
+    - https://docs.tensorlake.ai/document-ingestion/parsing/page-classification.md
+    - https://docs.tensorlake.ai/document-ingestion/parsing/edit.md
+    - https://docs.tensorlake.ai/document-ingestion/parsing/parse-output.md
+    - https://docs.tensorlake.ai/document-ingestion/parsing/docx-parsing.md
+    - https://docs.tensorlake.ai/document-ingestion/parsing/chart-extraction.md
+    - https://docs.tensorlake.ai/document-ingestion/parsing/key-value-extraction.md
+    - https://docs.tensorlake.ai/document-ingestion/parsing/header-correction.md
+    - https://docs.tensorlake.ai/document-ingestion/parsing/table-merging.md
+    - https://docs.tensorlake.ai/document-ingestion/parsing/signature.md
+    - https://docs.tensorlake.ai/document-ingestion/parsing/barcode.md
+    - https://docs.tensorlake.ai/document-ingestion/parsing/summarization.md
+    - https://docs.tensorlake.ai/document-ingestion/datasets/create.md
+    - https://docs.tensorlake.ai/document-ingestion/datasets/data.md
+  sdk_version: "0.4.39"
+  last_verified: "2026-04-07"
+
+integrations.md:
+  sources:
+    - https://docs.tensorlake.ai/integrations/overview.md
+    - https://docs.tensorlake.ai/integrations/langchain.md
+    - https://docs.tensorlake.ai/integrations/chroma.md
+    - https://docs.tensorlake.ai/integrations/qdrant.md
+    - https://docs.tensorlake.ai/integrations/databricks.md
+    - https://docs.tensorlake.ai/integrations/motherduck.md
+  sdk_version: "0.4.39"
+  last_verified: "2026-04-07"
+
+platform.md:
+  sources:
+    - https://docs.tensorlake.ai/platform/webhooks/overview.md
+    - https://docs.tensorlake.ai/platform/webhooks/configuration.md
+    - https://docs.tensorlake.ai/platform/webhooks/signature-verification.md
+    - https://docs.tensorlake.ai/platform/access-control.md
+    - https://docs.tensorlake.ai/platform/authentication.md
+    - https://docs.tensorlake.ai/platform/eu-data-residency.md
+  sdk_version: "0.4.39"
+  last_verified: "2026-04-07"
+
+sandbox_advanced.md:
+  sources:
+    - https://docs.tensorlake.ai/sandboxes/skills-in-sandboxes.md
+    - https://docs.tensorlake.ai/sandboxes/ai-code-execution.md
+    - https://docs.tensorlake.ai/sandboxes/data-analysis.md
+    - https://docs.tensorlake.ai/sandboxes/cicd-build.md
+  sdk_version: "0.4.39"
+  last_verified: "2026-04-07"
+
+troubleshooting.md:
+  sources:
+    - https://docs.tensorlake.ai/applications/overview.md
+    - https://docs.tensorlake.ai/applications/production/troubleshooting.md
+    - https://docs.tensorlake.ai/document-ingestion/production/integration.md
+    - https://docs.tensorlake.ai/document-ingestion/production/benchmarks.md
+  sdk_version: "0.4.39"
+  last_verified: "2026-04-07"

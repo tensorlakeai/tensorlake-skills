@@ -1,0 +1,110 @@
+name: Drift Check — Skill vs Live Docs
+
+on:
+  schedule:
+    # Every Monday at 09:00 UTC
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      threshold:
+        description: "Minimum new symbols to flag as drift (default 5)"
+        required: false
+        default: "5"
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  drift-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Fetch live docs
+        run: python .github/scripts/fetch_docs.py --llms-txt
+
+      - name: Check for drift
+        id: drift
+        run: |
+          THRESHOLD="${{ github.event.inputs.threshold || '5' }}"
+          if python .github/scripts/check_drift.py --threshold "$THRESHOLD"; then
+            echo "drifted=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "drifted=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload drift report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-report
+          path: .github/scripts/drift-report.md
+
+      - name: Open or update GitHub Issue
+        if: steps.drift.outputs.drifted == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('.github/scripts/drift-report.md', 'utf8');
+
+            const title = '🔄 Skill drift detected — bundled references may be outdated';
+            const label = 'drift';
+
+            // Find an existing open drift issue to update (avoid duplicates).
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+              per_page: 1,
+            });
+
+            const body = [
+              `**Automated drift check — ${new Date().toISOString().slice(0, 10)}**\n`,
+              report,
+              '\n---',
+              `Run: [${context.runId}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+            ].join('\n');
+
+            if (issues.length > 0) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues[0].number,
+                body,
+              });
+              console.log(`Updated existing issue #${issues[0].number}`);
+            } else {
+              // Ensure the label exists.
+              try {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label,
+                  color: 'fbca04',
+                  description: 'Automated drift detection between skill refs and live docs',
+                });
+              } catch (e) {
+                // Label already exists — fine.
+              }
+
+              const created = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: [label],
+              });
+              console.log(`Created issue #${created.data.number}`);
+            }

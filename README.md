@@ -30,7 +30,7 @@ The skill is especially useful for tasks like:
 - building agentic applications with an orchestrator and specialist sub-agents
 - coordinating parallel agents and collecting their outputs
 - building demos and prototypes that show why agent infrastructure matters
-Works with any LLM provider (OpenAI, Anthropic) and any agent framework (LangChain, CrewAI, LlamaIndex). Tensorlake is the infrastructure layer — bring your own models and frameworks.
+Works with any LLM provider (OpenAI, Anthropic) and any agent framework (LangChain, etc.). Tensorlake is the infrastructure layer — bring your own models and frameworks.
 
 The skill triggers automatically when you ask the agent to:
 
@@ -70,14 +70,105 @@ Tensorlake requires a `TENSORLAKE_API_KEY` configured in the local environment. 
 
 ```
 tensorlake-skills/
-├── SKILL.md              # Skill definition (Claude Code, Google ADK)
-├── AGENTS.md             # Skill definition (OpenAI Codex)
+├── SKILL.md                  # Skill definition (Claude Code, Google ADK)
+├── AGENTS.md                 # Skill definition (OpenAI Codex)
+├── CHANGELOG.md              # Changes tracked per SDK version
+├── .claude-plugin/
+│   ├── plugin.json               # Claude Code plugin metadata
+│   └── marketplace.json          # Marketplace listing
+├── scripts/
+│   └── bump-version.sh          # Version bump automation
+├── .github/
+│   ├── workflows/
+│   │   └── sync-check.yml        # Weekly drift detection (CI)
+│   └── scripts/
+│       ├── fetch_docs.py         # Fetch live doc pages
+│       ├── check_drift.py        # Compare fetched vs bundled
+│       └── sources.yaml          # Map: reference file → source URLs
 └── references/
-    ├── applications_sdk.md   # Orchestrate API reference
-    ├── sandbox_sdk.md        # Sandbox API reference
-    ├── documentai_sdk.md     # DocumentAI API reference
-    └── integrations.md       # Integration patterns (LangChain, CrewAI, etc.)
+    ├── applications_sdk.md       # Orchestrate API reference
+    ├── sandbox_sdk.md            # Sandbox API reference
+    ├── documentai_sdk.md         # DocumentAI API reference
+    ├── integrations.md           # Integration patterns (LangChain, OpenAI, ChromaDB, Qdrant, etc.)
+    ├── platform.md               # Webhooks, auth, access control, EU data residency
+    ├── sandbox_advanced.md       # Skills-in-sandboxes, AI code execution, data analysis, CI/CD
+    └── troubleshooting.md        # Common issues, production integration, benchmarks
 ```
+
+## Versioning
+
+This skill uses [SemVer](https://semver.org/) for its own version, independent of the TensorLake SDK version it documents.
+
+- **Major** — breaking changes (renamed/removed reference files, restructured skill)
+- **Minor** — new reference files, significant content additions, new SDK version coverage
+- **Patch** — fixes, small content updates, drift corrections
+
+The TensorLake SDK version being documented is tracked separately in `sources.yaml` and in the source headers at the top of each reference file.
+
+### Bumping the Version
+
+Use `scripts/bump-version.sh` to update the version across all files:
+
+```bash
+./scripts/bump-version.sh patch                # 2.0.0 -> 2.0.1
+./scripts/bump-version.sh minor                # 2.0.0 -> 2.1.0
+./scripts/bump-version.sh major                # 2.0.0 -> 3.0.0
+./scripts/bump-version.sh minor --sdk 0.5.0    # bump + update SDK version in changelog
+```
+
+The script:
+1. Reads the current version from `SKILL.md` frontmatter
+2. Bumps major, minor, or patch
+3. Updates `SKILL.md` and `AGENTS.md`
+4. Stamps the `[Unreleased]` section in `CHANGELOG.md` with the new version and today's date
+5. Prints the git commands to commit and tag
+
+### Release Workflow
+
+```bash
+# 1. Make your changes to reference files, SKILL.md, etc.
+
+# 2. Add an [Unreleased] section to CHANGELOG.md with your changes
+
+# 3. Run the bump script
+./scripts/bump-version.sh minor
+
+# 4. Commit, tag, and push
+git add -A
+git commit -m "release: v2.1.0"
+git tag v2.1.0
+git push origin HEAD && git push origin v2.1.0
+```
+
+## Maintaining References
+
+### Source Tracking
+
+Each reference file has a source header that tracks which doc pages it was built from:
+
+```html
+<!--
+Source:
+  - https://docs.tensorlake.ai/sandboxes/lifecycle.md
+  - https://docs.tensorlake.ai/sandboxes/commands.md
+SDK version: tensorlake 0.4.39
+Last verified: 2026-04-07
+-->
+```
+
+The full mapping is in `.github/scripts/sources.yaml`.
+
+### Drift Detection
+
+A weekly GitHub Action (`sync-check.yml`) fetches the live TensorLake docs and compares them against the bundled reference files. If new APIs, removed endpoints, or changed signatures are detected, it opens a GitHub Issue with a summary of what drifted.
+
+### Maintenance Cadence
+
+| Frequency | Action |
+|-----------|--------|
+| Weekly (automated) | CI drift-check runs, opens issue if divergence detected |
+| Per SDK release | Manual update of reference files + bump version |
+| Monthly | Review gap coverage — are new doc pages appearing that need a new reference file? |
 
 ## Documentation
 

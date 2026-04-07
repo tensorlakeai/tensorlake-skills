@@ -1,3 +1,26 @@
+<!--
+Source:
+  - https://docs.tensorlake.ai/document-ingestion/overview.md
+  - https://docs.tensorlake.ai/document-ingestion/quickstart.md
+  - https://docs.tensorlake.ai/document-ingestion/parsing/read.md
+  - https://docs.tensorlake.ai/document-ingestion/parsing/structured-extraction.md
+  - https://docs.tensorlake.ai/document-ingestion/parsing/page-classification.md
+  - https://docs.tensorlake.ai/document-ingestion/parsing/edit.md
+  - https://docs.tensorlake.ai/document-ingestion/parsing/parse-output.md
+  - https://docs.tensorlake.ai/document-ingestion/parsing/docx-parsing.md
+  - https://docs.tensorlake.ai/document-ingestion/parsing/chart-extraction.md
+  - https://docs.tensorlake.ai/document-ingestion/parsing/key-value-extraction.md
+  - https://docs.tensorlake.ai/document-ingestion/parsing/header-correction.md
+  - https://docs.tensorlake.ai/document-ingestion/parsing/table-merging.md
+  - https://docs.tensorlake.ai/document-ingestion/parsing/signature.md
+  - https://docs.tensorlake.ai/document-ingestion/parsing/barcode.md
+  - https://docs.tensorlake.ai/document-ingestion/parsing/summarization.md
+  - https://docs.tensorlake.ai/document-ingestion/datasets/create.md
+  - https://docs.tensorlake.ai/document-ingestion/datasets/data.md
+SDK version: tensorlake 0.4.39
+Last verified: 2026-04-07
+-->
+
 # TensorLake DocumentAI SDK Reference
 
 ## Imports
@@ -9,9 +32,7 @@ from tensorlake.documentai import (
     PageClassConfig, MimeType, FormFillingOptions,
     ChunkingStrategy, OcrPipelineProvider, ModelProvider,
     TableOutputMode, TableParsingFormat, PageFragmentType,
-    ParseStatus, PartitionStrategy,
-    PartitionConfig, SimplePartitionStrategy, PatternPartitionStrategy, PatternConfig,
-    DatasetDataFilter,
+    ParseStatus,
 )
 ```
 
@@ -99,11 +120,13 @@ class Invoice(BaseModel):
     vendor_name: str
 
 extraction_id = doc_ai.extract(
-    StructuredExtractionOptions(                # First positional arg
-        schema_name="invoice",
-        json_schema=Invoice,
-    ),
     file_id=file_id,
+    structured_extraction_options=[
+        StructuredExtractionOptions(
+            schema_name="invoice",
+            json_schema=Invoice,
+        ),
+    ],
 )
 
 result = doc_ai.wait_for_completion(extraction_id)
@@ -115,8 +138,10 @@ for data in result.structured_data:
 
 ```python
 classify_id = doc_ai.classify(
-    [PageClassConfig(name="invoice", description="An invoice document")],  # First positional arg
     file_id=file_id,
+    page_classifications=[
+        PageClassConfig(name="invoice", description="An invoice document"),
+    ],
 )
 result = doc_ai.wait_for_completion(classify_id)
 ```
@@ -125,19 +150,65 @@ result = doc_ai.wait_for_completion(classify_id)
 
 ```python
 edit_id = doc_ai.edit(
-    FormFillingOptions(                         # First positional arg
+    file_id=file_id,
+    form_filling=FormFillingOptions(
         fill_prompt="Fill with company name 'Acme Corp'",
         ignore_source_values=False,             # True to overwrite existing values
         no_acroform=False,                      # True to skip PDF AcroForm detection
         no_widget_detection=False,              # True to skip visual widget analysis
     ),
-    file_id=file_id,
 )
 result = doc_ai.wait_for_completion(edit_id)
 # result.filled_pdf_base64, result.form_filling_metadata
 ```
 
 Note: `edit()` does NOT have a `page_range` parameter.
+
+## DOCX Tracked Changes & Comments
+
+When parsing DOCX files containing Microsoft Word revision history, TensorLake preserves collaboration metadata in the output markup.
+
+### Tracked Changes Markup
+
+| Change Type | HTML Tag | Example |
+|-------------|----------|---------|
+| Insertions | `<ins>` | `<ins>added text</ins>` |
+| Deletions | `<del>` | `<del>removed text</del>` |
+
+### Comments Markup
+
+| Comment Type | Markup | Example |
+|-------------|--------|---------|
+| Text-anchored | `<span class="comment" data-note="...">` | `<span class="comment" data-note="Review this">highlighted text</span>` |
+| Cursor-position | `<!-- Comment: ... -->` | `<!-- Comment: Need to verify this -->` |
+
+### Extracting Changes Programmatically
+
+```python
+from bs4 import BeautifulSoup
+
+result = doc_ai.parse_and_wait(file="contract_with_edits.docx")
+
+for page in result.pages:
+    for fragment in page.page_fragments:
+        soup = BeautifulSoup(fragment.content.content, "html.parser")
+
+        # Find all insertions
+        for ins in soup.find_all("ins"):
+            print(f"Added: {ins.get_text(strip=True)}")
+
+        # Find all deletions
+        for del_tag in soup.find_all("del"):
+            print(f"Removed: {del_tag.get_text(strip=True)}")
+
+        # Find all comments
+        for span in soup.find_all("span", class_="comment"):
+            text = span.get_text(strip=True)
+            note = span.get("data-note", "")
+            print(f"Comment on '{text}': {note}")
+```
+
+**Important:** Tracked changes are only preserved when parsing DOCX files that contain Word's revision history. No special `ParsingOptions` flags are needed — change tracking is automatic for DOCX files with revisions.
 
 ## Datasets
 
@@ -157,9 +228,8 @@ dataset = doc_ai.update_dataset(dataset_id, ...)
 doc_ai.delete_dataset(dataset_id)
 
 # Parse a file into a dataset
-parse_id = doc_ai.parse_dataset_file(dataset, file_id)
-# Or parse and wait:
-result = doc_ai.parse_dataset_file(dataset, file_id, wait_for_completion=True)
+parse_id = doc_ai.parse_dataset_file(dataset=dataset, file=file_id)
+result = doc_ai.wait_for_completion(parse_id)
 
 data = doc_ai.get_dataset_data(dataset)     # -> PaginatedResult[ParseResult]
 ```
@@ -171,7 +241,7 @@ ParsingOptions(
     chunking_strategy: ChunkingStrategy | None = None,
     ocr_model: OcrPipelineProvider | None = None,
     table_output_mode: TableOutputMode | None = None,
-    table_parsing_format: TableParsingFormat | None = None,
+    table_parsing_strategy: TableParsingFormat | None = None,
     include_images: bool | None = None,
     signature_detection: bool | None = None,
     barcode_detection: bool | None = None,         # Requires TENSORLAKE03
@@ -227,23 +297,23 @@ StructuredExtractionOptions(
 - `ModelProvider.SONNET` — Anthropic Claude Sonnet
 - `ModelProvider.GPT4OMINI` — OpenAI GPT-4o Mini
 
-**Partition Strategy:**
+**Partition Strategy** (passed as dict):
 
 ```python
 # Simple strategies
-SimplePartitionStrategy(strategy="none")      # Entire document
-SimplePartitionStrategy(strategy="page")      # Each page separately
-SimplePartitionStrategy(strategy="section")   # Groups by whitespace
-SimplePartitionStrategy(strategy="fragment")  # Individual elements
+{"strategy": "none"}         # Entire document
+{"strategy": "page"}         # Each page separately
+{"strategy": "section"}      # Groups by whitespace
+{"strategy": "fragment"}     # Individual elements
 
 # Pattern-based
-PatternPartitionStrategy(
-    strategy="patterns",
-    patterns=PatternConfig(
-        start_patterns=["Invoice No"],
-        end_patterns=["Total Due"],
-    )
-)
+{
+    "strategy": "patterns",
+    "patterns": {
+        "start_patterns": ["Invoice No"],
+        "end_patterns": ["Total Due"],
+    }
+}
 ```
 
 ## Enrichment Options

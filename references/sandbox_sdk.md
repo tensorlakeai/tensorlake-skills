@@ -1,3 +1,17 @@
+<!--
+Source:
+  - https://docs.tensorlake.ai/sandboxes/introduction.md
+  - https://docs.tensorlake.ai/sandboxes/lifecycle.md
+  - https://docs.tensorlake.ai/sandboxes/commands.md
+  - https://docs.tensorlake.ai/sandboxes/file-operations.md
+  - https://docs.tensorlake.ai/sandboxes/snapshots.md
+  - https://docs.tensorlake.ai/sandboxes/processes.md
+  - https://docs.tensorlake.ai/sandboxes/networking.md
+  - https://docs.tensorlake.ai/sandboxes/images.md
+SDK version: tensorlake 0.4.39
+Last verified: 2026-04-07
+-->
+
 # TensorLake Sandbox SDK Reference
 
 ## Imports
@@ -65,8 +79,6 @@ with client.create_and_connect(
 ) as sandbox:
     result = sandbox.run("echo", ["hello"])
 
-# Or connect to existing sandbox
-sandbox = client.connect(sandbox_id)
 ```
 
 ### Snapshots
@@ -92,31 +104,36 @@ Snapshots restore filesystem and memory state. Inherited settings (image, resour
 tl sbx clone <sandbox-id>   # Snapshot + restore in one operation
 ```
 
-Note: Cloning and suspending named sandboxes are CLI-only operations, not available in the Python SDK.
+Note: Cloning is a CLI-only operation, not available in the Python SDK.
 
-### Sandbox Pools
+### Suspend & Resume
 
-```python
-pool = client.create_pool(
-    image: str | None = None,
-    cpus: float = 1.0,
-    memory_mb: int = 2048,
-    secret_names: list[str] | None = None,
-    timeout_secs: int = 0,
-    entrypoint: list[str] | None = None,
-    max_containers: int | None = None,
-    warm_containers: int | None = None,
-)
-pool_id = pool.pool_id
+Suspend/resume is available for **named sandboxes only**. Ephemeral sandboxes return 400.
 
-info = client.get_pool(pool_id)        # -> SandboxPoolInfo
-pools = client.list_pools()            # -> list[SandboxPoolInfo]
-info = client.update_pool(pool_id, ...)
-client.delete_pool(pool_id)
+**CLI:**
 
-# Claim a sandbox from the pool
-response = client.claim(pool_id)
+```bash
+tl sbx suspend my-env
+tl sbx resume my-env
 ```
+
+**REST API:**
+
+```bash
+# Suspend — snapshots the sandbox and terminates its live container
+curl -X POST https://api.tensorlake.ai/sandboxes/{sandbox_id_or_name}/suspend \
+  -H "Authorization: Bearer $TL_API_KEY"
+# 202 = suspend initiated, 200 = already suspended
+
+# Resume — restores from snapshot
+curl -X POST https://api.tensorlake.ai/sandboxes/{sandbox_id_or_name}/resume \
+  -H "Authorization: Bearer $TL_API_KEY"
+# 202 = resume initiated, 200 = already running
+```
+
+**Status codes (both endpoints):** 400 = cannot suspend/resume in current state (or ephemeral), 401 = invalid credentials, 403 = insufficient permissions, 404 = not found.
+
+Note: Suspend/resume is not available in the Python SDK — use CLI or REST API. However, many sandbox-proxy requests (e.g., hitting the sandbox URL) automatically resume suspended sandboxes.
 
 ## Sandbox — Interact with Running Sandbox
 
@@ -163,6 +180,9 @@ proc = sandbox.start_process(
     args: list[str] | None = None,
     env: dict[str, str] | None = None,
     working_dir: str | None = None,
+    stdin_mode: str | None = None,           # "pipe" to enable stdin writing
+    stdout_mode: str | None = None,          # "capture" to capture stdout
+    stderr_mode: str | None = None,          # "capture" to capture stderr
 )
 # proc.pid, proc.status
 
@@ -178,6 +198,38 @@ sandbox.send_signal(proc.pid, signal.SIGTERM)  # Graceful stop
 sandbox.send_signal(proc.pid, signal.SIGKILL)  # Force kill
 ```
 
+### Process Stdin/Stdout/Stderr (Granular APIs)
+
+For fine-grained I/O control, use `stdin_mode="pipe"` when starting a process:
+
+```python
+# Start process with stdin pipe
+proc = sandbox.start_process("python", ["-i"], stdin_mode="pipe")
+
+# Write to stdin (SDK wraps the REST endpoint)
+# REST: POST /api/v1/processes/<pid>/stdin
+# Close stdin when done:
+# REST: POST /api/v1/processes/<pid>/stdin/close
+```
+
+**Stdout/Stderr streaming (SSE):**
+
+```python
+# Stream output line-by-line as Server-Sent Events
+for event in sandbox.follow_output(proc.pid):
+    # event.line — output content
+    # event.timestamp — when the line was emitted
+    # event type: "output" (data) or "eof" (stream complete)
+    print(event.line, end="")
+```
+
+**REST equivalents:**
+- Stream output: `GET /api/v1/processes/<pid>/output/follow` (SSE — emits `output` and `eof` events)
+- Write stdin: `POST /api/v1/processes/<pid>/stdin` (body: raw bytes)
+- Close stdin: `POST /api/v1/processes/<pid>/stdin/close`
+- Send signal: `POST /api/v1/processes/<pid>/signal` (body: `{"signal": 15}`)
+- Kill process: `DELETE /api/v1/processes/<pid>`
+
 ### Interactive PTY Session
 
 ```python
@@ -187,13 +239,6 @@ session = sandbox.create_pty_session(
     cols=80,
 )
 ws_url = sandbox.pty_ws_url(session["session_id"], session["token"])
-```
-
-### Cleanup
-
-```python
-sandbox.close()       # Close connection, sandbox keeps running
-# client.delete(sandbox_id) to terminate
 ```
 
 ## Sandbox Images

@@ -1,3 +1,29 @@
+<!--
+Source:
+  - https://docs.tensorlake.ai/applications/introduction.md
+  - https://docs.tensorlake.ai/applications/concepts.md
+  - https://docs.tensorlake.ai/applications/building-workflows.md
+  - https://docs.tensorlake.ai/applications/futures.md
+  - https://docs.tensorlake.ai/applications/map-reduce.md
+  - https://docs.tensorlake.ai/applications/async-functions.md
+  - https://docs.tensorlake.ai/applications/images.md
+  - https://docs.tensorlake.ai/applications/durability.md
+  - https://docs.tensorlake.ai/applications/crash-recovery.md
+  - https://docs.tensorlake.ai/applications/retries.md
+  - https://docs.tensorlake.ai/applications/secrets.md
+  - https://docs.tensorlake.ai/applications/timeouts.md
+  - https://docs.tensorlake.ai/applications/scale-out-queuing.md
+  - https://docs.tensorlake.ai/applications/scaling-agents.md
+  - https://docs.tensorlake.ai/applications/observability.md
+  - https://docs.tensorlake.ai/applications/cron-scheduler.md
+  - https://docs.tensorlake.ai/applications/parallel-sub-agents.md
+  - https://docs.tensorlake.ai/applications/sandboxes.md
+  - https://docs.tensorlake.ai/applications/guides/streaming-progress.md
+  - https://docs.tensorlake.ai/applications/guides/logging.md
+SDK version: tensorlake 0.4.39
+Last verified: 2026-04-07
+-->
+
 # TensorLake Applications SDK Reference
 
 ## Imports
@@ -97,10 +123,10 @@ future = my_function.future.map([item1, item2, item3])
 results = future.result()
 
 # Reduce: fold items with function (signature: accumulated, next_item -> accumulated)
-total = add.reduce([1, 2, 3, 4, 5], initial=0)
+total = add.reduce([1, 2, 3, 4, 5], 0)
 
 # Non-blocking reduce
-future = add.future.reduce([1, 2, 3, 4, 5], initial=0)
+future = add.future.reduce([1, 2, 3, 4, 5], 0)
 total = future.result()
 
 # Chain: map over a future's result
@@ -223,10 +249,10 @@ ctx.progress.update(current=10, total=100, message="Processing...")
 Build custom container images for functions.
 
 ```python
-img = Image(name="my-image", base_image="python:3.11-slim")
-img.run("pip install numpy torch")
-img.env("MODEL_PATH", "/models/v1")
-img.copy("src", "/app/src")
+img = (
+    Image(name="my-image", base_image="python:3.11-slim")
+    .run("pip install numpy torch")
+)
 
 @function(image=img, gpu="T4")
 def inference(data: str) -> str:
@@ -238,7 +264,7 @@ def inference(data: str) -> str:
 
 Default base image: `python:{LOCAL_PYTHON_VERSION}-slim-bookworm`
 
-Image builder methods (chainable): `.run(command)`, `.env(key, value)`, `.copy(src, dest)`, `.add(src, dest)`
+Image builder methods (chainable): `.run(command)`
 
 ## File Type
 

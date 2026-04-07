@@ -1,7 +1,7 @@
 {
   "name": "tensorlake",
-  "version": "1.0.0",
-  "description": "Build agentic workflow applications, sandboxed execution environments, and document processing pipelines using the TensorLake SDK.",
+  "version": "2.0.0",
+  "description": "Tensorlake SDK for agent sandboxes and sandbox-native orchestration. Use when building AI agents that need sandboxed execution environments, isolated tool calls, or durable workflow orchestration.",
   "author": "TensorLake",
   "homepage": "https://github.com/tensorlakeai/tensorlake-skills",
   "allowed_urls": [
