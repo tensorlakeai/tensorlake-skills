@@ -2,7 +2,7 @@
 
 All notable changes to the TensorLake skill are documented here.
 
-## [Unreleased] — SDK 0.4.39
+## [2.0.0] — SDK 0.4.39 — 2026-04-07
 
 ### Added
 - **platform.md** — webhooks (event types, payloads, signature verification), authentication, access control (org/project roles), EU data residency
@@ -15,7 +15,7 @@ All notable changes to the TensorLake skill are documented here.
 ### Changed
 - `sources.yaml` — moved all `_uncovered` entries into proper file mappings for the 3 new reference files
 
-## [Initial] — SDK 0.4.39 — 2026-04-07
+## [1.0.0] — SDK 0.4.39 — 2026-04-07
 
 ### Added
 - **sandbox_sdk.md** — SandboxClient lifecycle, commands, file ops, snapshots, processes, networking, images
