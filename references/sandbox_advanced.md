@@ -57,11 +57,11 @@ CLAUDE_CODE_IMAGE = (
 )
 ```
 
-### Template Creation
+### Image Creation
 
 ```bash
-tl sbx create-template template.py --name claude-code-skills
-tl sbx new --template claude-code-skills
+tl sbx image create template.py --name claude-code-skills
+tl sbx new --image claude-code-skills
 ```
 
 ### Runtime Installation (SDK)
