@@ -89,6 +89,7 @@ THIRD_PARTY_CLASSES = frozenset({
     "ClaudeAgentOptions", "ApprovalDeniedError", "ValidationError",
     "ZeroDivisionError", "ModuleNotFoundError", "PersistentClient",
     "CitedResponse", "PersonSearchResult", "ProcessingResult",
+    "RuntimeError", "ModelSettings",
 })
 
 # Third-party API parameter names found in code examples — not Tensorlake API surface.
@@ -102,8 +103,12 @@ THIRD_PARTY_PARAMS = frozenset({
     # Python stdlib / third-party logging
     "exc_info", "cache_logger_on_first_use", "capture_output",
     "stack_info", "stacklevel",
+    # Python stdlib / setuptools / os
+    "exist_ok", "package_dir",
     # Agent SDK parameters (non-Tensorlake)
-    "permission_mode", "user_id",
+    "permission_mode", "user_id", "model_settings", "tool_choice",
+    # sklearn / ML library parameters
+    "random_state", "return_x_y",
 })
 
 # Regex for example variable names: things like agent_a, llm_image, research_image.
@@ -117,6 +122,8 @@ _EXAMPLE_VAR_RE = re.compile(
     r"[a-z]+_value|"                     # input_value, query_value
     r"\w+_client|"                       # sandbox_client, http_client
     r"\w+_numbers|"                      # doubled_numbers, squared_numbers
+    r"\w+_results|"                      # tool_results, search_results
+    r"[A-Z][A-Z0-9_]*_(?:TOOL|FUNCTION|PROMPT|RESULTS?)|"  # RUN_CODE_TOOL, etc.
     r"OPENAI_API_KEY|AWS_ACCESS_KEY|TENSORLAKE_API_KEY|ANTHROPIC_API_KEY"
     r")$"
 )
@@ -129,6 +136,7 @@ _MODULE_OWNERS: dict[str, list[str]] = {
     "sandbox_sdk.md": ["tensorlake.sandbox"],
     "sandbox_advanced.md": ["tensorlake.sandbox"],
     "documentai_sdk.md": ["tensorlake.document_ai", "tensorlake.documentai", "tensorlake.doc_ai"],
+    "troubleshooting.md": [],  # Cross-cutting guide — all tensorlake imports are examples
 }
 
 # Object names in method-call patterns → owning tensorlake module.
@@ -457,7 +465,7 @@ def main() -> int:
 
         # Filter cross-module symbols from both sides
         owned = _MODULE_OWNERS.get(ref_file)
-        if owned:
+        if owned is not None:
             ref_foreign = _extract_foreign_symbols(ref_text, owned)
             ref_symbols -= ref_foreign
 
@@ -475,7 +483,7 @@ def main() -> int:
 
         # Filter out symbols from cross-module tensorlake references
         owned = _MODULE_OWNERS.get(ref_file)
-        if owned:
+        if owned is not None:
             foreign = _extract_foreign_symbols(docs_text, owned)
             docs_symbols -= foreign
 
