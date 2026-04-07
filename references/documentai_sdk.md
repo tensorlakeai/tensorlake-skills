@@ -241,7 +241,7 @@ ParsingOptions(
     chunking_strategy: ChunkingStrategy | None = None,
     ocr_model: OcrPipelineProvider | None = None,
     table_output_mode: TableOutputMode | None = None,
-    table_parsing_format: TableParsingFormat | None = None,
+    table_parsing_strategy: TableParsingFormat | None = None,
     include_images: bool | None = None,
     signature_detection: bool | None = None,
     barcode_detection: bool | None = None,         # Requires TENSORLAKE03

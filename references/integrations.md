@@ -529,9 +529,9 @@ parse_id = doc_ai.extract(
 result = doc_ai.wait_for_completion(parse_id)
 
 records = []
-if result.status == ParseStatus.SUCCESS:
+if result.status == ParseStatus.SUCCESSFUL:
     for data in result.structured_data:
-        records.append(data)
+        records.append(data.data)
 
 df = pd.DataFrame(records)
 # spark.createDataFrame(df).write.mode("append").saveAsTable("companies.company_info")

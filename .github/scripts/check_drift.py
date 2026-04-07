@@ -172,7 +172,7 @@ _ROUTE_RULES: list[tuple[str, str]] = [
     ("/api-reference/v2/files/", "documentai_sdk.md"),
     ("/api-reference/v2/edit", "documentai_sdk.md"),
     ("/integrations/", "integrations.md"),
-    ("/platform/", "NEW: platform.md"),
+    ("/platform/", "platform.md"),
     ("/examples/", "_skip"),       # tutorials — not SDK reference
     ("/faqs/", "_skip"),
     ("/opensource/", "_skip"),
@@ -376,9 +376,10 @@ def main() -> int:
     out_path.write_text(report, encoding="utf-8")
     print(f"\nDrift report written to {out_path}")
 
-    # Determine exit code: drift if any ref has enough new symbols, or new pages exist.
+    # Determine exit code: drift if any ref has enough new or removed symbols, or new pages exist.
     significant = any(
         len(d.get("in_docs_not_ref", set())) >= args.threshold
+        or len(d.get("in_ref_not_docs", set())) >= args.threshold
         for d in ref_diffs.values()
     ) or len(new_pages) > 0
     return 1 if significant else 0
