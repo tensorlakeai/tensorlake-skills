@@ -4,8 +4,8 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/ai-code-execution.md
   - https://docs.tensorlake.ai/sandboxes/data-analysis.md
   - https://docs.tensorlake.ai/sandboxes/cicd-build.md
-SDK version: tensorlake 0.4.39
-Last verified: 2026-04-07
+SDK version: tensorlake 0.4.41
+Last verified: 2026-04-08
 -->
 
 # TensorLake Sandbox Advanced Patterns
@@ -124,6 +124,7 @@ sandbox = client.create_and_connect(snapshot_id=snapshot.snapshot_id)
 - **Reuse sandboxes** — creating new ones per tool call adds cold-start latency and loses state
 - **Set `allow_internet_access=False`** for untrusted code
 - **Pre-install deps via snapshots** or let agents `pip install` on demand
+- **Tear down** with `sandbox.close()` or `sandbox.terminate()` when the session ends
 - Files and packages persist across calls, but each Python invocation is a fresh process (re-import required)
 
 ---
