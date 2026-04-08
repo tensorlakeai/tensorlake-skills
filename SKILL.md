@@ -84,7 +84,7 @@ For integration examples (LangChain, OpenAI, Anthropic, multi-agent orchestratio
 5. **Local dev**: `run_local_application(fn, *args)` — no containers needed.
 6. **Remote deploy**: `tensorlake deploy path/to/app.py` then `run_remote_application(fn, *args)`.
 7. **Custom images**: Use `Image(base_image=...).run("pip install ...")` for dependencies.
-8. **Secrets**: Declare with `secrets=["MY_SECRET"]` in `@function()`, manage via `tensorlake secrets`.
+8. **Secrets**: Declare with `secrets=["MY_SECRET"]` in `@function()`, manage via `tensorlake secrets <ls|set|rm>`.
 
 ## API Reference
 
@@ -103,10 +103,10 @@ Bundled references (use when building with Tensorlake):
 ## CLI Commands
 
 ```bash
-tl deploy path/to/app.py                # Deploy to cloud
-tl parse --file-path doc.pdf            # Parse document
-tl login                                # Authenticate
-tl secrets                              # Manage secrets
-tl sbx new                              # Create a new sandbox
-tl sbx image create img.py --name NAME   # Build sandbox image
+tl deploy path/to/app.py                            # Deploy to cloud
+tl parse doc.pdf                                   # Parse document
+tl login                                           # Authenticate
+tl secrets ls                                      # List secrets
+tl sbx new                                         # Create a new sandbox
+tl sbx image create Dockerfile --registered-name NAME  # Register a sandbox image
 ```
