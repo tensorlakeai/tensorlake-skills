@@ -60,10 +60,17 @@ def main() -> int:
 
     out = Path(args.output_dir)
     out.mkdir(parents=True, exist_ok=True)
+    previous_manifest_path = out / "manifest.yaml"
+    previous_manifest = {}
+    if previous_manifest_path.exists():
+        previous_manifest = yaml.safe_load(previous_manifest_path.read_text(encoding="utf-8")) or {}
+    previous_checksums: dict[str, str] = previous_manifest.get("checksums", {}) or {}
 
     total = 0
     failed = 0
+    retained = 0
     checksums: dict[str, str] = {}
+    llms_txt_fetched = False
 
     for ref_file, meta in sources.items():
         urls = meta.get("sources", [])
@@ -79,8 +86,13 @@ def main() -> int:
             print(f"Fetching {url} ...")
             body = fetch(url)
             if body is None:
-                failed += 1
-                print(f"  [FAIL] Could not fetch {url}")
+                if dest.exists() and url in previous_checksums:
+                    checksums[url] = previous_checksums[url]
+                    retained += 1
+                    print(f"  [retain] Keeping previously fetched copy for {url}")
+                else:
+                    failed += 1
+                    print(f"  [FAIL] Could not fetch {url}")
                 continue
 
             dest = ref_dir / f"{name}.txt"
@@ -95,18 +107,26 @@ def main() -> int:
         if body:
             dest = out / "llms.txt"
             dest.write_text(body, encoding="utf-8")
+            checksums["https://docs.tensorlake.ai/llms.txt"] = hashlib.sha256(body.encode()).hexdigest()[:16]
+            llms_txt_fetched = True
             print(f"  -> {dest} ({len(body)} chars)")
+        elif (out / "llms.txt").exists() and "https://docs.tensorlake.ai/llms.txt" in previous_checksums:
+            checksums["https://docs.tensorlake.ai/llms.txt"] = previous_checksums["https://docs.tensorlake.ai/llms.txt"]
+            llms_txt_fetched = True
+            retained += 1
+            print("  [retain] Keeping previously fetched copy for llms.txt")
 
     # Write a manifest so check_drift.py knows what was fetched.
     manifest = out / "manifest.yaml"
     manifest.write_text(
         yaml.dump({"fetched_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                    "total": total, "failed": failed, "checksums": checksums},
+                    "total": total, "failed": failed, "retained": retained,
+                    "checksums": checksums, "llms_txt_fetched": llms_txt_fetched},
                    default_flow_style=False),
         encoding="utf-8",
     )
 
-    print(f"\nDone: {total - failed}/{total} pages fetched, {failed} failures.")
+    print(f"\nDone: {total - failed}/{total} pages available, {retained} retained, {failed} failures.")
     return 1 if failed > 0 else 0  # Fail on any fetch failure to avoid false drift reports
 
 

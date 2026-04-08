@@ -1,8 +1,11 @@
 <!--
 Source:
   - https://docs.tensorlake.ai/applications/introduction.md
+  - https://docs.tensorlake.ai/applications/quickstart.md
+  - https://docs.tensorlake.ai/applications/architecture.md
   - https://docs.tensorlake.ai/applications/concepts.md
   - https://docs.tensorlake.ai/applications/building-workflows.md
+  - https://docs.tensorlake.ai/applications/error-handling.md
   - https://docs.tensorlake.ai/applications/futures.md
   - https://docs.tensorlake.ai/applications/map-reduce.md
   - https://docs.tensorlake.ai/applications/async-functions.md
@@ -20,8 +23,9 @@ Source:
   - https://docs.tensorlake.ai/applications/sandboxes.md
   - https://docs.tensorlake.ai/applications/guides/streaming-progress.md
   - https://docs.tensorlake.ai/applications/guides/logging.md
-SDK version: tensorlake 0.4.39
-Last verified: 2026-04-07
+  - https://docs.tensorlake.ai/applications/guides/autoscaling.md
+SDK version: tensorlake 0.4.42
+Last verified: 2026-04-08
 -->
 
 # TensorLake Applications SDK Reference
@@ -203,6 +207,11 @@ print(request.id)    # Request identifier
 output = request.output()
 ```
 
+```bash
+# Deploy before running remotely
+tl deploy path/to/app.py
+```
+
 ## Durable Execution
 
 Every `@function()` call is automatically checkpointed. On replay, previously successful calls return cached outputs instantly.
@@ -350,3 +359,10 @@ Redeploy applications after updating secrets. AES-256-GCM encryption, in-memory 
 ## Observability
 
 Every `@function()` call is automatically traced. The dashboard shows function call sequence, timing (including cold starts), dependency visualization, and status. Use standard Python `logging` module; logs are captured automatically.
+
+```python
+from tensorlake.applications import Logger
+
+logger = Logger.get_logger(module="my_app")
+logger.info("starting run", log_attributes={"request_id": "req-123"})
+```

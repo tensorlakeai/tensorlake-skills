@@ -3,11 +3,19 @@ Source:
   - https://docs.tensorlake.ai/platform/webhooks/overview.md
   - https://docs.tensorlake.ai/platform/webhooks/configuration.md
   - https://docs.tensorlake.ai/platform/webhooks/signature-verification.md
+  - https://docs.tensorlake.ai/platform/webhooks/payloads/document-ingestion.md
+  - https://docs.tensorlake.ai/platform/webhooks/payloads/workflows.md
+  - https://docs.tensorlake.ai/platform/webhooks/testing.md
   - https://docs.tensorlake.ai/platform/access-control.md
   - https://docs.tensorlake.ai/platform/authentication.md
   - https://docs.tensorlake.ai/platform/eu-data-residency.md
-SDK version: tensorlake 0.4.39
-Last verified: 2026-04-07
+  - https://docs.tensorlake.ai/platform/billing.md
+  - https://docs.tensorlake.ai/platform/playground/overview.md
+  - https://docs.tensorlake.ai/platform/playground/sample-documents.md
+  - https://docs.tensorlake.ai/platform/security.md
+  - https://docs.tensorlake.ai/platform/sso.md
+SDK version: tensorlake 0.4.42
+Last verified: 2026-04-08
 -->
 
 # TensorLake Platform Reference
