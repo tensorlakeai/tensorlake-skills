@@ -4,6 +4,10 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/ai-code-execution.md
   - https://docs.tensorlake.ai/sandboxes/data-analysis.md
   - https://docs.tensorlake.ai/sandboxes/cicd-build.md
+  - https://docs.tensorlake.ai/sandboxes/agentic-autoresearch.md
+  - https://docs.tensorlake.ai/sandboxes/agentic-rl-reproducible-env.md
+  - https://docs.tensorlake.ai/sandboxes/agentic-swarm-intelligence.md
+  - https://docs.tensorlake.ai/sandboxes/gspo-agentic-rl.md
 SDK version: tensorlake 0.4.42
 Last verified: 2026-04-08
 -->
@@ -259,6 +263,17 @@ asyncio.run(main())
 
 Use snapshots to avoid re-installing dependencies on each run.
 
+### Parallel Batch Execution
+
+```python
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+with ThreadPoolExecutor(max_workers=4) as pool:
+    futures = {pool.submit(run_model_benchmark, name, path): name for name, path in models.items()}
+    for future in as_completed(futures):
+        print(future.result())
+```
+
 ---
 
 ## CI/CD Build Pipelines
@@ -302,6 +317,9 @@ try:
     # Build artifacts
     sandbox.run("python", ["setup.py", "sdist", "bdist_wheel"],
         working_dir="/workspace/project")
+
+    # Download artifacts from the sandbox
+    wheel_bytes = sandbox.read_file("/workspace/project/dist/my_project.whl")
 finally:
     sandbox.close()
 ```

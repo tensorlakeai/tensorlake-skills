@@ -16,8 +16,8 @@ import argparse
 import json
 import re
 import sys
-from collections import Counter, defaultdict
-from dataclasses import dataclass, field
+from collections import Counter
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -37,6 +37,7 @@ JSON_FIELDS = "json_fields"
 PROSE = "prose"
 
 CONFIDENCE_ORDER = (HIGH_CONFIDENCE, MEDIUM_CONFIDENCE, LOW_CONFIDENCE)
+REPORT_CONFIDENCE_ORDER = (HIGH_CONFIDENCE,)
 
 HIGH_SIGNAL_KINDS = frozenset({IMPORTS, METHODS, DECORATORS, CLI})
 MEDIUM_SIGNAL_KINDS = frozenset({OPTIONS, JSON_FIELDS})
@@ -58,7 +59,9 @@ JSON_FIELD_RE = re.compile(r'["\']([a-zA-Z_][a-zA-Z0-9_]*)["\']\s*:')
 INLINE_CODE_RE = re.compile(r"`([^`\n]+)`")
 CAMEL_TOKEN_RE = re.compile(r"\b([a-z]+(?:[A-Z][a-z0-9]+)+)\b")
 SNAKE_TOKEN_RE = re.compile(r"\b([a-z]+(?:_[a-z0-9]+)+)\b")
-DOC_URL_RE = re.compile(r"https://docs\.tensorlake\.ai/[\w./-]+\.md")
+LLMS_LINK_RE = re.compile(
+    r"^\s*-\s+\[[^\]]+\]\((https://docs\.tensorlake\.ai/[\w./-]+\.md)\)(?::.*)?\s*$"
+)
 
 NOISE = frozenset(
     {
@@ -389,6 +392,10 @@ def _normalize_imports(text: str) -> str:
     )
 
 
+def slug(url: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9]+", "_", url.split("docs.tensorlake.ai/")[-1]).strip("_")
+
+
 def _to_snake_case(token: str) -> str:
     token = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", token)
     token = token.replace("-", "_")
@@ -689,7 +696,12 @@ def text_mentions_symbol(text: str, token: str) -> bool:
 
 
 def extract_doc_urls(llms_text: str) -> set[str]:
-    return set(DOC_URL_RE.findall(llms_text))
+    urls: set[str] = set()
+    for line in llms_text.splitlines():
+        match = LLMS_LINK_RE.match(line)
+        if match:
+            urls.add(match.group(1))
+    return urls
 
 
 def tracked_urls(sources: dict) -> set[str]:
@@ -710,6 +722,21 @@ def classify_new_pages(urls: list[str]) -> dict[str, list[str]]:
                 break
         buckets.setdefault(target, []).append(url)
     return buckets
+
+
+def source_urls_for_token(token: str, source_urls: list[str], fetched_subdir: Path) -> list[str]:
+    matches: list[str] = []
+    for url in source_urls:
+        txt_path = fetched_subdir / f"{slug(url)}.txt"
+        if not txt_path.exists():
+            continue
+        try:
+            text = txt_path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if text_mentions_symbol(text, token):
+            matches.append(url)
+    return matches
 
 
 def validate_fetch_corpus(
@@ -757,7 +784,12 @@ def validate_fetch_corpus(
     return problems
 
 
-def build_report(ref_diffs: dict[str, dict], new_pages: list[str], fetch_problems: list[str]) -> str:
+def build_report(
+    ref_diffs: dict[str, dict],
+    new_pages: list[str],
+    fetch_problems: list[str],
+    sources: dict,
+) -> str:
     lines = ["# Tensorlake Skill Drift Report", ""]
 
     if fetch_problems:
@@ -771,7 +803,7 @@ def build_report(ref_diffs: dict[str, dict], new_pages: list[str], fetch_problem
     has_drift = bool(fetch_problems)
     for ref_file, diff in sorted(ref_diffs.items()):
         sections = []
-        for confidence in CONFIDENCE_ORDER:
+        for confidence in REPORT_CONFIDENCE_ORDER:
             added = diff.get(f"{confidence}_in_docs_not_ref", set())
             removed = diff.get(f"{confidence}_in_ref_not_docs", set())
             if not added and not removed:
@@ -781,16 +813,31 @@ def build_report(ref_diffs: dict[str, dict], new_pages: list[str], fetch_problem
             continue
 
         has_drift = True
+        source_urls = sources.get(ref_file, {}).get("sources", [])
         lines.append(f"## `references/{ref_file}`")
         lines.append("")
+        if source_urls:
+            lines.append("Checked source URLs:")
+            for url in source_urls:
+                lines.append(f"- {url}")
+            lines.append("")
         for confidence, added, removed in sections:
             if added:
                 lines.append(f"### {confidence.capitalize()}-confidence additions ({len(added)})")
                 for token in sorted(added):
-                    lines.append(f"- `{token}`")
+                    token_sources = diff.get(f"{confidence}_source_urls", {}).get(token, [])
+                    if token_sources:
+                        joined = ", ".join(token_sources[:3])
+                        if len(token_sources) > 3:
+                            joined += f" (+{len(token_sources) - 3} more)"
+                        lines.append(f"- `{token}` — from: {joined}")
+                    else:
+                        lines.append(f"- `{token}`")
                 lines.append("")
             if removed:
                 lines.append(f"### {confidence.capitalize()}-confidence removals ({len(removed)})")
+                if source_urls:
+                    lines.append("Not found in the checked source URLs above.")
                 for token in sorted(removed):
                     lines.append(f"- `{token}`")
                 lines.append("")
@@ -888,6 +935,11 @@ def main() -> int:
                 in_ref_not_docs -= verified.get("in_ref_not_docs", set())
             diff[f"{confidence}_in_docs_not_ref"] = in_docs_not_ref
             diff[f"{confidence}_in_ref_not_docs"] = in_ref_not_docs
+            source_urls = sources.get(ref_file, {}).get("sources", [])
+            diff[f"{confidence}_source_urls"] = {
+                token: source_urls_for_token(token, source_urls, fetched_subdir)
+                for token in in_docs_not_ref
+            }
 
         ref_diffs[ref_file] = diff
         print(
@@ -905,7 +957,7 @@ def main() -> int:
         if new_pages:
             print(f"{len(new_pages)} doc pages not tracked in sources.yaml")
 
-    report = build_report(ref_diffs, new_pages, fetch_problems)
+    report = build_report(ref_diffs, new_pages, fetch_problems, sources)
     Path(args.output).write_text(report, encoding="utf-8")
     print(f"Drift report written to {args.output}")
 
