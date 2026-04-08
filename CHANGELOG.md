@@ -2,6 +2,12 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [2.0.2] — SDK 0.4.41 — 2026-04-08
+
+### Changed
+- **sandbox_sdk.md** — added `connect()`, `update_sandbox()`, `close()`/`terminate()`, `write_stdin()`/`close_stdin()`, `expose_ports()`/`unexpose_ports()`; renamed `create_pty_session()` → `create_pty()` and `pty_ws_url()` → `connect_pty()`; added `SandboxProcessStatus`, `SandboxProcessStdinMode`, `SandboxProcessOutputMode` enums; added `pty-sessions.md` source
+- **sandbox_advanced.md** — added `close()`/`terminate()` teardown note in AI code execution best practices
+
 ## [2.0.1] — SDK 0.4.39 — 2026-04-07
 
 ### Fixed

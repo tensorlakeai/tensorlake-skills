@@ -8,8 +8,9 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/processes.md
   - https://docs.tensorlake.ai/sandboxes/networking.md
   - https://docs.tensorlake.ai/sandboxes/images.md
-SDK version: tensorlake 0.4.39
-Last verified: 2026-04-07
+  - https://docs.tensorlake.ai/sandboxes/pty-sessions.md
+SDK version: tensorlake 0.4.41
+Last verified: 2026-04-08
 -->
 
 # TensorLake Sandbox SDK Reference
@@ -46,11 +47,18 @@ sandbox_id = sandbox.sandbox_id
 print(sandbox.status)
 ```
 
-### Query & Delete
+### Connect to Existing Sandbox
+
+```python
+sandbox = client.connect(sandbox_id)   # -> Sandbox (attach to running sandbox)
+```
+
+### Query, Update & Delete
 
 ```python
 info = client.get(sandbox_id)          # -> SandboxInfo
 sandboxes = client.list()              # -> list[SandboxInfo]
+client.update_sandbox(sandbox_id, name="new-name")  # Rename sandbox
 client.delete(sandbox_id)              # Terminates the sandbox (idempotent)
 ```
 
@@ -63,7 +71,7 @@ client.delete(sandbox_id)              # Terminates the sandbox (idempotent)
 - **Ephemeral**: Created without `name`. Auto-terminate on completion. Cannot be suspended.
 - **Named/Persistent**: Created with `name` parameter. Support suspend/resume, can be auto-suspended when idle, and can be referenced by ID or name.
 
-### Connect to a Sandbox
+### Create & Connect to a Sandbox
 
 ```python
 # Context manager (auto-terminates on exit)
@@ -79,6 +87,11 @@ with client.create_and_connect(
 ) as sandbox:
     result = sandbox.run("echo", ["hello"])
 
+# Manual lifecycle (call close() or terminate() when done)
+sandbox = client.create_and_connect(cpus=1.0)
+# ... use sandbox ...
+sandbox.close()       # Terminates sandbox and closes connection
+# or: sandbox.terminate()  # Equivalent — stops the sandbox
 ```
 
 ### Snapshots
@@ -184,7 +197,9 @@ proc = sandbox.start_process(
     stdout_mode: str | None = None,          # "capture" to capture stdout
     stderr_mode: str | None = None,          # "capture" to capture stderr
 )
-# proc.pid, proc.status
+# proc.pid, proc.status (SandboxProcessStatus), proc.stdin_writable
+# proc.command, proc.args, proc.started_at, proc.ended_at
+# proc.exit_code, proc.signal
 
 sandbox.list_processes()                     # -> list[ProcessInfo]
 
@@ -206,10 +221,11 @@ For fine-grained I/O control, use `stdin_mode="pipe"` when starting a process:
 # Start process with stdin pipe
 proc = sandbox.start_process("python", ["-i"], stdin_mode="pipe")
 
-# Write to stdin (SDK wraps the REST endpoint)
-# REST: POST /api/v1/processes/<pid>/stdin
-# Close stdin when done:
-# REST: POST /api/v1/processes/<pid>/stdin/close
+# Write to stdin
+sandbox.write_stdin(proc.pid, b"print('hello')\n")
+
+# Close stdin (delivers EOF without terminating the process)
+sandbox.close_stdin(proc.pid)
 ```
 
 **Stdout/Stderr streaming (SSE):**
@@ -233,12 +249,20 @@ for event in sandbox.follow_output(proc.pid):
 ### Interactive PTY Session
 
 ```python
-session = sandbox.create_pty_session(
+# Create a PTY session
+pty = sandbox.create_pty(
     command="/bin/bash",
-    rows=24,
+    args=["-l"],
+    env={"TERM": "xterm-256color"},
+    working_dir="/workspace",
     cols=80,
+    rows=24,
 )
-ws_url = sandbox.pty_ws_url(session["session_id"], session["token"])
+# pty exposes: send_input(), resize(), wait(), disconnect(), connect(), kill()
+# Subscribe to output: pty.on_data(callback), pty.on_exit(callback)
+
+# Reconnect to an existing PTY session
+pty = sandbox.connect_pty(session_id, token)
 ```
 
 ## Sandbox Images
@@ -290,7 +314,16 @@ tl sbx new --image data-tools-image
 - User services: `https://<port>-<sandbox-id>.sandbox.tensorlake.ai`
 - Supports HTTP/1.1, HTTP/2, WebSocket upgrades
 
-### Port Exposure (CLI/HTTP only)
+### Port Exposure
+
+**Python SDK:**
+
+```python
+client.expose_ports(sandbox_id, ports=[8080], allow_unauthenticated_access=False)
+client.unexpose_ports(sandbox_id, ports=[8080])
+```
+
+**CLI:**
 
 ```bash
 tl sbx port expose <sandbox-id> 8080
@@ -303,6 +336,30 @@ tl sbx port rm <sandbox-id> 8080
 - Named sandboxes can be suspended manually or auto-suspended when idle.
 - Requests to a **suspended** named sandbox automatically resume it and wait for the port to become routable.
 - Ephemeral sandboxes do not support suspend/resume.
+
+## Enums
+
+### SandboxProcessStatus
+
+| Value | Meaning |
+|---|---|
+| `running` | Process is executing |
+| `exited` | Process exited normally |
+| `signaled` | Process terminated by signal |
+
+### SandboxProcessStdinMode
+
+| Value | Meaning |
+|---|---|
+| `closed` | Stdin is not writable (default) |
+| `pipe` | Stdin accepts writes via `write_stdin()` |
+
+### SandboxProcessOutputMode
+
+| Value | Meaning |
+|---|---|
+| `capture` | Capture output for later retrieval |
+| `discard` | Discard output |
 
 ## Sandbox Statuses
 
