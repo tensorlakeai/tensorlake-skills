@@ -2,6 +2,13 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [2.1.1] — SDK 0.4.41 — 2026-04-08
+
+### Changed
+- **check_drift.py** — separated evidence by confidence, restricted the rendered report to high-confidence drift, added per-symbol source URL attribution, parsed `llms.txt` line-by-line from Markdown links, and reduced false positives across sandbox/applications references
+- **fetch_docs.py** — preserve previously fetched pages/checksums on failed retries so a bad fetch cannot poison the manifest
+- **sources.yaml** / **references/** — expanded non-API doc coverage from `llms.txt`, synchronized source headers in reference files, and added `sandboxes/pty-sessions.md` so PTY symbols stop reporting as false removals
+
 ## [2.1.0] — SDK 0.4.41 — 2026-04-08
 
 ### Added

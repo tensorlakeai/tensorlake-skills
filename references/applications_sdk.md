@@ -24,7 +24,7 @@ Source:
   - https://docs.tensorlake.ai/applications/guides/streaming-progress.md
   - https://docs.tensorlake.ai/applications/guides/logging.md
   - https://docs.tensorlake.ai/applications/guides/autoscaling.md
-SDK version: tensorlake 0.4.39
+SDK version: tensorlake 0.4.42
 Last verified: 2026-04-08
 -->
 
