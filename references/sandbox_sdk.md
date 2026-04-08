@@ -9,7 +9,7 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/networking.md
   - https://docs.tensorlake.ai/sandboxes/images.md
   - https://docs.tensorlake.ai/sandboxes/pty-sessions.md
-SDK version: tensorlake 0.4.41
+SDK version: tensorlake 0.4.42
 Last verified: 2026-04-08
 -->
 
@@ -17,17 +17,39 @@ Last verified: 2026-04-08
 
 ## Imports
 
+**Python:**
+
 ```python
 from tensorlake.sandbox import SandboxClient
 ```
 
+**TypeScript:**
+
+```typescript
+import { SandboxClient } from "tensorlake";
+```
+
+Install: `npm install tensorlake` (also installs `tl` and `tensorlake` CLI tools)
+
 ## SandboxClient — Lifecycle Management
+
+**Python:**
 
 ```python
 client = SandboxClient()
 ```
 
+**TypeScript:**
+
+```typescript
+const client = SandboxClient.forCloud({
+  apiKey: process.env.TENSORLAKE_API_KEY,
+});
+```
+
 ### Create Sandboxes
+
+**Python:**
 
 ```python
 # Ephemeral sandbox — no name, cannot be suspended
@@ -47,24 +69,76 @@ sandbox_id = sandbox.sandbox_id
 print(sandbox.status)
 ```
 
+**TypeScript:**
+
+```typescript
+// Ephemeral sandbox
+const sandbox = await client.create({
+  cpus: 1.0,
+  memoryMb: 1024,
+  timeoutSecs: 300,
+});
+
+// Named sandbox
+const named = await client.create({
+  name: "my-agent-env",
+  cpus: 2.0,
+  memoryMb: 2048,
+});
+
+console.log(named.sandboxId);  // server-assigned UUID
+console.log(named.name);       // "my-agent-env"
+```
+
 ### Connect to Existing Sandbox
 
+**Python:**
+
 ```python
-sandbox = client.connect(sandbox_id)   # -> Sandbox (attach to running sandbox)
+# `identifier` accepts sandbox_id (UUID) or name
+sandbox = client.connect(identifier="my-env")
+print(sandbox.sandbox_id)  # server UUID, e.g. "s7jus08qec4axzgbpq76h"
+print(sandbox.name)        # "my-env"
+```
+
+**TypeScript:**
+
+```typescript
+// Accepts sandbox ID or name
+const sandbox = client.connect("my-env");
+console.log(sandbox.sandboxId);  // server UUID
+console.log(sandbox.name);       // "my-env"
 ```
 
 ### Query, Update & Delete
 
+**Python:**
+
 ```python
-info = client.get(sandbox_id)          # -> SandboxInfo
+info = client.get("my-env")            # -> SandboxInfo (accepts name or sandbox_id)
 sandboxes = client.list()              # -> list[SandboxInfo]
-client.update_sandbox(sandbox_id, name="new-name")  # Rename sandbox
-client.delete(sandbox_id)              # Terminates the sandbox (idempotent)
+client.update_sandbox("my-env", "new-name")  # Rename sandbox
+client.delete("new-name")             # Terminates the sandbox (accepts name or sandbox_id)
 ```
+
+**TypeScript:**
+
+```typescript
+const info = await client.get("my-env");     // accepts name or sandboxId
+const sandboxes = await client.list();
+await client.update("my-env", { name: "new-name" });
+await client.delete("new-name");
+```
+
+### Sandbox Properties
+
+**Python:** `sandbox.sandbox_id` (str), `sandbox.name` (str | None), `sandbox.status` (str)
+
+**TypeScript:** `sandbox.sandboxId` (string), `sandbox.name` (string | null)
 
 ### SandboxInfo Attributes
 
-`sandbox_id`, `name`, `namespace`, `status`, `image`, `resources` (`ContainerResourcesInfo`: `.cpus`, `.memory_mb`), `secret_names`, `timeout_secs`, `entrypoint`, `created_at`, `terminated_at`
+`sandbox_id`/`sandboxId`, `name`, `namespace`, `status`, `image`, `resources` (`ContainerResourcesInfo`: `.cpus`, `.memory_mb`/`.memoryMb`), `secret_names`, `timeout_secs`, `entrypoint`, `created_at`, `terminated_at`
 
 ### Ephemeral vs Named Sandboxes
 
@@ -72,6 +146,8 @@ client.delete(sandbox_id)              # Terminates the sandbox (idempotent)
 - **Named/Persistent**: Created with `name` parameter. Support suspend/resume, can be auto-suspended when idle, and can be referenced by ID or name.
 
 ### Create & Connect to a Sandbox
+
+**Python:**
 
 ```python
 # Context manager (auto-terminates on exit)
@@ -94,7 +170,30 @@ sandbox.close()       # Terminates sandbox and closes connection
 # or: sandbox.terminate()  # Equivalent — stops the sandbox
 ```
 
+**TypeScript:**
+
+```typescript
+const sandbox = await client.createAndConnect({
+  name: "my-env",          // optional
+  cpus: 1.0,
+  memoryMb: 1024,
+  timeoutSecs: 600,
+  allowInternetAccess: false,
+  snapshotId: "snap-xxx",  // optional — restore from snapshot
+});
+
+try {
+  const result = await sandbox.run("echo", { args: ["hello"] });
+  console.log(result.stdout);
+} finally {
+  await sandbox.terminate();
+  client.close();
+}
+```
+
 ### Snapshots
+
+**Python:**
 
 ```python
 snapshot = client.snapshot_and_wait(sandbox_id, timeout=300, poll_interval=1.0)
@@ -107,6 +206,22 @@ client.delete_snapshot(snapshot_id)
 
 # Restore from snapshot
 new_sandbox = client.create_and_connect(snapshot_id=snapshot.snapshot_id)
+```
+
+**TypeScript:**
+
+```typescript
+const snapshot = await client.snapshotAndWait(sandbox.sandboxId);
+console.log(snapshot.snapshotId);
+
+const info = await client.getSnapshot("snapshot-id");
+const snapshots = await client.listSnapshots();
+await client.deleteSnapshot("snapshot-id");
+
+// Restore from snapshot
+const restored = await client.createAndConnect({
+  snapshotId: snapshot.snapshotId,
+});
 ```
 
 Snapshots restore filesystem and memory state. Inherited settings (image, resources, entrypoint, secrets) can be overridden on restore.
@@ -152,6 +267,8 @@ Note: Suspend/resume is not available in the Python SDK — use CLI or REST API.
 
 ### Execute Commands
 
+**Python:**
+
 ```python
 result = sandbox.run(
     command: str,                        # e.g., "python", "bash"
@@ -165,14 +282,42 @@ result.stdout      # str
 result.stderr      # str
 ```
 
+**TypeScript:**
+
+```typescript
+const result = await sandbox.run("python", {
+  args: ["-c", "print('Hello from sandbox!')"],
+  env: { MODE: "prod", DEBUG: "0" },
+  workingDir: "/workspace",
+  timeout: 10,
+});
+console.log(result.stdout);
+console.log(result.exitCode);
+```
+
 Shell commands (pipes, redirects, chaining) require wrapping in bash:
+
+**Python:**
 
 ```python
 sandbox.run("bash", ["-c", "ls -la /workspace | grep '.py'"])
 sandbox.run("bash", ["-c", "cd /workspace && pip install -r requirements.txt && python main.py"])
 ```
 
+**TypeScript:**
+
+```typescript
+await sandbox.run("bash", {
+  args: ["-lc", "ls -la /workspace | grep '.py' | wc -l"],
+});
+await sandbox.run("bash", {
+  args: ["-lc", "cd /workspace && pip install -r requirements.txt && python main.py"],
+});
+```
+
 ### File Operations
+
+**Python:**
 
 ```python
 sandbox.write_file(path: str, content: bytes)
@@ -182,9 +327,25 @@ entries = sandbox.list_directory(path: str)   # -> ListDirectoryResponse
 # entries.entries[].name, entries.entries[].size
 ```
 
+**TypeScript:**
+
+```typescript
+await sandbox.writeFile(
+  "/workspace/data.csv",
+  new TextEncoder().encode("name,score\nAlice,95\nBob,87"),
+);
+
+const content = await sandbox.readFile("/workspace/data.csv");
+console.log(new TextDecoder().decode(content));
+
+await sandbox.deleteFile("/workspace/data.csv");
+```
+
 Best practice: Use `/workspace` as the default working directory.
 
 ### Process Management
+
+**Python:**
 
 ```python
 # Start a long-running process
@@ -213,30 +374,54 @@ sandbox.send_signal(proc.pid, signal.SIGTERM)  # Graceful stop
 sandbox.send_signal(proc.pid, signal.SIGKILL)  # Force kill
 ```
 
-### Process Stdin/Stdout/Stderr (Granular APIs)
+**TypeScript:**
 
-For fine-grained I/O control, use `stdin_mode="pipe"` when starting a process:
+```typescript
+import { ProcessStatus } from "tensorlake";
 
-```python
-# Start process with stdin pipe
-proc = sandbox.start_process("python", ["-i"], stdin_mode="pipe")
+const proc = await sandbox.startProcess("python", {
+  args: ["-c", "import time\nfor i in range(5):\n print(f'Step {i+1}/5')\n time.sleep(1)"],
+});
 
-# Write to stdin
-sandbox.write_stdin(proc.pid, b"print('hello')\n")
+// Poll for completion
+let info = await sandbox.getProcess(proc.pid);
+while (info.status === ProcessStatus.RUNNING) {
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  info = await sandbox.getProcess(proc.pid);
+}
 
-# Close stdin (delivers EOF without terminating the process)
-sandbox.close_stdin(proc.pid)
+// Get captured output
+console.log((await sandbox.getStdout(proc.pid)).lines);
+console.log((await sandbox.getStderr(proc.pid)).lines);
+console.log((await sandbox.getOutput(proc.pid)).lines);  // combined
+
+// Stream output as it arrives (SSE)
+for await (const event of sandbox.followOutput(proc.pid)) {
+  process.stdout.write(event.line);
+}
 ```
 
-**Stdout/Stderr streaming (SSE):**
+### Process Stdin/Stdout/Stderr (Granular APIs)
+
+For fine-grained I/O control, use `stdin_mode="pipe"` (Python) or `stdinMode: "pipe"` (TypeScript) when starting a process:
+
+**Python:**
 
 ```python
-# Stream output line-by-line as Server-Sent Events
-for event in sandbox.follow_output(proc.pid):
-    # event.line — output content
-    # event.timestamp — when the line was emitted
-    # event type: "output" (data) or "eof" (stream complete)
-    print(event.line, end="")
+proc = sandbox.start_process("python", ["-i"], stdin_mode="pipe")
+sandbox.write_stdin(proc.pid, b"print('hello')\n")
+sandbox.close_stdin(proc.pid)  # delivers EOF without terminating the process
+```
+
+**TypeScript:**
+
+```typescript
+const proc = await sandbox.startProcess("python", {
+  args: ["-i"],
+  stdinMode: "pipe",
+});
+await sandbox.writeStdin(proc.pid, new TextEncoder().encode("print('hello')\n"));
+await sandbox.closeStdin(proc.pid);
 ```
 
 **REST equivalents:**
@@ -248,8 +433,9 @@ for event in sandbox.follow_output(proc.pid):
 
 ### Interactive PTY Session
 
+**Python:**
+
 ```python
-# Create a PTY session
 pty = sandbox.create_pty(
     command="/bin/bash",
     args=["-l"],
@@ -261,13 +447,31 @@ pty = sandbox.create_pty(
 # pty exposes: send_input(), resize(), wait(), disconnect(), connect(), kill()
 # Subscribe to output: pty.on_data(callback), pty.on_exit(callback)
 
+pty.send_input("pwd\nexit\n")
+print(pty.wait())
+
 # Reconnect to an existing PTY session
 pty = sandbox.connect_pty(session_id, token)
 ```
 
+**TypeScript:**
+
+```typescript
+const pty = await sandbox.createPty({
+  command: "/bin/bash",
+  rows: 24,
+  cols: 80,
+});
+
+await pty.sendInput("pwd\nexit\n");
+console.log(await pty.wait());
+```
+
 ## Sandbox Images
 
-Build custom images using the Image builder (imported from applications):
+Build custom images using the Image builder:
+
+**Python:**
 
 ```python
 from tensorlake.applications import Image
@@ -278,6 +482,28 @@ SANDBOX_IMAGE = (
     .run("mkdir -p /workspace/cache")
     .env("APP_ENV", "prod")
 )
+```
+
+**TypeScript:**
+
+```typescript
+import { Image, createSandboxImage } from "tensorlake";
+
+const image = new Image({
+  name: "data-tools",
+  baseImage: "ubuntu-minimal",
+})
+  .run("pip install pandas pyarrow jupyter")
+  .run("mkdir -p /workspace/cache")
+  .env("APP_ENV", "prod")
+  .workdir("/workspace");
+
+// Register image
+await createSandboxImage(image, {
+  contextDir: ".",
+  cpus: 4,
+  memoryMb: 4096,
+});
 ```
 
 ### Base Images
@@ -293,6 +519,32 @@ SANDBOX_IMAGE = (
 - `.env(key, value)` — Set environment variable
 - `.copy(src, dest)` — Copy file from local filesystem
 - `.add(src, dest)` — Add file to image
+- `.workdir(path)` — Set working directory (TypeScript only)
+
+### Launching Sandboxes from Custom Images
+
+**Python:**
+
+```python
+with client.create_and_connect(
+    image="data-tools",
+    cpus=4.0,
+    memory_mb=4096,
+    timeout_secs=1800,
+) as sandbox:
+    result = sandbox.run("python3", ["-c", "import pandas; print('ready')"])
+```
+
+**TypeScript:**
+
+```typescript
+const sandbox = await client.createAndConnect({
+  image: "data-tools",
+  cpus: 4.0,
+  memoryMb: 4096,
+  timeoutSecs: 1800,
+});
+```
 
 ### CLI
 
@@ -303,10 +555,11 @@ tl sbx new --image data-tools-image
 
 ## Networking
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `allow_internet_access` | `bool` | `True` | Global internet toggle |
-| `deny_out` | `list[str]` | `[]` | Blocked outbound destinations (domains/IPs/CIDRs) |
+| Python Parameter | TypeScript Parameter | Type | Default | Description |
+|---|---|---|---|---|
+| `allow_internet_access` | `allowInternetAccess` | `bool` | `True` | Global internet toggle |
+| `deny_out` | `denyOut` | `list[str]` | `[]` | Blocked outbound destinations (domains/IPs/CIDRs) |
+| `allow_out` | `allowOut` | `list[str]` | `[]` | Allowed outbound destinations (when internet disabled) |
 
 ### Public URLs
 
@@ -316,11 +569,18 @@ tl sbx new --image data-tools-image
 
 ### Port Exposure
 
-**Python SDK:**
+**Python:**
 
 ```python
 client.expose_ports(sandbox_id, ports=[8080], allow_unauthenticated_access=False)
 client.unexpose_ports(sandbox_id, ports=[8080])
+```
+
+**TypeScript:**
+
+```typescript
+await client.exposePorts("my-env", [8080], { allowUnauthenticatedAccess: false });
+await client.unexposePorts("my-env", [8080]);
 ```
 
 **CLI:**

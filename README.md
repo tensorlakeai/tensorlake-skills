@@ -2,7 +2,7 @@
 
 Build production agent workflows with [Tensorlake's](https://tensorlake.ai).
 
-This skill helps coding agents use Tensorlake to build real agent systems with sandboxed execution and orchestration. It is designed for modern agent use cases like multi-agent applications, isolated code execution, long-running workflows, and tool-using agents that need a real workspace.
+This skill helps coding agents use Tensorlake to build real agent systems with sandboxed execution and orchestration. It covers both the **Python** (`pip install tensorlake`) and **TypeScript** (`npm install tensorlake`) SDKs. It is designed for modern agent use cases like multi-agent applications, isolated code execution, long-running workflows, and tool-using agents that need a real workspace.
 
 Instead of treating Tensorlake as just another API, this skill teaches agents how to use Tensorlake as infrastructure: run tasks in isolated environments with the Sandbox SDK, coordinate durable workflows with the sandbox-native Orchestrate SDK, and compose reliable agent systems for production use.
 
@@ -64,7 +64,7 @@ Works with Claude Code, Cursor, Cline, GitHub Copilot, Windsurf, and more via [s
 
 ## Setup
 
-Tensorlake requires a `TENSORLAKE_API_KEY` configured in the local environment. Get one at [cloud.tensorlake.ai](https://cloud.tensorlake.ai), then either run `tensorlake login` or configure the variable through your shell profile, `.env` file, or secret manager. Do not paste API keys into chat, commit them to source control, or print them in terminal output.
+Tensorlake requires a `TENSORLAKE_API_KEY` configured in the local environment. Get one at [cloud.tensorlake.ai](https://cloud.tensorlake.ai), then either run `tensorlake login` (Python) / `npx tl login` (TypeScript) or configure the variable through your shell profile, `.env` file, or secret manager. Do not paste API keys into chat, commit them to source control, or print them in terminal output.
 
 ## Repository Structure
 
@@ -151,8 +151,8 @@ Each reference file has a source header that tracks which doc pages it was built
 Source:
   - https://docs.tensorlake.ai/sandboxes/lifecycle.md
   - https://docs.tensorlake.ai/sandboxes/commands.md
-SDK version: tensorlake 0.4.39
-Last verified: 2026-04-07
+SDK version: tensorlake 0.4.42
+Last verified: 2026-04-08
 -->
 ```
 
