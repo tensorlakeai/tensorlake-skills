@@ -11,19 +11,21 @@ description: >
   database, or API as the infrastructure layer.
 metadata:
   author: tensorlake
-  version: 2.0.2
+  version: 2.1.0
 ---
 
 # Tensorlake SDK
 
-Two APIs: **Sandbox** (execution environments for agents and isolated tool calls), **Orchestrate** (sandbox-native durable workflow orchestration for agents — imported as `tensorlake.applications`). Use standalone or as infrastructure alongside any LLM, agent framework, database, or API.
+Two APIs: **Sandbox** (execution environments for agents and isolated tool calls), **Orchestrate** (sandbox-native durable workflow orchestration for agents — imported as `tensorlake.applications`). Available in both **Python** (`pip install tensorlake`) and **TypeScript** (`npm install tensorlake`). Use standalone or as infrastructure alongside any LLM, agent framework, database, or API.
 
 **For documentation questions**: Read the relevant reference file below to answer. If the bundled references don't cover it, direct the user to the Tensorlake docs site.
 **For building**: Use the Quick Start and Core Patterns below, plus reference files for API details.
 
 ## Setup
 
-Tensorlake requires the `TENSORLAKE_API_KEY` environment variable to be configured before running Tensorlake code. If it is missing, direct the user to run `tensorlake login` or to configure the key through their local environment (for example a shell profile, `.env` file, or secret manager). Do **not** ask the user to paste the key into the conversation, include it in generated code, or print it in terminal output. Get an API key at [cloud.tensorlake.ai](https://cloud.tensorlake.ai). For deployed applications, use the `secrets` parameter in `@function()` to pass keys securely.
+**Python:** `pip install tensorlake` — **TypeScript:** `npm install tensorlake`
+
+Both SDKs ship with `tl` and `tensorlake` CLI tools. Tensorlake requires the `TENSORLAKE_API_KEY` environment variable to be configured before running Tensorlake code. If it is missing, direct the user to run `tensorlake login` (Python) / `npx tl login` (TypeScript) or to configure the key through their local environment (for example a shell profile, `.env` file, or secret manager). Do **not** ask the user to paste the key into the conversation, include it in generated code, or print it in terminal output. Get an API key at [cloud.tensorlake.ai](https://cloud.tensorlake.ai). For deployed applications, use the `secrets` parameter in `@function()` to pass keys securely.
 
 ## Quick Start — Orchestrate Workflow
 

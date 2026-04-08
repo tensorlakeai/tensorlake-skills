@@ -4,7 +4,7 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/ai-code-execution.md
   - https://docs.tensorlake.ai/sandboxes/data-analysis.md
   - https://docs.tensorlake.ai/sandboxes/cicd-build.md
-SDK version: tensorlake 0.4.41
+SDK version: tensorlake 0.4.42
 Last verified: 2026-04-08
 -->
 
@@ -28,33 +28,69 @@ Install agent skill files into sandbox images so coding agents (Claude Code, Cod
 
 ### Installation via Skills CLI (Multi-Agent)
 
-```python
-from tensorlake.applications import Image
+**Python:**
 
-SKILLS_IMAGE = (
-    Image(name="with-skills", base_image="python:3.11-slim")
-    .run("apt-get update && apt-get install -y nodejs npm")
+```python
+from tensorlake import Image
+
+image = (
+    Image(name="with-skills", base_image="ubuntu-systemd")
+    .run("apt-get update && apt-get install -y nodejs npm python3 python3-pip")
     .run("npm install -g skills")
     .run("skills add tensorlakeai/tensorlake-skills --all -y --copy")
-    .run("pip install tensorlake")
+    .run("python3 -m pip install --break-system-packages tensorlake")
 )
+```
+
+**TypeScript:**
+
+```typescript
+import { Image } from "tensorlake";
+
+const image = new Image({
+  name: "with-skills",
+  baseImage: "ubuntu-systemd",
+})
+  .run("apt-get update && apt-get install -y nodejs npm python3 python3-pip")
+  .run("npm install -g skills")
+  .run("skills add tensorlakeai/tensorlake-skills --all -y --copy")
+  .run("python3 -m pip install --break-system-packages tensorlake");
 ```
 
 Flags: `--all` deploys to all detected agents, `-y` non-interactive, `--copy` avoids symlink issues in containers.
 
 ### Claude Code Specific Setup
 
-```python
-from tensorlake.applications import Image
+**Python:**
 
-CLAUDE_CODE_IMAGE = (
-    Image(name="claude-code-skills", base_image="python:3.11-slim")
-    .run("apt-get update && apt-get install -y git")
+```python
+from tensorlake import Image
+
+image = (
+    Image(name="claude-code-skills", base_image="ubuntu-systemd")
+    .run("apt-get update && apt-get install -y git python3 python3-pip")
     .run("git clone https://github.com/tensorlakeai/tensorlake-skills /tmp/tensorlake-skills")
     .run("mkdir -p /root/.claude/skills/tensorlake && cp -r /tmp/tensorlake-skills/SKILL.md /tmp/tensorlake-skills/references /root/.claude/skills/tensorlake/")
     .run("rm -rf /tmp/tensorlake-skills")
-    .run("pip install tensorlake")
+    .run("python3 -m pip install --break-system-packages tensorlake")
 )
+```
+
+**TypeScript:**
+
+```typescript
+import { Image } from "tensorlake";
+
+const image = new Image({
+  name: "claude-code-skills",
+  baseImage: "ubuntu-systemd",
+})
+  .run("apt-get update && apt-get install -y git python3 python3-pip")
+  .run("git clone https://github.com/tensorlakeai/tensorlake-skills /tmp/tensorlake-skills")
+  .run("mkdir -p /root/.claude/skills/tensorlake && " +
+    "cp -r /tmp/tensorlake-skills/SKILL.md /tmp/tensorlake-skills/references /root/.claude/skills/tensorlake/")
+  .run("rm -rf /tmp/tensorlake-skills")
+  .run("python3 -m pip install --break-system-packages tensorlake");
 ```
 
 ### Image Creation
@@ -92,6 +128,8 @@ Use sandboxes as LLM tool-call targets for safe code execution.
 2. Maintain it across multiple tool calls (state persists)
 3. Close when done
 
+**Python:**
+
 ```python
 sandbox = client.create_and_connect(
     cpus=1.0,
@@ -102,6 +140,42 @@ sandbox = client.create_and_connect(
 
 result = sandbox.run("python", ["-c", code])
 # result.stdout, result.stderr, result.exit_code
+```
+
+**TypeScript:**
+
+```typescript
+import { SandboxClient } from "tensorlake";
+
+const client = SandboxClient.forCloud({
+  apiKey: process.env.TENSORLAKE_API_KEY,
+});
+
+const sandbox = await client.createAndConnect({
+  cpus: 1.0,
+  memoryMb: 1024,
+  timeoutSecs: 600,
+  allowInternetAccess: false,
+});
+
+async function runCode(code: string): Promise<string> {
+  const result = await sandbox.run("python", {
+    args: ["-c", code],
+  });
+
+  const chunks = [result.stdout.trim()];
+  if (result.stderr.trim()) chunks.push(`[stderr]\n${result.stderr.trim()}`);
+  if (result.exitCode !== 0) chunks.push(`[exit code: ${result.exitCode}]`);
+  return chunks.filter(Boolean).join("\n\n") || "(no output)";
+}
+
+try {
+  const output = await runCode("import statistics\nnums = [4, 8, 15, 16, 23, 42]\nprint(statistics.mean(nums))");
+  console.log(output);
+} finally {
+  await sandbox.terminate();
+  client.close();
+}
 ```
 
 ### Snapshots for Pre-installed Dependencies

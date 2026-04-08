@@ -1,16 +1,18 @@
 # Tensorlake SDK
-<!-- version: 2.0.2 -->
+<!-- version: 2.1.0 -->
 
 Tensorlake provides two APIs for building agentic applications:
 
 - **Sandbox** — Execution environments for agents and isolated tool calls
 - **Orchestrate** — Sandbox-native durable workflow orchestration for agents, with parallel map/reduce, auto-scaling, and crash recovery (imported as `tensorlake.applications`)
 
-Use standalone or as infrastructure alongside any LLM provider, agent framework, database, or API.
+Available in both **Python** (`pip install tensorlake`) and **TypeScript** (`npm install tensorlake`). Use standalone or as infrastructure alongside any LLM provider, agent framework, database, or API.
 
 ## Setup
 
-Tensorlake requires the `TENSORLAKE_API_KEY` environment variable to be configured before running Tensorlake code. If it is missing, direct the user to run `tensorlake login` or to configure the key through their local environment (for example a shell profile, `.env` file, or secret manager). Do **not** ask the user to paste the key into the conversation, include it in generated code, or print it in terminal output. Get an API key at [cloud.tensorlake.ai](https://cloud.tensorlake.ai).
+**Python:** `pip install tensorlake` — **TypeScript:** `npm install tensorlake`
+
+Tensorlake requires the `TENSORLAKE_API_KEY` environment variable to be configured before running Tensorlake code. If it is missing, direct the user to run `tensorlake login` (Python) / `npx tl login` (TypeScript) or to configure the key through their local environment (for example a shell profile, `.env` file, or secret manager). Do **not** ask the user to paste the key into the conversation, include it in generated code, or print it in terminal output. Get an API key at [cloud.tensorlake.ai](https://cloud.tensorlake.ai).
 
 ## Quick Start
 
