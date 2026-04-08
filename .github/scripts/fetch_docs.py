@@ -64,6 +64,7 @@ def main() -> int:
     total = 0
     failed = 0
     checksums: dict[str, str] = {}
+    llms_txt_fetched = False
 
     for ref_file, meta in sources.items():
         urls = meta.get("sources", [])
@@ -95,13 +96,15 @@ def main() -> int:
         if body:
             dest = out / "llms.txt"
             dest.write_text(body, encoding="utf-8")
+            checksums["https://docs.tensorlake.ai/llms.txt"] = hashlib.sha256(body.encode()).hexdigest()[:16]
+            llms_txt_fetched = True
             print(f"  -> {dest} ({len(body)} chars)")
 
     # Write a manifest so check_drift.py knows what was fetched.
     manifest = out / "manifest.yaml"
     manifest.write_text(
         yaml.dump({"fetched_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                    "total": total, "failed": failed, "checksums": checksums},
+                    "total": total, "failed": failed, "checksums": checksums, "llms_txt_fetched": llms_txt_fetched},
                    default_flow_style=False),
         encoding="utf-8",
     )
