@@ -17,8 +17,9 @@ sandbox_sdk.md:
     - https://docs.tensorlake.ai/sandboxes/networking.md
     - https://docs.tensorlake.ai/sandboxes/images.md
     - https://docs.tensorlake.ai/sandboxes/pty-sessions.md
-  sdk_version: "0.4.42"
-  last_verified: "2026-04-08"
+    - https://docs.tensorlake.ai/sandboxes/computer-use.md
+  sdk_version: "0.4.43"
+  last_verified: "2026-04-09"
 
 applications_sdk.md:
   sources:

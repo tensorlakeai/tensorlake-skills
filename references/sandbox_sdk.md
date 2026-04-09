@@ -9,8 +9,9 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/networking.md
   - https://docs.tensorlake.ai/sandboxes/images.md
   - https://docs.tensorlake.ai/sandboxes/pty-sessions.md
-SDK version: tensorlake 0.4.42
-Last verified: 2026-04-08
+  - https://docs.tensorlake.ai/sandboxes/computer-use.md
+SDK version: tensorlake 0.4.43
+Last verified: 2026-04-09
 -->
 
 # TensorLake Sandbox SDK Reference
@@ -466,6 +467,65 @@ const pty = await sandbox.createPty({
 await pty.sendInput("pwd\nexit\n");
 console.log(await pty.wait());
 ```
+
+## Computer Use (Desktop Automation)
+
+Use the `ubuntu-vnc` image to get a desktop-enabled sandbox with XFCE, TigerVNC, and Firefox. Desktop connections are proxied through an authenticated endpoint — no port exposure needed.
+
+**Python:**
+
+```python
+from tensorlake.sandbox import SandboxClient
+from pathlib import Path
+import time
+
+client = SandboxClient()
+
+# Screenshot
+with client.create_and_connect(image="ubuntu-vnc") as sandbox:
+    with sandbox.connect_desktop(password="tensorlake") as desktop:
+        Path("sandbox-desktop.png").write_bytes(desktop.screenshot())
+
+# Send keyboard input and verify
+with client.create_and_connect(image="ubuntu-vnc") as sandbox:
+    with sandbox.connect_desktop(password="tensorlake") as desktop:
+        desktop.press(["ctrl", "alt", "t"])
+        time.sleep(1.0)
+        desktop.type_text("echo docs-test > /tmp/desktop-test.txt")
+        desktop.press("enter")
+    result = sandbox.run("bash", ["-lc", "cat /tmp/desktop-test.txt"])
+    print(result.stdout.strip())
+```
+
+### Reconnecting to an Existing Desktop Sandbox
+
+```python
+sandbox_id = "your-running-sandbox-id"
+with client.connect(sandbox_id) as sandbox:
+    with sandbox.connect_desktop(password="tensorlake") as desktop:
+        Path("existing-sandbox.png").write_bytes(desktop.screenshot())
+```
+
+### Desktop Methods
+
+| Method | Description |
+|---|---|
+| `screenshot()` | Returns PNG bytes of current desktop |
+| `press(key)` | Press key or key combo (e.g., `["ctrl", "alt", "t"]`) |
+| `type_text(text)` | Type text input |
+| `move_mouse()` | Move cursor |
+| `click()` | Single mouse click |
+| `double_click()` | Double mouse click |
+| `scroll()` | Scroll |
+| `key_down()` | Key press (held) |
+| `key_up()` | Key release |
+
+### Notes
+
+- Default VNC password for managed `ubuntu-vnc` image: `"tensorlake"`
+- Desktop connection is proxied through an authenticated endpoint (no port exposure needed)
+- `client.connect()` does not terminate sandbox on exit (unlike `create_and_connect` context manager)
+- Context manager pattern (`with`) auto-closes desktop connections
 
 ## Sandbox Images
 

@@ -2,6 +2,15 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [2.1.2] — SDK 0.4.43 — 2026-04-09
+
+### Added
+- **sandbox_sdk.md** — added Computer Use (Desktop Automation) section: `connect_desktop()`, `screenshot()`, `press()`, `type_text()`, `move_mouse()`, `click()`, `double_click()`, `scroll()`, `key_down()`, `key_up()` with `ubuntu-vnc` image
+
+### Changed
+- **check_drift.py** — added `("/api-reference/", "_skip")` to `ROUTE_RULES` so API reference pages are excluded from the drift report
+- **sources.yaml** — added `sandboxes/computer-use.md` to `sandbox_sdk.md` sources
+
 ## [2.1.1] — SDK 0.4.42 — 2026-04-08
 
 ### Changed
