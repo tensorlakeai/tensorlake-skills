@@ -107,19 +107,12 @@ curl -X POST https://api.tensorlake.ai/sandboxes/<sandbox-id>/snapshot \
 
 ### Restore from a Snapshot
 
-Create a new sandbox from a snapshot. The new sandbox restores the captured filesystem and memory state, and inherits the image, resources, entrypoint, and secrets from the snapshot unless explicitly overridden.
+Create a new sandbox from a snapshot. The new sandbox restores the captured filesystem and memory state **exactly as it was** — image, resources (CPUs, memory), entrypoint, and secrets all come from the snapshot and cannot be changed at restore time. If you need different resources, create a fresh sandbox instead of restoring.
 
 **Python:**
 
 ```python
 restored = client.create_and_connect(snapshot_id=snapshot.snapshot_id)
-
-# Override inherited settings at restore
-restored = client.create_and_connect(
-    snapshot_id=snapshot.snapshot_id,
-    cpus=4.0,
-    memory_mb=2048,
-)
 ```
 
 **TypeScript:**
@@ -127,8 +120,6 @@ restored = client.create_and_connect(
 ```typescript
 const restored = await client.createAndConnect({
   snapshotId: snapshot.snapshotId,
-  cpus: 4.0,
-  memoryMb: 2048,
 });
 ```
 
@@ -136,7 +127,6 @@ const restored = await client.createAndConnect({
 
 ```bash
 tl sbx new --snapshot <snapshot-id>
-tl sbx new --snapshot <snapshot-id> --cpus 4.0 --memory 2048
 ```
 
 **REST:**
@@ -145,10 +135,7 @@ tl sbx new --snapshot <snapshot-id> --cpus 4.0 --memory 2048
 curl -X POST https://api.tensorlake.ai/sandboxes \
   -H "Authorization: Bearer $TL_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{
-    "snapshot_id": "<snapshot-id>",
-    "resources": {"cpus": 4.0, "memory_mb": 2048}
-  }'
+  -d '{"snapshot_id": "<snapshot-id>"}'
 ```
 
 ### Manage Snapshots
@@ -275,7 +262,7 @@ Rule of thumb: **suspend** when you want *this* sandbox back later; **snapshot**
 - **Terminated is final.** A terminated sandbox cannot be resumed. Use snapshots beforehand if you need a restore path.
 - **Clone is CLI-only.** Python SDK, TypeScript SDK, and HTTP API do not expose a one-shot clone. Use `snapshot_and_wait` + `create_and_connect(snapshot_id=...)` instead.
 - **Snapshot restore is to a new sandbox.** Restoring does not mutate the original sandbox; it creates a new one with a new `sandbox_id`.
-- **Inherited vs overridable settings on restore.** A restored sandbox inherits image, resources, entrypoint, and secrets from the snapshot. CPUs, memory, and other create-time settings can be overridden at restore.
+- **Snapshot restore is as-is.** A restored sandbox inherits image, resources, entrypoint, and secrets from the snapshot — none of these can be changed at restore time. If you need different CPUs, memory, or an updated image, create a fresh sandbox instead.
 
 ## See Also
 
