@@ -316,6 +316,14 @@ VERIFIED_FALSE_POSITIVES = {
         # to SandboxProcessStdinMode — so the checker thinks it's missing. It isn't.
         "in_docs_not_ref": {"SandboxProcessStdinMode"},
     },
+    "applications_sdk.md": {
+        # ReplayMode is imported in the reference (HIGH confidence via PY_IMPORT_RE),
+        # but the live `applications/durability` page only mentions it inline in prose
+        # (e.g. `request.replay(mode=ReplayMode.ADAPTIVE)`), so the doc-side extractor
+        # never puts it in a bucket. With the HIGH-confidence text-level fallback now
+        # disabled (see main() below), the checker would otherwise flag it as drift.
+        "in_ref_not_docs": {"ReplayMode"},
+    },
 }
 
 
