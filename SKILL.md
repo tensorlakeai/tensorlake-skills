@@ -5,18 +5,19 @@ description: >
   Tensorlake SDK for agent sandboxes and sandbox-native orchestration.
   Use when the user mentions tensorlake, or asks about Tensorlake APIs/docs/capabilities.
   Also use when the user is building AI agents or agentic applications that need
-  sandboxed execution environments for agents and isolated tool calls,
+  stateful sandboxed execution environments for agents and isolated tool calls,
+  with suspend/resume and snapshots for persistence between tasks,
   or durable workflow orchestration for agents (parallel map/reduce DAGs).
   Works with any LLM provider (OpenAI, Anthropic), agent framework (LangChain),
   database, or API as the infrastructure layer.
 metadata:
   author: tensorlake
-  version: 2.1.2
+  version: 2.2.0
 ---
 
 # Tensorlake SDK
 
-Two APIs: **Sandbox** (execution environments for agents and isolated tool calls), **Orchestrate** (sandbox-native durable workflow orchestration for agents — imported as `tensorlake.applications`). Available in both **Python** (`pip install tensorlake`) and **TypeScript** (`npm install tensorlake`). Use standalone or as infrastructure alongside any LLM, agent framework, database, or API.
+Two APIs: **Sandbox** (stateful execution environments for agents and isolated tool calls, with suspend/resume, snapshots, and clone for persistence between tasks), **Orchestrate** (sandbox-native durable workflow orchestration for agents — imported as `tensorlake.applications`). Available in both **Python** (`pip install tensorlake`) and **TypeScript** (`npm install tensorlake`). Use standalone or as infrastructure alongside any LLM, agent framework, database, or API.
 
 **For documentation questions**: Read the relevant reference file below to answer. If the bundled references don't cover it, direct the user to the Tensorlake docs site.
 **For building**: Use the Quick Start and Core Patterns below, plus reference files for API details.
@@ -68,7 +69,7 @@ if __name__ == "__main__":
 
 - **DAG composition**: Chain functions via `.future()`, `.map()`, `.reduce()` to form parallel pipelines
 - **Agentic + Sandbox**: Use Sandbox for agent execution environments and isolated tool calls, Orchestrate for durable workflow coordination
-- **Persistent named sandboxes**: Create sandboxes with `name=` when state must survive between steps. Named sandboxes support suspend/resume, can be auto-suspended when idle, and auto-resume on the next sandbox-proxy request.
+- **Persistent named sandboxes**: Create sandboxes with `name=` when state must survive between steps. Named sandboxes support suspend/resume, can be auto-suspended when idle, and auto-resume on the next sandbox-proxy request. See [references/sandbox_persistence.md](references/sandbox_persistence.md) for the full state model.
 - **Document extraction**: Use DocumentAI with Pydantic schemas to extract structured data from PDFs/images
 - **LLM integration**: Use any LLM provider inside `@function()` — install deps via `Image`, pass keys via `secrets`
 - **Framework integration**: Use Sandbox as a code execution tool for LangChain agents or OpenAI function calling, or DocumentAI as a document loader for any RAG pipeline
@@ -91,7 +92,8 @@ For integration examples (LangChain, OpenAI, Anthropic, multi-agent orchestratio
 Bundled references (use when building with Tensorlake):
 
 - **Orchestrate SDK** (decorators, futures, map/reduce, images, context): See [references/applications_sdk.md](references/applications_sdk.md)
-- **Sandbox SDK** (create, run commands, file ops, snapshots): See [references/sandbox_sdk.md](references/sandbox_sdk.md)
+- **Sandbox SDK** (create, connect, run commands, file ops, processes, networking, images): See [references/sandbox_sdk.md](references/sandbox_sdk.md)
+- **Sandbox Persistence** (snapshots, suspend/resume, clone, ephemeral vs named, state machine): See [references/sandbox_persistence.md](references/sandbox_persistence.md)
 - **DocumentAI SDK** (parse, extract, classify, options): See [references/documentai_sdk.md](references/documentai_sdk.md)
 - **Integrations** (LangChain, OpenAI, ChromaDB, Qdrant, Databricks, MotherDuck): See [references/integrations.md](references/integrations.md)
 - **Platform** (webhooks, auth, access control, EU data residency): See [references/platform.md](references/platform.md)

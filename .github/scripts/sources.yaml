@@ -9,17 +9,22 @@
 sandbox_sdk.md:
   sources:
     - https://docs.tensorlake.ai/sandboxes/introduction.md
-    - https://docs.tensorlake.ai/sandboxes/lifecycle.md
     - https://docs.tensorlake.ai/sandboxes/commands.md
     - https://docs.tensorlake.ai/sandboxes/file-operations.md
-    - https://docs.tensorlake.ai/sandboxes/snapshots.md
     - https://docs.tensorlake.ai/sandboxes/processes.md
     - https://docs.tensorlake.ai/sandboxes/networking.md
     - https://docs.tensorlake.ai/sandboxes/images.md
     - https://docs.tensorlake.ai/sandboxes/pty-sessions.md
     - https://docs.tensorlake.ai/sandboxes/computer-use.md
-  sdk_version: "0.4.43"
-  last_verified: "2026-04-09"
+  sdk_version: "0.4.44"
+  last_verified: "2026-04-10"
+
+sandbox_persistence.md:
+  sources:
+    - https://docs.tensorlake.ai/sandboxes/lifecycle.md
+    - https://docs.tensorlake.ai/sandboxes/snapshots.md
+  sdk_version: "0.4.44"
+  last_verified: "2026-04-10"
 
 applications_sdk.md:
   sources:
