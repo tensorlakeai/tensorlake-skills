@@ -14,7 +14,7 @@ Last verified: 2026-04-10
 
 # TensorLake Sandbox SDK Reference
 
-For state management (snapshots, suspend/resume, clone, ephemeral vs named, state machine), see [persistence.md](persistence.md).
+For state management (snapshots, suspend/resume, clone, ephemeral vs named, state machine), see [sandbox_persistence.md](sandbox_persistence.md).
 
 ## Imports
 
@@ -189,7 +189,7 @@ try {
 
 ### Persistence
 
-Snapshots, suspend/resume, clone, ephemeral vs named, and the full state machine live in [persistence.md](persistence.md).
+Snapshots, suspend/resume, clone, ephemeral vs named, and the full state machine live in [sandbox_persistence.md](sandbox_persistence.md).
 
 ## Sandbox — Interact with Running Sandbox
 
@@ -582,7 +582,7 @@ tl sbx port ls <sandbox-id>
 tl sbx port rm <sandbox-id> 8080
 ```
 
-Idle auto-suspend and auto-resume for named sandboxes are covered in [persistence.md](persistence.md#idle-auto-suspend-and-auto-resume).
+Idle auto-suspend and auto-resume for named sandboxes are covered in [sandbox_persistence.md](sandbox_persistence.md#idle-auto-suspend-and-auto-resume).
 
 ## Enums
 

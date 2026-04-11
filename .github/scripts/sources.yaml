@@ -19,7 +19,7 @@ sandbox_sdk.md:
   sdk_version: "0.4.44"
   last_verified: "2026-04-10"
 
-persistence.md:
+sandbox_persistence.md:
   sources:
     - https://docs.tensorlake.ai/sandboxes/lifecycle.md
     - https://docs.tensorlake.ai/sandboxes/snapshots.md

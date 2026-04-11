@@ -286,7 +286,7 @@ MODULE_OWNERS = {
     "applications_sdk.md": ("tensorlake.applications",),
     "sandbox_sdk.md": ("tensorlake.sandbox",),
     "sandbox_advanced.md": ("tensorlake.sandbox",),
-    "persistence.md": ("tensorlake.sandbox",),
+    "sandbox_persistence.md": ("tensorlake.sandbox",),
     "documentai_sdk.md": ("tensorlake.document_ai",),
     "integrations.md": (),
     "platform.md": (),
@@ -314,7 +314,21 @@ VERIFIED_FALSE_POSITIVES = {
         # a `###` heading (which isn't extracted because PROSE is disabled for this
         # ref). The docs contain the TypeScript alias `StdinMode`, which canonicalizes
         # to SandboxProcessStdinMode — so the checker thinks it's missing. It isn't.
-        "in_docs_not_ref": {"SandboxProcessStdinMode"},
+        #
+        # The snapshot/suspend/resume symbols are documented in sandbox_persistence.md,
+        # not sandbox_sdk.md — but they still appear in `introduction.md` quickstart
+        # snippets (which remains a sandbox_sdk source). The checker runs each ref
+        # file in isolation and can't see that they're covered by a sibling ref, so
+        # we mark them as verified-elsewhere here.
+        "in_docs_not_ref": {
+            "SandboxProcessStdinMode",
+            "suspend",
+            "resume",
+            "snapshot_and_wait",
+            "get_snapshot",
+            "list_snapshots",
+            "delete_snapshot",
+        },
     },
     "applications_sdk.md": {
         # ReplayMode is imported in the reference (HIGH confidence via PY_IMPORT_RE),
@@ -351,9 +365,9 @@ REFERENCE_RULES = {
         deny_tokens=frozenset({"close", "stdout_capture", "Sandbox", "login", "secrets_set"}),
         allowed_cli_prefixes=("sbx_",),
     ),
-    "persistence.md": RefRule(
+    "sandbox_persistence.md": RefRule(
         enabled_kinds=frozenset({IMPORTS, METHODS, CLI, OPTIONS, JSON_FIELDS}),
-        owned_modules=MODULE_OWNERS["persistence.md"],
+        owned_modules=MODULE_OWNERS["sandbox_persistence.md"],
         deny_tokens=frozenset({"close", "Sandbox"}),
         allowed_cli_prefixes=("sbx_",),
     ),

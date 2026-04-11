@@ -69,7 +69,7 @@ if __name__ == "__main__":
 
 - **DAG composition**: Chain functions via `.future()`, `.map()`, `.reduce()` to form parallel pipelines
 - **Agentic + Sandbox**: Use Sandbox for agent execution environments and isolated tool calls, Orchestrate for durable workflow coordination
-- **Persistent named sandboxes**: Create sandboxes with `name=` when state must survive between steps. Named sandboxes support suspend/resume, can be auto-suspended when idle, and auto-resume on the next sandbox-proxy request. See [references/persistence.md](references/persistence.md) for the full state model.
+- **Persistent named sandboxes**: Create sandboxes with `name=` when state must survive between steps. Named sandboxes support suspend/resume, can be auto-suspended when idle, and auto-resume on the next sandbox-proxy request. See [references/sandbox_persistence.md](references/sandbox_persistence.md) for the full state model.
 - **Document extraction**: Use DocumentAI with Pydantic schemas to extract structured data from PDFs/images
 - **LLM integration**: Use any LLM provider inside `@function()` — install deps via `Image`, pass keys via `secrets`
 - **Framework integration**: Use Sandbox as a code execution tool for LangChain agents or OpenAI function calling, or DocumentAI as a document loader for any RAG pipeline
@@ -93,7 +93,7 @@ Bundled references (use when building with Tensorlake):
 
 - **Orchestrate SDK** (decorators, futures, map/reduce, images, context): See [references/applications_sdk.md](references/applications_sdk.md)
 - **Sandbox SDK** (create, connect, run commands, file ops, processes, networking, images): See [references/sandbox_sdk.md](references/sandbox_sdk.md)
-- **Sandbox Persistence** (snapshots, suspend/resume, clone, ephemeral vs named, state machine): See [references/persistence.md](references/persistence.md)
+- **Sandbox Persistence** (snapshots, suspend/resume, clone, ephemeral vs named, state machine): See [references/sandbox_persistence.md](references/sandbox_persistence.md)
 - **DocumentAI SDK** (parse, extract, classify, options): See [references/documentai_sdk.md](references/documentai_sdk.md)
 - **Integrations** (LangChain, OpenAI, ChromaDB, Qdrant, Databricks, MotherDuck): See [references/integrations.md](references/integrations.md)
 - **Platform** (webhooks, auth, access control, EU data residency): See [references/platform.md](references/platform.md)
