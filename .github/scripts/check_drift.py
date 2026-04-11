@@ -48,7 +48,14 @@ TS_IMPORT_RE = re.compile(
     r'import\s+(?:type\s+)?\{([^}]+)\}\s+from\s+[\'"]((?:@tensorlake/[\w./-]+)|tensorlake(?:/[\w./-]+)*)[\'"]'
 )
 METHOD_CALL_RE = re.compile(
-    r"\b(?:client|sandbox|doc_ai|document_ai|pool|proc|session|request|ctx|future|dataset|parser|app)\s*\.\s*(\w+)\s*\("
+    # Matches method calls on common TensorLake object names. Base names also allow
+    # an optional `_client` / `Client` suffix so docs that use variable names like
+    # `sandbox_client` (Python) or `sandboxClient` (TypeScript) are covered — without
+    # this, `sandbox_client.connect_pty(...)` was silently invisible to the checker
+    # because `\bsandbox\b` doesn't match before `_client` (`_` is a word character).
+    r"\b(?:(?:sandbox|doc_ai|document_ai|documentai|documentAI|docAI)(?:_client|Client)?"
+    r"|client|pool|proc|session|request|ctx|future|dataset|parser|app)"
+    r"\s*\.\s*(\w+)\s*\("
 )
 DECORATOR_RE = re.compile(r"@(application|function|cls)\s*\(")
 TL_SUBCOMMAND_RE = re.compile(r"\btl\s+([a-z][\w-]*(?:\s+[a-z][\w-]*){0,2})")
@@ -253,6 +260,13 @@ EXPLICIT_ALIASES = {
     "tensorlake.doc_ai": "tensorlake.document_ai",
 }
 
+# Reverse map: canonical form -> set of original alias forms. Used when looking up
+# source URLs for a canonicalized token — the raw docs may contain the alias form
+# (e.g. `StdinMode`) rather than the canonical form (`SandboxProcessStdinMode`).
+REVERSE_ALIASES: dict[str, set[str]] = {}
+for _alias_key, _alias_value in EXPLICIT_ALIASES.items():
+    REVERSE_ALIASES.setdefault(_alias_value, set()).add(_alias_key)
+
 EXAMPLE_TOKEN_RE = re.compile(
     r"^(?:"
     r"agent_[a-z]|"
@@ -272,6 +286,7 @@ MODULE_OWNERS = {
     "applications_sdk.md": ("tensorlake.applications",),
     "sandbox_sdk.md": ("tensorlake.sandbox",),
     "sandbox_advanced.md": ("tensorlake.sandbox",),
+    "persistence.md": ("tensorlake.sandbox",),
     "documentai_sdk.md": ("tensorlake.document_ai",),
     "integrations.md": (),
     "platform.md": (),
@@ -280,15 +295,26 @@ MODULE_OWNERS = {
 
 OBJECT_MODULES = {
     "sandbox": "tensorlake.sandbox",
+    "sandbox_client": "tensorlake.sandbox",
+    "sandboxClient": "tensorlake.sandbox",
     "pool": "tensorlake.sandbox",
     "proc": "tensorlake.sandbox",
     "doc_ai": "tensorlake.document_ai",
+    "doc_ai_client": "tensorlake.document_ai",
+    "docAIClient": "tensorlake.document_ai",
     "document_ai": "tensorlake.document_ai",
+    "document_ai_client": "tensorlake.document_ai",
+    "documentAIClient": "tensorlake.document_ai",
 }
 
 VERIFIED_FALSE_POSITIVES = {
     "sandbox_sdk.md": {
         "in_ref_not_docs": {"close"},
+        # SandboxProcessStdinMode is a Python enum that shows up in the reference as
+        # a `###` heading (which isn't extracted because PROSE is disabled for this
+        # ref). The docs contain the TypeScript alias `StdinMode`, which canonicalizes
+        # to SandboxProcessStdinMode — so the checker thinks it's missing. It isn't.
+        "in_docs_not_ref": {"SandboxProcessStdinMode"},
     },
 }
 
@@ -315,6 +341,12 @@ REFERENCE_RULES = {
         enabled_kinds=frozenset({IMPORTS, METHODS, CLI, OPTIONS, JSON_FIELDS}),
         owned_modules=MODULE_OWNERS["sandbox_sdk.md"],
         deny_tokens=frozenset({"close", "stdout_capture", "Sandbox", "login", "secrets_set"}),
+        allowed_cli_prefixes=("sbx_",),
+    ),
+    "persistence.md": RefRule(
+        enabled_kinds=frozenset({IMPORTS, METHODS, CLI, OPTIONS, JSON_FIELDS}),
+        owned_modules=MODULE_OWNERS["persistence.md"],
+        deny_tokens=frozenset({"close", "Sandbox"}),
         allowed_cli_prefixes=("sbx_",),
     ),
     "sandbox_advanced.md": RefRule(
@@ -356,6 +388,11 @@ REFERENCE_RULES = {
 }
 
 ROUTE_RULES = [
+    ("/api-reference/", "_skip"),
+    ("/examples/", "_skip"),
+    ("/faqs/", "_skip"),
+    ("/opensource/", "_skip"),
+    ("/use-cases/", "_skip"),
     ("/sandboxes/skills-in-sandboxes", "sandbox_advanced.md"),
     ("/sandboxes/ai-code-execution", "sandbox_advanced.md"),
     ("/sandboxes/data-analysis", "sandbox_advanced.md"),
@@ -364,15 +401,10 @@ ROUTE_RULES = [
     ("/document-ingestion/production/", "troubleshooting.md"),
     ("/applications/overview", "troubleshooting.md"),
     ("/sandboxes/", "sandbox_sdk.md"),
-    ("/api-reference/", "_skip"),
     ("/applications/", "applications_sdk.md"),
     ("/document-ingestion/", "documentai_sdk.md"),
     ("/integrations/", "integrations.md"),
     ("/platform/", "platform.md"),
-    ("/examples/", "_skip"),
-    ("/faqs/", "_skip"),
-    ("/opensource/", "_skip"),
-    ("/use-cases/", "_skip"),
 ]
 
 
@@ -717,8 +749,40 @@ def classify_new_pages(urls: list[str]) -> dict[str, list[str]]:
     return buckets
 
 
-def source_urls_for_token(token: str, source_urls: list[str], fetched_subdir: Path) -> list[str]:
-    matches: list[str] = []
+def source_urls_for_token(
+    token: str, source_urls: list[str], fetched_subdir: Path
+) -> list[tuple[str, str | None]]:
+    # A HIGH-confidence addition may have been canonicalized via EXPLICIT_ALIASES —
+    # e.g. `killProcess` -> `kill_process`, or `tensorlake.documentai.models.options`
+    # -> `tensorlake.document_ai.models.options`. The raw docs still contain the alias
+    # form, so `text_mentions_symbol(text, canonical)` would miss it. Build ordered
+    # search variants: try the literal token and its canonical form first, then fall
+    # back to alias substitutions. If a match is only found via an alias, the caller
+    # needs to know which alias so the reader can actually find it in the doc.
+    canonical = canonical_symbol(token)
+    primary: list[str] = []
+    seen: set[str] = set()
+    for form in (token, canonical):
+        if form and form not in seen:
+            seen.add(form)
+            primary.append(form)
+
+    alias_variants: list[str] = []
+    for form in sorted(REVERSE_ALIASES.get(token, set()) | REVERSE_ALIASES.get(canonical, set())):
+        if form not in seen:
+            seen.add(form)
+            alias_variants.append(form)
+    for alias_key, alias_value in EXPLICIT_ALIASES.items():
+        if not alias_value:
+            continue
+        for base in (token, canonical):
+            if alias_value in base:
+                substituted = base.replace(alias_value, alias_key)
+                if substituted not in seen:
+                    seen.add(substituted)
+                    alias_variants.append(substituted)
+
+    matches: list[tuple[str, str | None]] = []
     for url in source_urls:
         txt_path = fetched_subdir / f"{slug(url)}.txt"
         if not txt_path.exists():
@@ -727,8 +791,18 @@ def source_urls_for_token(token: str, source_urls: list[str], fetched_subdir: Pa
             text = txt_path.read_text(encoding="utf-8")
         except OSError:
             continue
-        if text_mentions_symbol(text, token):
-            matches.append(url)
+        # Prefer a literal/canonical match. If found, no alias annotation needed.
+        if any(text_mentions_symbol(text, form) for form in primary):
+            matches.append((url, None))
+            continue
+        # Otherwise record which alias form actually appears, so the reader can
+        # jump straight to it with Ctrl-F on the target page.
+        alias_hit = next(
+            (form for form in alias_variants if text_mentions_symbol(text, form)),
+            None,
+        )
+        if alias_hit is not None:
+            matches.append((url, alias_hit))
     return matches
 
 
@@ -820,7 +894,10 @@ def build_report(
                 for token in sorted(added):
                     token_sources = diff.get(f"{confidence}_source_urls", {}).get(token, [])
                     if token_sources:
-                        joined = ", ".join(token_sources[:3])
+                        rendered: list[str] = []
+                        for url, alias in token_sources[:3]:
+                            rendered.append(f"{url} (as `{alias}`)" if alias else url)
+                        joined = ", ".join(rendered)
                         if len(token_sources) > 3:
                             joined += f" (+{len(token_sources) - 3} more)"
                         lines.append(f"- `{token}` — from: {joined}")
@@ -916,8 +993,16 @@ def main() -> int:
         for confidence in CONFIDENCE_ORDER:
             in_docs_not_ref = set_diff_with_aliases(docs_buckets[confidence], all_ref_symbols)
             in_ref_not_docs = set_diff_with_aliases(ref_buckets[confidence], all_docs_symbols)
-            in_docs_not_ref = {token for token in in_docs_not_ref if not text_mentions_symbol(ref_text, token)}
-            in_ref_not_docs = {token for token in in_ref_not_docs if not text_mentions_symbol(docs_text, token)}
+            # Raw-text "symbol appears somewhere" safety net is only applied to
+            # MEDIUM/LOW confidence, where extraction is noisy enough to warrant
+            # suppressing likely false positives. HIGH-confidence signals come from
+            # strong structural patterns (imports, method calls, decorators, CLI
+            # subcommands); a loose word match in prose or a heading should not veto
+            # them, or real SDK drift (e.g. a new `client.suspend()` method whose name
+            # also appears in a CLI example or heading) gets silently swallowed.
+            if confidence != HIGH_CONFIDENCE:
+                in_docs_not_ref = {token for token in in_docs_not_ref if not text_mentions_symbol(ref_text, token)}
+                in_ref_not_docs = {token for token in in_ref_not_docs if not text_mentions_symbol(docs_text, token)}
             if confidence in rule.suppress_removals:
                 in_ref_not_docs = set()
             verified = VERIFIED_FALSE_POSITIVES.get(ref_file, {})

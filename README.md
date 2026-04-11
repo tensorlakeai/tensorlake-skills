@@ -88,6 +88,7 @@ tensorlake-skills/
 └── references/
     ├── applications_sdk.md       # Orchestrate API reference
     ├── sandbox_sdk.md            # Sandbox API reference
+    ├── persistence.md            # Sandbox state: snapshots, suspend/resume, state machine
     ├── documentai_sdk.md         # DocumentAI API reference
     ├── integrations.md           # Integration patterns (LangChain, OpenAI, ChromaDB, Qdrant, etc.)
     ├── platform.md               # Webhooks, auth, access control, EU data residency

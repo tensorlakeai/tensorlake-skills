@@ -1,20 +1,20 @@
 <!--
 Source:
   - https://docs.tensorlake.ai/sandboxes/introduction.md
-  - https://docs.tensorlake.ai/sandboxes/lifecycle.md
   - https://docs.tensorlake.ai/sandboxes/commands.md
   - https://docs.tensorlake.ai/sandboxes/file-operations.md
-  - https://docs.tensorlake.ai/sandboxes/snapshots.md
   - https://docs.tensorlake.ai/sandboxes/processes.md
   - https://docs.tensorlake.ai/sandboxes/networking.md
   - https://docs.tensorlake.ai/sandboxes/images.md
   - https://docs.tensorlake.ai/sandboxes/pty-sessions.md
   - https://docs.tensorlake.ai/sandboxes/computer-use.md
-SDK version: tensorlake 0.4.43
-Last verified: 2026-04-09
+SDK version: tensorlake 0.4.44
+Last verified: 2026-04-10
 -->
 
 # TensorLake Sandbox SDK Reference
+
+For state management (snapshots, suspend/resume, clone, ephemeral vs named, state machine), see [persistence.md](persistence.md).
 
 ## Imports
 
@@ -141,11 +141,6 @@ await client.delete("new-name");
 
 `sandbox_id`/`sandboxId`, `name`, `namespace`, `status`, `image`, `resources` (`ContainerResourcesInfo`: `.cpus`, `.memory_mb`/`.memoryMb`), `secret_names`, `timeout_secs`, `entrypoint`, `created_at`, `terminated_at`
 
-### Ephemeral vs Named Sandboxes
-
-- **Ephemeral**: Created without `name`. Auto-terminate on completion. Cannot be suspended.
-- **Named/Persistent**: Created with `name` parameter. Support suspend/resume, can be auto-suspended when idle, and can be referenced by ID or name.
-
 ### Create & Connect to a Sandbox
 
 **Python:**
@@ -192,77 +187,9 @@ try {
 }
 ```
 
-### Snapshots
+### Persistence
 
-**Python:**
-
-```python
-snapshot = client.snapshot_and_wait(sandbox_id, timeout=300, poll_interval=1.0)
-print(snapshot.snapshot_id)
-# snapshot.status.value, snapshot.size_bytes
-
-info = client.get_snapshot(snapshot_id)           # -> SnapshotInfo
-snapshots = client.list_snapshots()               # -> list[SnapshotInfo]
-client.delete_snapshot(snapshot_id)
-
-# Restore from snapshot
-new_sandbox = client.create_and_connect(snapshot_id=snapshot.snapshot_id)
-```
-
-**TypeScript:**
-
-```typescript
-const snapshot = await client.snapshotAndWait(sandbox.sandboxId);
-console.log(snapshot.snapshotId);
-
-const info = await client.getSnapshot("snapshot-id");
-const snapshots = await client.listSnapshots();
-await client.deleteSnapshot("snapshot-id");
-
-// Restore from snapshot
-const restored = await client.createAndConnect({
-  snapshotId: snapshot.snapshotId,
-});
-```
-
-Snapshots restore filesystem and memory state. Inherited settings (image, resources, entrypoint, secrets) can be overridden on restore.
-
-### Clone (CLI only)
-
-```bash
-tl sbx clone <sandbox-id>   # Snapshot + restore in one operation
-```
-
-Note: Cloning is a CLI-only operation, not available in the Python SDK.
-
-### Suspend & Resume
-
-Suspend/resume is available for **named sandboxes only**. Ephemeral sandboxes return 400.
-
-**CLI:**
-
-```bash
-tl sbx suspend my-env
-tl sbx resume my-env
-```
-
-**REST API:**
-
-```bash
-# Suspend — snapshots the sandbox and terminates its live container
-curl -X POST https://api.tensorlake.ai/sandboxes/{sandbox_id_or_name}/suspend \
-  -H "Authorization: Bearer $TL_API_KEY"
-# 202 = suspend initiated, 200 = already suspended
-
-# Resume — restores from snapshot
-curl -X POST https://api.tensorlake.ai/sandboxes/{sandbox_id_or_name}/resume \
-  -H "Authorization: Bearer $TL_API_KEY"
-# 202 = resume initiated, 200 = already running
-```
-
-**Status codes (both endpoints):** 400 = cannot suspend/resume in current state (or ephemeral), 401 = invalid credentials, 403 = insufficient permissions, 404 = not found.
-
-Note: Suspend/resume is not available in the Python SDK — use CLI or REST API. However, many sandbox-proxy requests (e.g., hitting the sandbox URL) automatically resume suspended sandboxes.
+Snapshots, suspend/resume, clone, ephemeral vs named, and the full state machine live in [persistence.md](persistence.md).
 
 ## Sandbox — Interact with Running Sandbox
 
@@ -400,6 +327,10 @@ console.log((await sandbox.getOutput(proc.pid)).lines);  // combined
 for await (const event of sandbox.followOutput(proc.pid)) {
   process.stdout.write(event.line);
 }
+
+// Signal / kill
+await sandbox.sendSignal(proc.pid, 15);   // SIGTERM — graceful stop
+await sandbox.killProcess(proc.pid);       // Dedicated kill convenience (no Python equivalent)
 ```
 
 ### Process Stdin/Stdout/Stderr (Granular APIs)
@@ -651,11 +582,7 @@ tl sbx port ls <sandbox-id>
 tl sbx port rm <sandbox-id> 8080
 ```
 
-### Idle Suspend and Auto-Resume
-
-- Named sandboxes can be suspended manually or auto-suspended when idle.
-- Requests to a **suspended** named sandbox automatically resume it and wait for the port to become routable.
-- Ephemeral sandboxes do not support suspend/resume.
+Idle auto-suspend and auto-resume for named sandboxes are covered in [persistence.md](persistence.md#idle-auto-suspend-and-auto-resume).
 
 ## Enums
 
@@ -680,17 +607,6 @@ tl sbx port rm <sandbox-id> 8080
 |---|---|
 | `capture` | Capture output for later retrieval |
 | `discard` | Discard output |
-
-## Sandbox Statuses
-
-| Status | Meaning |
-|---|---|
-| `Pending` | Being created/scheduled |
-| `Running` | Ready for commands |
-| `Snapshotting` | Snapshot in progress |
-| `Suspending` | Being suspended |
-| `Suspended` | Paused (named sandboxes only) |
-| `Terminated` | Stopped |
 
 ## CLI Quick Reference
 
