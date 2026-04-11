@@ -190,15 +190,15 @@ tl sbx clone <sandbox-id> --timeout 600
 
 ## Suspend & Resume
 
-Suspend a running **named** sandbox to pause its state in place, then resume it later exactly where it left off. Internally, suspend snapshots the sandbox's state and terminates the live container; resume restores from that snapshot. Ephemeral sandboxes cannot be suspended — suspend calls on them return an error.
+Suspend a running **named** sandbox to pause its state in place: filesystem and memory are preserved, and the running container stops so you aren't billed for compute. Resume brings the **same** sandbox back to `Running` exactly where it left off — the `sandbox_id` and name are unchanged, and you're resuming the suspended sandbox itself, not restoring from a snapshot into a new sandbox. Ephemeral sandboxes cannot be suspended — suspend calls on them return an error.
 
 Both operations accept either the sandbox name or the sandbox ID.
 
 **Python:**
 
 ```python
-client.suspend("my-env")   # Snapshots state, terminates live container
-client.resume("my-env")    # Restores from snapshot
+client.suspend("my-env")   # Pauses the sandbox in place; stops the running container
+client.resume("my-env")    # Brings the same sandbox back to Running
 ```
 
 **TypeScript:**
