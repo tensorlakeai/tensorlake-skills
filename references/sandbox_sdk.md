@@ -9,7 +9,7 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/pty-sessions.md
   - https://docs.tensorlake.ai/sandboxes/computer-use.md
 SDK version: tensorlake 0.4.44
-Last verified: 2026-04-10
+Last verified: 2026-04-12
 -->
 
 # TensorLake Sandbox SDK Reference

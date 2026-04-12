@@ -3,7 +3,7 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/lifecycle.md
   - https://docs.tensorlake.ai/sandboxes/snapshots.md
 SDK version: tensorlake 0.4.44
-Last verified: 2026-04-10
+Last verified: 2026-04-12
 -->
 
 # TensorLake Sandbox Persistence
@@ -27,19 +27,23 @@ Every sandbox moves through the states below. `create` starts the sandbox in `Pe
       │ ▲                                             │
       │ └─────────── snapshot complete ───────────────┘
       │
-      │                  (named only)
-      ├─── suspend ───► Suspending ───► Suspended
-      │                                     │
-      │ ◄────────────── resume ─────────────┘
-      │                                     │
-      ▼                                     ▼
-  Terminated  ◄────── terminate  ──────  Terminated
+      │                  (named only: suspend or timeout)
+      ├─── suspend / timeout ───► Suspending ───► Suspended
+      │                                                │
+      │ ◄──────────────── resume ──────────────────────┘
+      │                                                │
+      ▼ (ephemeral only: timeout; any: terminate)      ▼
+  Terminated  ◄────────── terminate  ───────────  Terminated
       │
       ▼
      [*]
 ```
 
-Ephemeral sandboxes follow the same `create → Pending → Running → Terminated` flow but cannot enter `Suspending`/`Suspended`.
+**Timeout behavior differs by sandbox type:**
+- **Named** — timeout triggers a suspend, preserving state for later resume.
+- **Ephemeral** — timeout triggers termination (final state).
+
+Ephemeral sandboxes follow the same `create → Pending → Running → Terminated` flow but cannot enter `Suspending`/`Suspended`. Explicit `terminate` works from `Running` for any sandbox.
 
 ### State Descriptions
 
@@ -48,9 +52,9 @@ Ephemeral sandboxes follow the same `create → Pending → Running → Terminat
 | `Pending` | Sandbox is being scheduled or started. | Yes |
 | `Running` | Sandbox is active and ready for commands, files, or processes. | Yes |
 | `Snapshotting` | A snapshot is being created from the running sandbox. Sandbox returns to `Running` on completion. | Yes |
-| `Suspending` | Sandbox is being suspended — state is snapshotted for later resume. Named sandboxes only. | Yes |
+| `Suspending` | Sandbox is being suspended — state is snapshotted for later resume. Triggered by manual suspend or timeout. Named sandboxes only. | Yes |
 | `Suspended` | Paused. Filesystem and memory are preserved. Named sandboxes only. | Snapshot storage only |
-| `Terminated` | Final state. Resources released. Cannot be reversed. | No |
+| `Terminated` | Final state. Resources released. Cannot be reversed. Triggered by explicit terminate (any sandbox) or timeout (ephemeral only). | No |
 
 ## Ephemeral vs Named
 
@@ -61,6 +65,7 @@ Persistence requires a **named** sandbox. Ephemeral sandboxes cannot be suspende
 | Created with | `client.create()` (no name) | `client.create(name=...)` |
 | Suspend / Resume | Not supported — returns an error | Supported |
 | Idle auto-suspend | Not supported | Supported |
+| Timeout behavior | Terminates on timeout | Suspends on timeout |
 | Reference by | ID only | ID **or** name |
 | Use when | Short-lived, one-off execution | Multi-step agents, persistent environments |
 
@@ -69,6 +74,8 @@ An ephemeral sandbox can be promoted to a named sandbox after creation via `clie
 ## Snapshots
 
 Snapshots capture the filesystem and memory state of a running sandbox. Use them to save work mid-session and restore it later in a **new** sandbox. Unlike suspend, snapshots do not pause the original — the sandbox keeps running after the snapshot completes.
+
+Snapshots are independent of sandbox lifecycle — they persist after the source sandbox is terminated. This means you can snapshot an ephemeral sandbox before it terminates and still recover its state later.
 
 ### Create a Snapshot
 
