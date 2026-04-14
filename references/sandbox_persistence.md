@@ -109,7 +109,7 @@ tl sbx snapshot <sandbox-id> --timeout 600
 
 ```bash
 curl -X POST https://api.tensorlake.ai/sandboxes/<sandbox-id>/snapshot \
-  -H "Authorization: Bearer $TL_API_KEY"
+  -H "Authorization: Bearer $TENSORLAKE_API_KEY"
 ```
 
 ### Restore from a Snapshot
@@ -140,7 +140,7 @@ tl sbx new --snapshot <snapshot-id>
 
 ```bash
 curl -X POST https://api.tensorlake.ai/sandboxes \
-  -H "Authorization: Bearer $TL_API_KEY" \
+  -H "Authorization: Bearer $TENSORLAKE_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"snapshot_id": "<snapshot-id>"}'
 ```
@@ -170,10 +170,10 @@ tl sbx snapshot ls
 tl sbx snapshot rm <snapshot-id>
 
 curl https://api.tensorlake.ai/snapshots \
-  -H "Authorization: Bearer $TL_API_KEY"
+  -H "Authorization: Bearer $TENSORLAKE_API_KEY"
 
 curl -X DELETE https://api.tensorlake.ai/snapshots/<snapshot-id> \
-  -H "Authorization: Bearer $TL_API_KEY"
+  -H "Authorization: Bearer $TENSORLAKE_API_KEY"
 ```
 
 ### `snapshot_and_wait` Parameters
@@ -227,12 +227,12 @@ tl sbx resume my-env
 ```bash
 # Suspend
 curl -X POST https://api.tensorlake.ai/sandboxes/{sandbox_id_or_name}/suspend \
-  -H "Authorization: Bearer $TL_API_KEY"
+  -H "Authorization: Bearer $TENSORLAKE_API_KEY"
 # 202 = suspend initiated, 200 = already suspended
 
 # Resume
 curl -X POST https://api.tensorlake.ai/sandboxes/{sandbox_id_or_name}/resume \
-  -H "Authorization: Bearer $TL_API_KEY"
+  -H "Authorization: Bearer $TENSORLAKE_API_KEY"
 # 202 = resume initiated, 200 = already running
 ```
 
