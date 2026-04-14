@@ -12,7 +12,7 @@ description: >
   database, or API as the infrastructure layer.
 metadata:
   author: tensorlake
-  version: 2.2.0
+  version: 2.3.0
 ---
 
 # Tensorlake SDK
@@ -26,7 +26,12 @@ Two APIs: **Sandbox** (stateful execution environments for agents and isolated t
 
 **Python:** `pip install tensorlake` — **TypeScript:** `npm install tensorlake`
 
-Both SDKs ship with `tl` and `tensorlake` CLI tools. Tensorlake requires the `TENSORLAKE_API_KEY` environment variable to be configured before running Tensorlake code. If it is missing, direct the user to run `tensorlake login` (Python) / `npx tl login` (TypeScript) or to configure the key through their local environment (for example a shell profile, `.env` file, or secret manager). Do **not** ask the user to paste the key into the conversation, include it in generated code, or print it in terminal output. Get an API key at [cloud.tensorlake.ai](https://cloud.tensorlake.ai). For deployed applications, use the `secrets` parameter in `@function()` to pass keys securely.
+Both SDKs ship with `tl` and `tensorlake` CLI tools. The skill itself declares no required environment variables — the variables below are runtime prerequisites for the user's code, configured in the user's own environment.
+
+- **`TENSORLAKE_API_KEY`** — the canonical env var name read by the Tensorlake SDK and CLI. Always use this exact name; do not substitute shorter aliases like `TL_API_KEY`. The key *value* itself has the format `tl_apiKey_*` (project-scoped). If the env var is missing, direct the user to run `tensorlake login` (Python) / `npx tl login` (TypeScript) or to configure it through their local environment (shell profile, `.env` file, or secret manager). Get a key at [cloud.tensorlake.ai](https://cloud.tensorlake.ai).
+- **Provider keys** (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.) — only required when the user opts into the corresponding integration in their own code. Not required by Tensorlake itself. For deployed applications, declare them with `secrets=["OPENAI_API_KEY", ...]` on `@function()` and manage their values via `tensorlake secrets set` — never inline the value in code.
+
+Do **not** ask the user to paste any key into the conversation, include keys in generated code, or print them in terminal output.
 
 ## Quick Start — Orchestrate Workflow
 

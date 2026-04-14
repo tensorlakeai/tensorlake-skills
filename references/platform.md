@@ -90,7 +90,10 @@ Webhooks notify your endpoints of Document Ingestion and Workflow status changes
 2. Provide webhook name and endpoint URL
 3. Select event types to monitor
 
-**Important:** Disable CSRF protection on your endpoint if your framework enables it by default.
+**Security:** Webhook deliveries are cross-origin POSTs without a session cookie, so frameworks that enable CSRF protection by default will reject them. Do **not** disable CSRF protection globally. Instead:
+
+1. **Exempt only the webhook route** from CSRF middleware (e.g., Django `@csrf_exempt`, Rails `skip_before_action :verify_authenticity_token, only: [:webhook]`, Express-style per-route exclusion).
+2. **Verify the Svix signature** on every request using the signing secret from the webhook settings — this is what actually authenticates the payload. Reject any request whose signature does not validate.
 
 ### Event Types
 
