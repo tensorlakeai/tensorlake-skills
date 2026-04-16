@@ -12,7 +12,7 @@ description: >
   database, or API as the infrastructure layer.
 metadata:
   author: tensorlake
-  version: 2.3.0
+  version: 2.3.1
 ---
 
 # Tensorlake SDK

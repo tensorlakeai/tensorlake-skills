@@ -2,7 +2,7 @@
 Source:
   - https://docs.tensorlake.ai/sandboxes/lifecycle.md
   - https://docs.tensorlake.ai/sandboxes/snapshots.md
-SDK version: tensorlake 0.4.44
+SDK version: tensorlake 0.4.46
 Last verified: 2026-04-16
 -->
 
