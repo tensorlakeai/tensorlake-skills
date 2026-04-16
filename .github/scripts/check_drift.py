@@ -330,6 +330,20 @@ VERIFIED_FALSE_POSITIVES = {
             "delete_snapshot",
         },
     },
+    "sandbox_persistence.md": {
+        # sandbox_persistence.md deliberately punts create/connect/terminate basics to
+        # sandbox_sdk.md (see the pointer at the top of the ref). The live lifecycle
+        # and snapshot pages still show full examples with
+        # `from tensorlake.sandbox import SandboxClient` and `client.connect(...)` /
+        # `client.delete(...)`, so the checker extracts those symbols as missing —
+        # they are covered by the sibling ref, which this extractor can't see.
+        "in_docs_not_ref": {
+            "SandboxClient",
+            "connect",
+            "delete",
+            "tensorlake.sandbox",
+        },
+    },
     "applications_sdk.md": {
         # ReplayMode is imported in the reference (HIGH confidence via PY_IMPORT_RE),
         # but the live `applications/durability` page only mentions it inline in prose

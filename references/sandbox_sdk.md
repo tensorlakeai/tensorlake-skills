@@ -1,15 +1,17 @@
 <!--
 Source:
   - https://docs.tensorlake.ai/sandboxes/introduction.md
+  - https://docs.tensorlake.ai/sandboxes/quickstart.md
   - https://docs.tensorlake.ai/sandboxes/commands.md
   - https://docs.tensorlake.ai/sandboxes/file-operations.md
   - https://docs.tensorlake.ai/sandboxes/processes.md
+  - https://docs.tensorlake.ai/sandboxes/environment-variables.md
   - https://docs.tensorlake.ai/sandboxes/networking.md
   - https://docs.tensorlake.ai/sandboxes/images.md
   - https://docs.tensorlake.ai/sandboxes/pty-sessions.md
   - https://docs.tensorlake.ai/sandboxes/computer-use.md
-SDK version: tensorlake 0.4.44
-Last verified: 2026-04-12
+SDK version: tensorlake 0.4.46
+Last verified: 2026-04-16
 -->
 
 # TensorLake Sandbox SDK Reference
@@ -30,7 +32,7 @@ from tensorlake.sandbox import SandboxClient
 import { SandboxClient } from "tensorlake";
 ```
 
-Install: `npm install tensorlake` (also installs `tl` and `tensorlake` CLI tools)
+Install: `pip install tensorlake` (Python) or `npm install tensorlake` (TypeScript). Both ship with the `tl` and `tensorlake` CLI tools. Authenticate once with `tl login`, or export `TENSORLAKE_API_KEY` in the environment.
 
 ## SandboxClient — Lifecycle Management
 
@@ -271,6 +273,50 @@ await sandbox.deleteFile("/workspace/data.csv");
 
 Best practice: Use `/workspace` as the default working directory.
 
+### Environment Variables
+
+Pass `env` on each invocation, choosing the scope that matches the lifetime you want:
+
+| Scope | API | Lifetime |
+|---|---|---|
+| Command | `sandbox.run(..., env={...})` | Single command execution |
+| Process | `sandbox.start_process(..., env={...})` | Life of the background process |
+| PTY | `sandbox.create_pty(..., env={...})` | Life of the interactive terminal session |
+
+**Python:**
+
+```python
+sandbox.run("bash", ["-lc", "echo $MODE"], env={"MODE": "prod", "DEBUG": "0"})
+
+pty = sandbox.create_pty(
+    command="/bin/bash",
+    env={"TERM": "xterm-256color", "APP_ENV": "dev"},
+    working_dir="/workspace",
+)
+```
+
+**TypeScript:**
+
+```typescript
+await sandbox.run("bash", {
+  args: ["-lc", "echo $MODE"],
+  env: { MODE: "prod", DEBUG: "0" },
+});
+
+const pty = await sandbox.createPty({
+  command: "/bin/bash",
+  env: { TERM: "xterm-256color", APP_ENV: "dev" },
+  workingDir: "/workspace",
+});
+```
+
+**CLI:** both `tl sbx exec` and `tl sbx ssh` accept repeated `--env KEY=VALUE` flags:
+
+```bash
+tl sbx exec <sandbox-id> --env MODE=prod --env DEBUG=0 bash -lc 'echo $MODE'
+tl sbx ssh  <sandbox-id> --env APP_ENV=dev --env TERM=screen-256color
+```
+
 ### Process Management
 
 **Python:**
@@ -503,6 +549,7 @@ await createSandboxImage(image, {
 |---|---|
 | `ubuntu-minimal` | Default. No systemd, boots in hundreds of ms. |
 | `ubuntu-systemd` | Includes systemd, supports Docker/K8s inside sandbox. |
+| `ubuntu-vnc` | Desktop-enabled (XFCE + TigerVNC + Firefox) — use with `sandbox.connect_desktop()` for computer-use / browser automation. |
 
 ### Image Builder Methods (chainable)
 

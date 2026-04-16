@@ -2,6 +2,17 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [2.3.1] — SDK 0.4.46 — 2026-04-16
+
+### Added
+- **sandbox_sdk.md** — new **Environment Variables** section consolidating command-scope (`sandbox.run`), process-scope (`start_process`), and PTY-scope (`create_pty`) env usage, plus the `tl sbx exec --env` and `tl sbx ssh --env` CLI flags, sourced from the new upstream `sandboxes/environment-variables.md` page
+- **sandbox_sdk.md** — `pip install tensorlake` and `tl login` / `TENSORLAKE_API_KEY` auth note in the Install line, sourced from the new upstream `sandboxes/quickstart.md` page
+- **sandbox_sdk.md** — `ubuntu-vnc` row added to the Base Images table (previously only referenced in the Computer Use section)
+- **sandbox_sdk.md** — `sandboxes/environment-variables.md` and `sandboxes/quickstart.md` added to the source URL header
+
+### Changed
+- **sandbox_sdk.md** / **sandbox_persistence.md** — bumped `SDK version` header to `tensorlake 0.4.46` and `Last verified` to `2026-04-16`
+
 ## [2.3.0] — SDK 0.4.44 — 2026-04-14
 
 ### Changed

@@ -2,8 +2,8 @@
 Source:
   - https://docs.tensorlake.ai/sandboxes/lifecycle.md
   - https://docs.tensorlake.ai/sandboxes/snapshots.md
-SDK version: tensorlake 0.4.44
-Last verified: 2026-04-12
+SDK version: tensorlake 0.4.46
+Last verified: 2026-04-16
 -->
 
 # TensorLake Sandbox Persistence
@@ -53,7 +53,7 @@ Ephemeral sandboxes follow the same `create → Pending → Running → Terminat
 | `Running` | Sandbox is active and ready for commands, files, or processes. | Yes |
 | `Snapshotting` | A snapshot is being created from the running sandbox. Sandbox returns to `Running` on completion. | Yes |
 | `Suspending` | Sandbox is being suspended — state is snapshotted for later resume. Triggered by manual suspend or timeout. Named sandboxes only. | Yes |
-| `Suspended` | Paused. Filesystem and memory are preserved. Named sandboxes only. | Snapshot storage only |
+| `Suspended` | Paused. Filesystem, memory, and running processes are preserved. Named sandboxes only. | Snapshot storage only |
 | `Terminated` | Final state. Resources released. Cannot be reversed. Triggered by explicit terminate (any sandbox) or timeout (ephemeral only). | No |
 
 ## Ephemeral vs Named
@@ -73,7 +73,7 @@ An ephemeral sandbox can be promoted to a named sandbox after creation via `clie
 
 ## Snapshots
 
-Snapshots capture the filesystem and memory state of a running sandbox. Use them to save work mid-session and restore it later in a **new** sandbox. Unlike suspend, snapshots do not pause the original — the sandbox keeps running after the snapshot completes.
+Snapshots capture the filesystem, memory, and running processes of a sandbox. Use them to save work mid-session and restore it later in a **new** sandbox. Unlike suspend, snapshots do not pause the original — the sandbox keeps running after the snapshot completes.
 
 Snapshots are independent of sandbox lifecycle — they persist after the source sandbox is terminated. This means you can snapshot an ephemeral sandbox before it terminates and still recover its state later.
 
@@ -114,7 +114,7 @@ curl -X POST https://api.tensorlake.ai/sandboxes/<sandbox-id>/snapshot \
 
 ### Restore from a Snapshot
 
-Create a new sandbox from a snapshot. The new sandbox restores the captured filesystem and memory state **exactly as it was** — image, resources (CPUs, memory), entrypoint, and secrets all come from the snapshot and cannot be changed at restore time. If you need different resources, create a fresh sandbox instead of restoring.
+Create a new sandbox from a snapshot. The new sandbox restores the captured filesystem, memory, and running processes **exactly as they were** — image, resources (CPUs, memory), entrypoint, and secrets all come from the snapshot and cannot be changed at restore time. If you need different resources, create a fresh sandbox instead of restoring.
 
 **Python:**
 
@@ -194,6 +194,8 @@ tl sbx clone <sandbox-id> --timeout 600
 ```
 
 **Availability:** CLI only. Not exposed in the Python SDK, TypeScript SDK, or HTTP API. For programmatic forking, call `snapshot_and_wait()` followed by `create_and_connect(snapshot_id=...)` explicitly.
+
+**Storage:** Clone's intermediate snapshot persists and consumes storage until explicitly deleted — remove it with `tl sbx snapshot rm <snapshot-id>` if you don't need it as a restore point.
 
 ## Suspend & Resume
 
