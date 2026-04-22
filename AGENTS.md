@@ -1,10 +1,10 @@
 # Tensorlake SDK
-<!-- version: 2.3.1 -->
+<!-- version: 2.4.0 -->
 
 Tensorlake provides two APIs for building agentic applications:
 
 - **Sandbox** — Stateful execution environments for agents and isolated tool calls, with suspend/resume, snapshots, and clone for persistence between tasks
-- **Orchestrate** — Sandbox-native durable workflow orchestration for agents, with parallel map/reduce, auto-scaling, and crash recovery (imported as `tensorlake.applications`)
+- **Orchestration** — Sandbox-native durable workflow orchestration for agents, with parallel map/reduce, auto-scaling, and crash recovery (imported as `tensorlake.applications`)
 
 Available in both **Python** (`pip install tensorlake`) and **TypeScript** (`npm install tensorlake`). Use standalone or as infrastructure alongside any LLM provider, agent framework, database, or API.
 
@@ -70,7 +70,7 @@ if __name__ == "__main__":
 ## Core Patterns
 
 - **DAG composition**: Chain functions via `.future()`, `.map()`, `.reduce()` to form parallel pipelines
-- **Agentic + Sandbox**: Use Sandbox for agent execution environments and isolated tool calls, Orchestrate for durable workflow coordination
+- **Agentic + Sandbox**: Use Sandbox for agent execution environments and isolated tool calls, Orchestration for durable workflow coordination
 - **Persistent named sandboxes**: Create sandboxes with `name=` when state must survive between steps. Named sandboxes support suspend/resume, can be auto-suspended when idle, and auto-resume on the next sandbox-proxy request. See `references/sandbox_persistence.md` for the full state model.
 - **Document extraction**: Use DocumentAI with Pydantic schemas to extract structured data from PDFs/images
 - **LLM integration**: Use any LLM provider inside `@function()` — install deps via `Image`, pass keys via `secrets`
@@ -80,7 +80,7 @@ if __name__ == "__main__":
 
 Detailed API docs are in the `references/` directory:
 
-- `references/applications_sdk.md` — Orchestrate SDK: decorators, futures, map/reduce, images, context
+- `references/applications_sdk.md` — Orchestration SDK: decorators, futures, map/reduce, images, context
 - `references/sandbox_sdk.md` — Create sandboxes, connect, run commands, file ops, processes, networking, images
 - `references/sandbox_persistence.md` — Sandbox state: snapshots, suspend/resume, clone, ephemeral vs named, state machine
 - `references/documentai_sdk.md` — Parse, extract, classify, options

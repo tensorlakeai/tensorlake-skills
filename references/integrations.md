@@ -6,8 +6,8 @@ Source:
   - https://docs.tensorlake.ai/integrations/qdrant.md
   - https://docs.tensorlake.ai/integrations/databricks.md
   - https://docs.tensorlake.ai/integrations/motherduck.md
-SDK version: tensorlake 0.4.39
-Last verified: 2026-04-07
+SDK version: tensorlake 0.4.49
+Last verified: 2026-04-22
 -->
 
 # TensorLake Integration Patterns

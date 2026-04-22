@@ -2,8 +2,8 @@
 Source:
   - https://docs.tensorlake.ai/sandboxes/lifecycle.md
   - https://docs.tensorlake.ai/sandboxes/snapshots.md
-SDK version: tensorlake 0.4.46
-Last verified: 2026-04-16
+SDK version: tensorlake 0.4.49
+Last verified: 2026-04-22
 -->
 
 # TensorLake Sandbox Persistence

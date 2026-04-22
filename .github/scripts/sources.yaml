@@ -9,22 +9,26 @@
 sandbox_sdk.md:
   sources:
     - https://docs.tensorlake.ai/sandboxes/introduction.md
+    - https://docs.tensorlake.ai/sandboxes/quickstart.md
+    - https://docs.tensorlake.ai/sandboxes/concepts.md
     - https://docs.tensorlake.ai/sandboxes/commands.md
+    - https://docs.tensorlake.ai/sandboxes/environment-variables.md
     - https://docs.tensorlake.ai/sandboxes/file-operations.md
     - https://docs.tensorlake.ai/sandboxes/processes.md
     - https://docs.tensorlake.ai/sandboxes/networking.md
     - https://docs.tensorlake.ai/sandboxes/images.md
     - https://docs.tensorlake.ai/sandboxes/pty-sessions.md
     - https://docs.tensorlake.ai/sandboxes/computer-use.md
-  sdk_version: "0.4.44"
-  last_verified: "2026-04-10"
+    - https://docs.tensorlake.ai/sandboxes/docker.md
+  sdk_version: "0.4.49"
+  last_verified: "2026-04-22"
 
 sandbox_persistence.md:
   sources:
     - https://docs.tensorlake.ai/sandboxes/lifecycle.md
     - https://docs.tensorlake.ai/sandboxes/snapshots.md
-  sdk_version: "0.4.44"
-  last_verified: "2026-04-10"
+  sdk_version: "0.4.49"
+  last_verified: "2026-04-22"
 
 applications_sdk.md:
   sources:
@@ -51,9 +55,8 @@ applications_sdk.md:
     - https://docs.tensorlake.ai/applications/sandboxes.md
     - https://docs.tensorlake.ai/applications/guides/streaming-progress.md
     - https://docs.tensorlake.ai/applications/guides/logging.md
-    - https://docs.tensorlake.ai/applications/guides/autoscaling.md
-  sdk_version: "0.4.39"
-  last_verified: "2026-04-07"
+  sdk_version: "0.4.49"
+  last_verified: "2026-04-22"
 
 documentai_sdk.md:
   sources:
@@ -76,8 +79,8 @@ documentai_sdk.md:
     - https://docs.tensorlake.ai/document-ingestion/datasets/data.md
     - https://docs.tensorlake.ai/document-ingestion/file-management/overview.md
     - https://docs.tensorlake.ai/document-ingestion/parsing/on-prem.md
-  sdk_version: "0.4.39"
-  last_verified: "2026-04-07"
+  sdk_version: "0.4.49"
+  last_verified: "2026-04-22"
 
 integrations.md:
   sources:
@@ -87,8 +90,8 @@ integrations.md:
     - https://docs.tensorlake.ai/integrations/qdrant.md
     - https://docs.tensorlake.ai/integrations/databricks.md
     - https://docs.tensorlake.ai/integrations/motherduck.md
-  sdk_version: "0.4.39"
-  last_verified: "2026-04-07"
+  sdk_version: "0.4.49"
+  last_verified: "2026-04-22"
 
 platform.md:
   sources:
@@ -106,8 +109,8 @@ platform.md:
     - https://docs.tensorlake.ai/platform/playground/sample-documents.md
     - https://docs.tensorlake.ai/platform/security.md
     - https://docs.tensorlake.ai/platform/sso.md
-  sdk_version: "0.4.39"
-  last_verified: "2026-04-07"
+  sdk_version: "0.4.49"
+  last_verified: "2026-04-22"
 
 sandbox_advanced.md:
   sources:
@@ -119,8 +122,8 @@ sandbox_advanced.md:
     - https://docs.tensorlake.ai/sandboxes/agentic-rl-reproducible-env.md
     - https://docs.tensorlake.ai/sandboxes/agentic-swarm-intelligence.md
     - https://docs.tensorlake.ai/sandboxes/gspo-agentic-rl.md
-  sdk_version: "0.4.39"
-  last_verified: "2026-04-07"
+  sdk_version: "0.4.49"
+  last_verified: "2026-04-22"
 
 troubleshooting.md:
   sources:
@@ -128,5 +131,5 @@ troubleshooting.md:
     - https://docs.tensorlake.ai/applications/production/troubleshooting.md
     - https://docs.tensorlake.ai/document-ingestion/production/integration.md
     - https://docs.tensorlake.ai/document-ingestion/production/benchmarks.md
-  sdk_version: "0.4.39"
-  last_verified: "2026-04-07"
+  sdk_version: "0.4.49"
+  last_verified: "2026-04-22"

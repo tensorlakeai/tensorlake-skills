@@ -12,12 +12,12 @@ description: >
   database, or API as the infrastructure layer.
 metadata:
   author: tensorlake
-  version: 2.3.1
+  version: 2.4.0
 ---
 
 # Tensorlake SDK
 
-Two APIs: **Sandbox** (stateful execution environments for agents and isolated tool calls, with suspend/resume, snapshots, and clone for persistence between tasks), **Orchestrate** (sandbox-native durable workflow orchestration for agents — imported as `tensorlake.applications`). Available in both **Python** (`pip install tensorlake`) and **TypeScript** (`npm install tensorlake`). Use standalone or as infrastructure alongside any LLM, agent framework, database, or API.
+Two APIs: **Sandbox** (stateful execution environments for agents and isolated tool calls, with suspend/resume, snapshots, and clone for persistence between tasks), **Orchestration** (sandbox-native durable workflow orchestration for agents — imported as `tensorlake.applications`). Available in both **Python** (`pip install tensorlake`) and **TypeScript** (`npm install tensorlake`). Use standalone or as infrastructure alongside any LLM, agent framework, database, or API.
 
 **For documentation questions**: Read the relevant reference file below to answer. If the bundled references don't cover it, direct the user to the Tensorlake docs site.
 **For building**: Use the Quick Start and Core Patterns below, plus reference files for API details.
@@ -33,7 +33,7 @@ Both SDKs ship with `tl` and `tensorlake` CLI tools. The skill itself declares n
 
 Do **not** ask the user to paste any key into the conversation, include keys in generated code, or print them in terminal output.
 
-## Quick Start — Orchestrate Workflow
+## Quick Start — Orchestration Workflow
 
 ```python
 from tensorlake.applications import (
@@ -73,7 +73,7 @@ if __name__ == "__main__":
 ## Core Patterns
 
 - **DAG composition**: Chain functions via `.future()`, `.map()`, `.reduce()` to form parallel pipelines
-- **Agentic + Sandbox**: Use Sandbox for agent execution environments and isolated tool calls, Orchestrate for durable workflow coordination
+- **Agentic + Sandbox**: Use Sandbox for agent execution environments and isolated tool calls, Orchestration for durable workflow coordination
 - **Persistent named sandboxes**: Create sandboxes with `name=` when state must survive between steps. Named sandboxes support suspend/resume, can be auto-suspended when idle, and auto-resume on the next sandbox-proxy request. See [references/sandbox_persistence.md](references/sandbox_persistence.md) for the full state model.
 - **Document extraction**: Use DocumentAI with Pydantic schemas to extract structured data from PDFs/images
 - **LLM integration**: Use any LLM provider inside `@function()` — install deps via `Image`, pass keys via `secrets`
@@ -96,7 +96,7 @@ For integration examples (LangChain, OpenAI, Anthropic, multi-agent orchestratio
 
 Bundled references (use when building with Tensorlake):
 
-- **Orchestrate SDK** (decorators, futures, map/reduce, images, context): See [references/applications_sdk.md](references/applications_sdk.md)
+- **Orchestration SDK** (decorators, futures, map/reduce, images, context): See [references/applications_sdk.md](references/applications_sdk.md)
 - **Sandbox SDK** (create, connect, run commands, file ops, processes, networking, images): See [references/sandbox_sdk.md](references/sandbox_sdk.md)
 - **Sandbox Persistence** (snapshots, suspend/resume, clone, ephemeral vs named, state machine): See [references/sandbox_persistence.md](references/sandbox_persistence.md)
 - **DocumentAI SDK** (parse, extract, classify, options): See [references/documentai_sdk.md](references/documentai_sdk.md)

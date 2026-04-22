@@ -8,8 +8,8 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/agentic-rl-reproducible-env.md
   - https://docs.tensorlake.ai/sandboxes/agentic-swarm-intelligence.md
   - https://docs.tensorlake.ai/sandboxes/gspo-agentic-rl.md
-SDK version: tensorlake 0.4.42
-Last verified: 2026-04-08
+SDK version: tensorlake 0.4.49
+Last verified: 2026-04-22
 -->
 
 # TensorLake Sandbox Advanced Patterns
