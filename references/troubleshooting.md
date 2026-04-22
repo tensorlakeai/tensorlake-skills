@@ -4,8 +4,8 @@ Source:
   - https://docs.tensorlake.ai/applications/production/troubleshooting.md
   - https://docs.tensorlake.ai/document-ingestion/production/integration.md
   - https://docs.tensorlake.ai/document-ingestion/production/benchmarks.md
-SDK version: tensorlake 0.4.39
-Last verified: 2026-04-07
+SDK version: tensorlake 0.4.49
+Last verified: 2026-04-22
 -->
 
 # TensorLake Troubleshooting & Production Guide

@@ -2,6 +2,7 @@
 Source:
   - https://docs.tensorlake.ai/sandboxes/introduction.md
   - https://docs.tensorlake.ai/sandboxes/quickstart.md
+  - https://docs.tensorlake.ai/sandboxes/concepts.md
   - https://docs.tensorlake.ai/sandboxes/commands.md
   - https://docs.tensorlake.ai/sandboxes/file-operations.md
   - https://docs.tensorlake.ai/sandboxes/processes.md
@@ -10,8 +11,9 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/images.md
   - https://docs.tensorlake.ai/sandboxes/pty-sessions.md
   - https://docs.tensorlake.ai/sandboxes/computer-use.md
-SDK version: tensorlake 0.4.46
-Last verified: 2026-04-16
+  - https://docs.tensorlake.ai/sandboxes/docker.md
+SDK version: tensorlake 0.4.49
+Last verified: 2026-04-22
 -->
 
 # TensorLake Sandbox SDK Reference
@@ -497,6 +499,41 @@ with client.connect(sandbox_id) as sandbox:
 | `key_down()` | Key press (held) |
 | `key_up()` | Key release |
 
+### Browser Access with noVNC
+
+For a live human-facing desktop stream (instead of polling `screenshot()`), bridge the sandbox's VNC port to the browser with [`noVNC`](https://novnc.com/info.html). Recommended architecture:
+
+1. Keep `TENSORLAKE_API_KEY` on the backend.
+2. Backend opens a TCP tunnel to the sandbox's VNC port `5901`.
+3. Bridge that tunnel to a browser WebSocket endpoint (e.g. `/vnc/<session-id>`).
+4. Point `noVNC` at your backend WebSocket; authenticate with desktop password `tensorlake`.
+
+Sandbox proxy auth stays server-side — you do **not** need to expose port `5901` publicly. For hybrid agent + human sessions, use `noVNC` for the live view and `sandbox.connect_desktop()` / `sandbox.connectDesktop()` for programmatic actions on the backend.
+
+**Browser client:**
+
+```bash
+npm install @novnc/novnc
+```
+
+```ts
+import RFB from "@novnc/novnc/lib/rfb";
+
+const host = document.getElementById("desktop") as HTMLDivElement;
+const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+const url = `${protocol}//${window.location.host}/vnc`;
+
+const rfb = new RFB(host, url, {
+  credentials: { password: "tensorlake" },
+  shared: true,
+});
+rfb.scaleViewport = true;
+```
+
+```html
+<div id="desktop" style="width: 1200px; height: 800px; background: black;"></div>
+```
+
 ### Notes
 
 - Default VNC password for managed `ubuntu-vnc` image: `"tensorlake"`
@@ -590,6 +627,10 @@ const sandbox = await client.createAndConnect({
 tl sbx image create image.py --name data-tools-image
 tl sbx new --image data-tools-image
 ```
+
+### Running Docker Inside a Sandbox
+
+Docker requires systemd, so launch with the `tensorlake/ubuntu-systemd` base image and install Docker from the official Ubuntu repository inside the sandbox. See [sandboxes/docker.md](https://docs.tensorlake.ai/sandboxes/docker.md) for the full install script and a `docker run hello-world` verification step.
 
 ## Networking
 
