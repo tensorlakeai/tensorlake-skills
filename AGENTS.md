@@ -1,5 +1,5 @@
 # Tensorlake SDK
-<!-- version: 2.4.0 -->
+<!-- version: 2.4.1 -->
 
 Tensorlake provides two APIs for building agentic applications:
 
@@ -7,6 +7,8 @@ Tensorlake provides two APIs for building agentic applications:
 - **Orchestration** — Sandbox-native durable workflow orchestration for agents, with parallel map/reduce, auto-scaling, and crash recovery (imported as `tensorlake.applications`)
 
 Available in both **Python** (`pip install tensorlake`) and **TypeScript** (`npm install tensorlake`). Use standalone or as infrastructure alongside any LLM provider, agent framework, database, or API.
+
+**Verify before suggesting**: Before showing any Tensorlake SDK code, confirm every symbol (import path, class, method, parameter) exists — either in the installed package or by reading the source in `references/`. If you can't verify a symbol, say so instead of guessing.
 
 ## Setup
 

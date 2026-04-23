@@ -2,6 +2,11 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [2.4.1] — 2026-04-22
+
+### Added
+- **SKILL.md** / **AGENTS.md** — "Verify before suggesting" guardrail: before showing any Tensorlake SDK code, confirm every symbol (import path, class, method, parameter) exists in the installed package or in `references/`, and say so instead of guessing when a symbol can't be verified
+
 ## [2.4.0] — SDK 0.4.49 — 2026-04-22
 
 ### Added

@@ -1,6 +1,6 @@
 {
   "name": "tensorlake",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "Tensorlake SDK for agent sandboxes and sandbox-native orchestration. Use when building AI agents that need sandboxed execution environments, isolated tool calls, or durable workflow orchestration.",
   "author": "TensorLake",
   "homepage": "https://github.com/tensorlakeai/tensorlake-skills",

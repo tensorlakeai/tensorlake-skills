@@ -12,7 +12,7 @@ description: >
   database, or API as the infrastructure layer.
 metadata:
   author: tensorlake
-  version: 2.4.0
+  version: 2.4.1
 ---
 
 # Tensorlake SDK
@@ -21,6 +21,7 @@ Two APIs: **Sandbox** (stateful execution environments for agents and isolated t
 
 **For documentation questions**: Read the relevant reference file below to answer. If the bundled references don't cover it, direct the user to the Tensorlake docs site.
 **For building**: Use the Quick Start and Core Patterns below, plus reference files for API details.
+**Verify before suggesting**: Before showing any Tensorlake SDK code, confirm every symbol (import path, class, method, parameter) exists — either in the installed package or by reading the source in `references/`. If you can't verify a symbol, say so instead of guessing.
 
 ## Setup
 
