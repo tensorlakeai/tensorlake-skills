@@ -543,16 +543,20 @@ rfb.scaleViewport = true;
 
 ## Sandbox Images
 
-Build custom images using the Image builder:
+A sandbox image is a project-scoped, named snapshot built from a base image plus build steps. Three definition formats — Python DSL, TypeScript DSL, Dockerfile — and two registration paths (CLI or TypeScript SDK).
+
+### Define an Image
 
 **Python:**
 
 ```python
-from tensorlake.applications import Image
+from tensorlake import Image
 
 SANDBOX_IMAGE = (
-    Image(name="data-tools", base_image="ubuntu-minimal")
-    .run("pip install pandas pyarrow jupyter")
+    Image(name="data-tools-image", base_image="tensorlake/ubuntu-systemd")
+    .copy("requirements.txt", "/tmp/requirements.txt")
+    .run("apt-get update && apt-get install -y python3 python3-pip")
+    .run("python3 -m pip install --break-system-packages -r /tmp/requirements.txt")
     .run("mkdir -p /workspace/cache")
     .env("APP_ENV", "prod")
 )
@@ -561,40 +565,91 @@ SANDBOX_IMAGE = (
 **TypeScript:**
 
 ```typescript
-import { Image, createSandboxImage } from "tensorlake";
+import { Image } from "tensorlake";
 
 const image = new Image({
-  name: "data-tools",
-  baseImage: "ubuntu-minimal",
+  name: "data-tools-image",
+  baseImage: "tensorlake/ubuntu-systemd",
 })
-  .run("pip install pandas pyarrow jupyter")
+  .copy("requirements.txt", "/tmp/requirements.txt")
+  .run("apt-get update && apt-get install -y python3 python3-pip")
+  .run("python3 -m pip install --break-system-packages -r /tmp/requirements.txt")
   .run("mkdir -p /workspace/cache")
   .env("APP_ENV", "prod")
   .workdir("/workspace");
+```
 
-// Register image
+**Dockerfile:**
+
+```dockerfile
+FROM tensorlake/ubuntu-systemd
+
+RUN apt-get update && apt-get install -y python3 python3-pip
+COPY requirements.txt /tmp/requirements.txt
+RUN python3 -m pip install --break-system-packages -r /tmp/requirements.txt
+RUN mkdir -p /workspace/cache
+ENV APP_ENV=prod
+WORKDIR /workspace
+```
+
+### Register the Image
+
+**CLI (Dockerfile only):**
+
+```bash
+tl sbx image create ./Dockerfile --registered-name data-tools-image
+```
+
+The positional argument is a Dockerfile path. The `-n/--registered-name` flag sets the registered name; if omitted, it defaults to the parent directory when the file is named `Dockerfile`, otherwise the file stem. Names must be unique within a project.
+
+**TypeScript SDK:**
+
+```typescript
+import { createSandboxImage, Image } from "tensorlake";
+
+const image = new Image({ name: "data-tools-image", baseImage: "tensorlake/ubuntu-systemd" })
+  .run("apt-get update && apt-get install -y python3 python3-pip");
+
 await createSandboxImage(image, {
-  contextDir: ".",
+  contextDir: ".",            // resolves relative copy()/add() sources
   cpus: 4,
   memoryMb: 4096,
 });
 ```
 
+`createSandboxImage()` reads cloud context from the environment — set `TENSORLAKE_API_KEY`, `TENSORLAKE_ORGANIZATION_ID`, and `TENSORLAKE_PROJECT_ID` before calling.
+
+**Python SDK:** There is no public Python equivalent of TypeScript's `createSandboxImage(image, opts)` that takes an `Image` DSL object. A `create_sandbox_image(dockerfile_path, registered_name, cpus, memory_mb, is_public=False)` function does exist in `tensorlake.cli.create_sandbox_image`, but it is the CLI internal that powers `tl sbx image create` — it takes a **Dockerfile path** and emits NDJSON events for the CLI shell, not a user-facing API.
+
+Practical paths for Python users:
+
+1. Write a Dockerfile and run `tl sbx image create ./Dockerfile --registered-name <name>` (recommended).
+2. Define in TypeScript and call `createSandboxImage()`.
+3. The `Image` DSL is otherwise consumed by the Applications/Workflows API; `tensorlake.image.utils.dockerfile_content(img)` can render it to Dockerfile text but injects Applications-specific lines (`WORKDIR /app`, `RUN pip install tensorlake==X.Y.Z`) so it isn't a clean sandbox-image path.
+
+Before registering, run `tl login` and `tl init` (or `npx tl init`) to select the target project.
+
 ### Base Images
 
 | Base Image | Description |
 |---|---|
-| `ubuntu-minimal` | Default. No systemd, boots in hundreds of ms. |
-| `ubuntu-systemd` | Includes systemd, supports Docker/K8s inside sandbox. |
-| `ubuntu-vnc` | Desktop-enabled (XFCE + TigerVNC + Firefox) — use with `sandbox.connect_desktop()` for computer-use / browser automation. |
+| `tensorlake/ubuntu-minimal` | Default. No systemd, boots in hundreds of ms. |
+| `tensorlake/ubuntu-systemd` | Includes systemd, supports Docker/K8s inside sandbox. |
+| `tensorlake/ubuntu-vnc` | Desktop-enabled (XFCE + TigerVNC + Firefox) — use with `sandbox.connect_desktop()` for computer-use / browser automation. |
+
+Use these prefixed names in `base_image=` / `baseImage:` and in `FROM`. When launching a sandbox from a base image directly via `image=`, the unprefixed form (`image="ubuntu-vnc"`) is also accepted.
 
 ### Image Builder Methods (chainable)
 
 - `.run(command)` — Execute shell command during build
 - `.env(key, value)` — Set environment variable
-- `.copy(src, dest)` — Copy file from local filesystem
-- `.add(src, dest)` — Add file to image
-- `.workdir(path)` — Set working directory (TypeScript only)
+- `.copy(src, dest)` — Copy file from local build context
+- `.add(src, dest)` — Add file from local build context
+- `.workdir(path)` — Set working directory (TypeScript only — Python `Image` has no `workdir` method as of 0.4.49; use a `WORKDIR` line in a Dockerfile if needed)
+
+### Supported Build Operations
+
+Materialized into the snapshot: `RUN`, `WORKDIR`, `ENV`, `COPY`, `ADD`. Preserved as metadata only (not executed): `CMD`, `ENTRYPOINT`, `EXPOSE`, `HEALTHCHECK`, `LABEL`, `STOPSIGNAL`, `VOLUME`. Not supported: `ARG`, `ONBUILD`, `SHELL`, `USER`, multi-stage Dockerfiles, remote `COPY`/`ADD` sources.
 
 ### Launching Sandboxes from Custom Images
 
@@ -602,7 +657,7 @@ await createSandboxImage(image, {
 
 ```python
 with client.create_and_connect(
-    image="data-tools",
+    image="data-tools-image",
     cpus=4.0,
     memory_mb=4096,
     timeout_secs=1800,
@@ -614,19 +669,21 @@ with client.create_and_connect(
 
 ```typescript
 const sandbox = await client.createAndConnect({
-  image: "data-tools",
+  image: "data-tools-image",
   cpus: 4.0,
   memoryMb: 4096,
   timeoutSecs: 1800,
 });
 ```
 
-### CLI
+**CLI:**
 
 ```bash
-tl sbx image create image.py --name data-tools-image
 tl sbx new --image data-tools-image
+tl sbx new --image data-tools-image --cpus 4.0 --memory 4096 --timeout 1800
 ```
+
+`tl sbx image describe <name>` shows the registered Dockerfile and snapshot metadata for a sandbox image.
 
 ### Running Docker Inside a Sandbox
 
@@ -710,6 +767,6 @@ tl sbx clone <id>                       # Snapshot + restore
 tl sbx snapshot <id>                    # Create snapshot
 tl sbx suspend <id>                     # Suspend named sandbox
 tl sbx terminate <id>                   # Terminate sandbox (by name or ID)
-tl sbx image create img.py --name NAME  # Build image
+tl sbx image create Dockerfile --registered-name NAME  # Build image
 tl sbx port expose <id> 8080            # Expose port
 ```

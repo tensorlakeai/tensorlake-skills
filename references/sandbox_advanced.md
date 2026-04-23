@@ -40,7 +40,7 @@ Install agent skill files into sandbox images so coding agents (Claude Code, Cod
 from tensorlake import Image
 
 image = (
-    Image(name="with-skills", base_image="ubuntu-systemd")
+    Image(name="with-skills", base_image="tensorlake/ubuntu-systemd")
     .run("apt-get update && apt-get install -y nodejs npm python3 python3-pip")
     .run("npm install -g skills")
     .run("skills add tensorlakeai/tensorlake-skills --all -y --copy")
@@ -55,7 +55,7 @@ import { Image } from "tensorlake";
 
 const image = new Image({
   name: "with-skills",
-  baseImage: "ubuntu-systemd",
+  baseImage: "tensorlake/ubuntu-systemd",
 })
   .run("apt-get update && apt-get install -y nodejs npm python3 python3-pip")
   .run("npm install -g skills")
@@ -73,7 +73,7 @@ Flags: `--all` deploys to all detected agents, `-y` non-interactive, `--copy` av
 from tensorlake import Image
 
 image = (
-    Image(name="claude-code-skills", base_image="ubuntu-systemd")
+    Image(name="claude-code-skills", base_image="tensorlake/ubuntu-systemd")
     .run("apt-get update && apt-get install -y git python3 python3-pip")
     .run("git clone https://github.com/tensorlakeai/tensorlake-skills /tmp/tensorlake-skills")
     .run("mkdir -p /root/.claude/skills/tensorlake && cp -r /tmp/tensorlake-skills/SKILL.md /tmp/tensorlake-skills/references /root/.claude/skills/tensorlake/")
@@ -89,7 +89,7 @@ import { Image } from "tensorlake";
 
 const image = new Image({
   name: "claude-code-skills",
-  baseImage: "ubuntu-systemd",
+  baseImage: "tensorlake/ubuntu-systemd",
 })
   .run("apt-get update && apt-get install -y git python3 python3-pip")
   .run("git clone https://github.com/tensorlakeai/tensorlake-skills /tmp/tensorlake-skills")
@@ -102,7 +102,7 @@ const image = new Image({
 ### Image Creation
 
 ```bash
-tl sbx image create template.py --name claude-code-skills
+tl sbx image create Dockerfile --registered-name claude-code-skills
 tl sbx new --image claude-code-skills
 ```
 
