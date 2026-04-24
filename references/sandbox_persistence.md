@@ -12,7 +12,7 @@ State-centric reference for keeping sandbox state across time: state machine, ep
 
 For creating, connecting to, and running commands in a sandbox, see [sandbox_sdk.md](sandbox_sdk.md).
 
-> **0.5.0:** snapshot/suspend/resume are instance methods on the `Sandbox` handle; restore is `Sandbox.create(snapshot_id=...)`. See [sandbox_sdk.md](sandbox_sdk.md) for the full migration from `SandboxClient`.
+> **0.5.0:** snapshot/suspend/resume are instance methods on the `Sandbox` handle; restore is `Sandbox.create(snapshot_id=...)`. `SandboxClient` still ships in `0.5.0` for management operations such as list/update/port exposure, but it is deprecated in favor of the direct `Sandbox` handle where available.
 
 ## Table of Contents
 
@@ -81,7 +81,7 @@ Persistence requires a **named** sandbox. Ephemeral sandboxes cannot be suspende
 | Reference by          | ID only                            | ID **or** name                              |
 | Use when              | Short-lived, one-off execution     | Multi-step agents, persistent environments  |
 
-An ephemeral sandbox can be promoted to a named sandbox after creation via `Sandbox.update(id, name)` (Python: positional) / `Sandbox.update(id, { name })` (TypeScript). After renaming, it becomes eligible for suspend/resume. The CLI equivalent is `tl sbx name <id> <new-name>`.
+An ephemeral sandbox can be promoted to a named sandbox after creation via `SandboxClient().update_sandbox(id, name)` in Python (or the client update helper in TypeScript). After renaming, it becomes eligible for suspend/resume. The CLI equivalent is `tl sbx name <id> <new-name>`.
 
 ## Snapshots
 
@@ -183,8 +183,8 @@ await Sandbox.deleteSnapshot("snapshot-id");
 **CLI / REST:**
 
 ```bash
-tl sbx snapshot ls
-tl sbx snapshot rm <snapshot-id>
+tl sbx checkpoint ls
+tl sbx checkpoint rm <snapshot-id>
 
 curl https://api.tensorlake.ai/snapshots \
   -H "Authorization: Bearer $TENSORLAKE_API_KEY"
@@ -203,7 +203,7 @@ fork_a = Sandbox.create(snapshot_id=snapshot.snapshot_id)
 fork_b = Sandbox.create(snapshot_id=snapshot.snapshot_id)
 ```
 
-The intermediate snapshot persists and consumes storage until you delete it with `Sandbox.delete_snapshot(snapshot_id)` (or `tl sbx snapshot rm <snapshot-id>`).
+The intermediate snapshot persists and consumes storage until you delete it with `Sandbox.delete_snapshot(snapshot_id)` (or `tl sbx checkpoint rm <snapshot-id>`).
 
 ## Suspend & Resume
 
@@ -277,7 +277,7 @@ Rule of thumb: **suspend** when you want *this* sandbox back later; **checkpoint
 
 ## Limitations
 
-- **Suspend/resume requires named sandboxes.** Ephemeral sandboxes return an error on suspend. Promote to named first via `Sandbox.update(id, name)` if you need to suspend.
+- **Suspend/resume requires named sandboxes.** Ephemeral sandboxes return an error on suspend. Promote to named first via `SandboxClient().update_sandbox(id, name)` if you need to suspend.
 - **Terminated is final.** A terminated sandbox cannot be resumed. Use `sandbox.checkpoint()` beforehand if you need a restore path.
 - **Snapshot restore is to a new sandbox.** Restoring does not mutate the original sandbox; it creates a new one with a new `sandbox_id`.
 - **Snapshot restore is as-is.** A restored sandbox inherits image, resources, entrypoint, and secrets from the snapshot — none of these can be changed at restore time. If you need different CPUs, memory, or an updated image, create a fresh sandbox instead.

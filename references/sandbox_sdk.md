@@ -21,7 +21,7 @@ Last verified: 2026-04-24
 
 For state management (snapshots, suspend/resume, ephemeral vs named, state machine), see [sandbox_persistence.md](sandbox_persistence.md).
 
-> **0.5.0 breaking change:** `SandboxClient` has been removed. The entry point is the `Sandbox` class itself — use static methods (`Sandbox.create`, `Sandbox.connect`, `Sandbox.list`, `Sandbox.update`, `Sandbox.expose_ports`, `Sandbox.unexpose_ports`, `Sandbox.get_snapshot`, `Sandbox.delete_snapshot`) plus instance methods on the returned handle (`.suspend()`, `.resume()`, `.terminate()`, `.checkpoint()`, `.list_snapshots()`, `.run()`, file/process/PTY ops). Snapshot creation is now `sandbox.checkpoint()` (was `client.snapshot_and_wait()`); restore is `Sandbox.create(snapshot_id=...)` (was `client.create_and_connect(snapshot_id=...)`).
+> **0.5.0 note:** `Sandbox` is now the preferred handle for create/connect/run/suspend/resume/checkpoint flows, but `SandboxClient` still ships in `0.5.0` and is marked deprecated rather than removed. In the installed package, `Sandbox.create`, `Sandbox.connect`, `Sandbox.get_snapshot`, and `Sandbox.delete_snapshot` exist; namespace-level management helpers such as list, rename/update, and port exposure still live on `SandboxClient`. Snapshot creation is now `sandbox.checkpoint()`; restore is `Sandbox.create(snapshot_id=...)`.
 
 ## Table of Contents
 
@@ -134,27 +134,33 @@ console.log(result.stdout);
 
 ### List, Update
 
+`SandboxClient` is still the verified API surface for listing sandboxes, renaming/promoting them, and updating exposed ports in the installed `0.5.0` Python package.
+
 **Python:**
 
 ```python
-sandboxes = Sandbox.list()                       # -> list[SandboxInfo]
+from tensorlake.sandbox import SandboxClient
+
+client = SandboxClient()
+sandboxes = client.list()                        # -> iterator[SandboxInfo]
 for sb in sandboxes:
     print(sb.sandbox_id, sb.status)
 
 # Rename / promote ephemeral → named (positional args)
-renamed = Sandbox.update("sbx-123", "my-env")
+renamed = client.update_sandbox("sbx-123", "my-env")
 print(renamed.name)
 ```
 
 **TypeScript:**
 
 ```typescript
-const sandboxes = await Sandbox.list();
+// Given an existing sandbox management client
+const sandboxes = await client.list();
 for (const sb of sandboxes) {
   console.log(sb.sandboxId, sb.status);
 }
 
-const renamed = await Sandbox.update("sbx-123", { name: "my-env" });
+const renamed = await client.update("sbx-123", { name: "my-env" });
 console.log(renamed.name);
 ```
 
@@ -172,9 +178,9 @@ const info = await Sandbox.getSnapshot("snap-xyz");
 await Sandbox.deleteSnapshot("snap-xyz");
 ```
 
-### Port Exposure (Static)
+### Port Exposure
 
-`Sandbox.expose_ports(identifier, ports, allow_unauthenticated_access=False)` and `Sandbox.unexpose_ports(identifier, ports)` mutate an existing sandbox's routed-port list. Full examples and the auth-vs-public trade-off live in [Networking → Port Exposure](#port-exposure) below.
+Use `SandboxClient.expose_ports(...)` / `SandboxClient.unexpose_ports(...)` in Python, the TypeScript client helpers, or the CLI. Full examples and the auth-vs-public trade-off live in [Networking → Port Exposure](#port-exposure) below.
 
 ## Sandbox — Instance Methods
 
@@ -198,7 +204,7 @@ await sandbox.resume();
 await sandbox.terminate();
 ```
 
-Suspend/resume only works on **named** sandboxes. Ephemeral sandboxes return an error. To convert an ephemeral sandbox into a named one after creation, call `Sandbox.update(id, name)`.
+Suspend/resume only works on **named** sandboxes. Ephemeral sandboxes return an error. To convert an ephemeral sandbox into a named one after creation, call `SandboxClient().update_sandbox(id, name)`.
 
 ### Snapshots (Instance)
 
@@ -708,8 +714,11 @@ The hostname accepts either the sandbox ID or a sandbox name.
 ### Port Exposure
 
 ```python
-Sandbox.expose_ports("my-env", [8080], allow_unauthenticated_access=False)
-Sandbox.unexpose_ports("my-env", [8080])
+from tensorlake.sandbox import SandboxClient
+
+client = SandboxClient()
+client.expose_ports("my-env", [8080], allow_unauthenticated_access=False)
+client.unexpose_ports("my-env", [8080])
 ```
 
 ```typescript
@@ -723,7 +732,7 @@ tl sbx port ls <sandbox-id>
 tl sbx port rm <sandbox-id> 8080
 ```
 
-The CLI `tl sbx port expose` workflow sets both `exposed_ports` and `allow_unauthenticated_access=true`, making traffic to the user port publicly reachable from the internet without TensorLake auth. Use `Sandbox.expose_ports(..., allow_unauthenticated_access=False)` for the authenticated-only mode.
+The CLI `tl sbx port expose` workflow sets both `exposed_ports` and `allow_unauthenticated_access=true`, making traffic to the user port publicly reachable from the internet without TensorLake auth. Use `SandboxClient().expose_ports(..., allow_unauthenticated_access=False)` for the authenticated-only mode.
 
 Idle auto-suspend and auto-resume for named sandboxes are covered in [sandbox_persistence.md](sandbox_persistence.md#idle-auto-suspend-and-auto-resume).
 

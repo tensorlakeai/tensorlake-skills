@@ -64,7 +64,7 @@ Works with Claude Code, Cursor, Cline, GitHub Copilot, Windsurf, and more via [s
 
 ## Setup
 
-Tensorlake requires a `TENSORLAKE_API_KEY` configured in the local environment. Get one at [cloud.tensorlake.ai](https://cloud.tensorlake.ai), then either run `tensorlake login` (Python) / `npx tl login` (TypeScript) or configure the variable through your shell profile, `.env` file, or secret manager. Do not paste API keys into chat, commit them to source control, or print them in terminal output.
+Tensorlake requires a `TENSORLAKE_API_KEY` configured in the local environment. Get one at [cloud.tensorlake.ai](https://cloud.tensorlake.ai), then either run `tl login` (or `tensorlake login`) / `npx tl login` (TypeScript) or configure the variable through your shell profile, `.env` file, or secret manager. Do not paste API keys into chat, commit them to source control, or print them in terminal output.
 
 ## Repository Structure
 
