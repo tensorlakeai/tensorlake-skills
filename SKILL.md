@@ -12,7 +12,7 @@ description: >
   database, or API as the infrastructure layer.
 metadata:
   author: tensorlake
-  version: 2.4.1
+  version: 2.5.0
 ---
 
 # Tensorlake SDK
@@ -27,9 +27,9 @@ Two APIs: **Sandbox** (stateful execution environments for agents and isolated t
 
 **Python:** `pip install tensorlake` — **TypeScript:** `npm install tensorlake`
 
-Both SDKs ship with `tl` and `tensorlake` CLI tools. The skill itself declares no required environment variables — the variables below are runtime prerequisites for the user's code, configured in the user's own environment.
+Both SDKs ship with `tl` and `tensorlake` CLI entrypoints. In this skill, prefer `tl` in examples; `tensorlake` is an alias with the same subcommands in the installed `0.5.0` CLI. The skill itself declares no required environment variables — the variables below are runtime prerequisites for the user's code, configured in the user's own environment.
 
-- **`TENSORLAKE_API_KEY`** — the canonical env var name read by the Tensorlake SDK and CLI. Always use this exact name; do not substitute shorter aliases like `TL_API_KEY`. The key *value* itself has the format `tl_apiKey_*` (project-scoped). If the env var is missing, direct the user to run `tensorlake login` (Python) / `npx tl login` (TypeScript) or to configure it through their local environment (shell profile, `.env` file, or secret manager). Get a key at [cloud.tensorlake.ai](https://cloud.tensorlake.ai).
+- **`TENSORLAKE_API_KEY`** — the canonical env var name read by the Tensorlake SDK and CLI. Always use this exact name; do not substitute shorter aliases like `TL_API_KEY`. The key *value* itself has the format `tl_apiKey_*` (project-scoped). If the env var is missing, direct the user to run `tl login` (or `tensorlake login`) / `npx tl login` (TypeScript) or to configure it through their local environment (shell profile, `.env` file, or secret manager). Get a key at [cloud.tensorlake.ai](https://cloud.tensorlake.ai).
 - **Provider keys** (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.) — only required when the user opts into the corresponding integration in their own code. Not required by Tensorlake itself. For deployed applications, declare them with `secrets=["OPENAI_API_KEY", ...]` on `@function()` and manage their values via `tensorlake secrets set` — never inline the value in code.
 
 Do **not** ask the user to paste any key into the conversation, include keys in generated code, or print them in terminal output.
@@ -76,7 +76,7 @@ if __name__ == "__main__":
 - **DAG composition**: Chain functions via `.future()`, `.map()`, `.reduce()` to form parallel pipelines
 - **Agentic + Sandbox**: Use Sandbox for agent execution environments and isolated tool calls, Orchestration for durable workflow coordination
 - **Persistent named sandboxes**: Create sandboxes with `name=` when state must survive between steps. Named sandboxes support suspend/resume, can be auto-suspended when idle, and auto-resume on the next sandbox-proxy request. See [references/sandbox_persistence.md](references/sandbox_persistence.md) for the full state model.
-- **LLM code-execution tool**: One sandbox per agent session, reused across every tool call. Create with `allow_internet_access=False` for untrusted code. Each call is `sandbox.run("python", ["-c", code])` and returns `.stdout` / `.stderr` / `.exit_code` — no `sandbox.exec()`, `sandbox.python()`, `sandbox.eval()`, or `sandbox.repl()`. **Each call is a fresh Python process: files written to disk and `pip install`ed packages persist across calls, but in-memory variables, imports, and module state do NOT.** If a user describes this as "one long REPL session," correct the framing. See [references/sandbox_advanced.md](references/sandbox_advanced.md#ai-code-execution).
+- **LLM code-execution tool**: One sandbox per agent session, reused across every tool call. Create with `Sandbox.create(allow_internet_access=False)` for untrusted code (`from tensorlake.sandbox import Sandbox`). Each call is `sandbox.run("python", ["-c", code])` and returns `.stdout` / `.stderr` / `.exit_code` — no `sandbox.exec()`, `sandbox.python()`, `sandbox.eval()`, or `sandbox.repl()`. **Each call is a fresh Python process: files written to disk and `pip install`ed packages persist across calls, but in-memory variables, imports, and module state do NOT.** If a user describes this as "one long REPL session," correct the framing. See [references/sandbox_advanced.md](references/sandbox_advanced.md#ai-code-execution).
 - **Document extraction**: Use DocumentAI with Pydantic schemas to extract structured data from PDFs/images
 - **LLM integration**: Use any LLM provider inside `@function()` — install deps via `Image`, pass keys via `secrets`
 - **Framework integration**: Use Sandbox as a code execution tool for LangChain agents or OpenAI function calling, or DocumentAI as a document loader for any RAG pipeline
@@ -90,7 +90,7 @@ For integration examples (LangChain, OpenAI, Anthropic, multi-agent orchestratio
 3. **Map input**: Pass a list or a Future that resolves to a list.
 4. **Futures chain**: `result = step2.future(step1.future(x))` — step2 waits for step1 automatically.
 5. **Local dev**: `run_local_application(fn, *args)` — no containers needed.
-6. **Remote deploy**: `tensorlake deploy path/to/app.py` then `run_remote_application(fn, *args)`.
+6. **Remote deploy**: `tl deploy path/to/app.py` (or `tensorlake deploy path/to/app.py`) then `run_remote_application(fn, *args)`.
 7. **Custom images**: Use `Image(base_image=...).run("pip install ...")` for dependencies.
 8. **Secrets**: Declare with `secrets=["MY_SECRET"]` in `@function()`, manage via `tensorlake secrets <ls|set|rm>`.
 
@@ -116,6 +116,8 @@ tl deploy path/to/app.py                            # Deploy to cloud
 tl parse doc.pdf                                   # Parse document
 tl login                                           # Authenticate
 tl secrets ls                                      # List secrets
-tl sbx new                                         # Create a new sandbox
+tl sbx create                                      # Create a new ephemeral sandbox
+tl sbx create my-env                               # Create a named sandbox (suspend/resume)
+tl sbx checkpoint <id>                             # Create a snapshot from a running sandbox
 tl sbx image create Dockerfile --registered-name NAME  # Register a sandbox image
 ```
