@@ -1,0 +1,38 @@
+{
+  "skill_name": "tensorlake",
+  "notes": "Blurred-prompt variants of evals 6 and 8 from evals.json. Each prompt keeps the Tensorlake sandbox as the explicit execution surface — the skill's job is to guide a coding agent to use that sandbox correctly — but describes the user's problem in realistic voice without numbering the requirements, naming the APIs, or prescribing the solution shape. Expectations grade whether the agent picks the right sandbox primitives unprompted, corrects any wrong mental models the user embedded, and avoids hallucinating SDK surface area.",
+  "evals": [
+    {
+      "id": 6,
+      "name": "sandbox-as-untrusted-llm-code-execution-tool-blurred",
+      "source_eval_id": 6,
+      "prompt": "I'm building a coding agent — the LLM writes Python, my code runs it inside a Tensorlake sandbox, and the result goes back to the LLM as a tool result. What does a clean setup look like? I want it to hold up if the LLM writes something nasty, and I'd like it to feel like one long REPL session to the LLM as the conversation goes on. Python SDK.",
+      "expected_output": "A single Tensorlake sandbox created once at session start and reused for every tool call, configured so untrusted code cannot reach arbitrary network destinations, with each execution going through sandbox.run(\"python\", [\"-c\", code]) and returning stdout/stderr/exit_code. Crucially, the response must push back on the user's 'long REPL session' framing: each python -c is a fresh process, so in-memory Python state does NOT carry between tool calls — only files on disk and installed packages do.",
+      "files": [],
+      "expectations": [
+        "One Tensorlake sandbox is created at session start and reused for every tool call in the conversation — not a new sandbox per tool call",
+        "The sandbox is configured so untrusted code cannot freely reach the internet (e.g. allow_internet_access=False, or an explicit allow_out allowlist) — the response does not skip this and does not imply the default is safe for LLM-generated code",
+        "Each execution is run through a documented Tensorlake sandbox method (e.g. sandbox.run(\"python\", [\"-c\", code])) and the response handles the real response fields for stdout, stderr, and exit code — no fabricated return shapes",
+        "The response CORRECTS the user's 'feels like one long REPL session' framing: it explicitly states that Python variables, imports, and other in-memory state do NOT persist across tool calls, because each execution is a fresh process",
+        "The response also notes what DOES persist across tool calls in the same Tensorlake sandbox — files on disk and packages installed via pip",
+        "No hallucinated Tensorlake sandbox methods or kwargs — specifically does not introduce sandbox.exec(), sandbox.python(), sandbox.eval(), sandbox.repl(), or kwargs like persistent=True / repl_mode=True / session=True that don't exist in the SDK"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "sandbox-long-running-process-stream-signal-snapshot-blurred",
+      "source_eval_id": 8,
+      "prompt": "I'm running a training job inside a Tensorlake sandbox — about half an hour. I want to watch its output live from my laptop as it runs, and still be able to kill it gracefully if the loss starts looking wrong. If I do have to kill it, I'd like to grab the partial state first so I can dig into it later in a fresh environment, without rerunning the training. Python SDK. How should this look?",
+      "expected_output": "Launch the training command as a non-blocking background process on the Tensorlake sandbox, stream its stdout live from the laptop via the documented streaming primitive, send SIGTERM for graceful shutdown, then snapshot the sandbox BEFORE terminating it, and explain that restoring the snapshot produces a NEW sandbox with a new sandbox_id — this is snapshot/restore semantics, not suspend/resume.",
+      "files": [],
+      "expectations": [
+        "The training command is launched as a non-blocking background process on the Tensorlake sandbox so the local script can still stream, signal, and snapshot — does NOT use a call that blocks until the 30-minute job finishes (e.g. a plain sandbox.run for the training command)",
+        "Live stdout streaming is done via the documented Tensorlake streaming primitive on the sandbox or process — does NOT invent methods like proc.stream(), proc.logs(), sandbox.tail(pid), or sandbox.stream_stdout(pid)",
+        "Graceful interrupt is delivered as a SIGTERM (signal 15) to the running process via the documented Tensorlake signal API — not via an invented proc.stop() / proc.kill() / sandbox.kill_process()",
+        "The snapshot happens BEFORE the sandbox is torn down, and the code's order is: launch → stream → signal → snapshot(wait) → terminate",
+        "The response DISTINGUISHES snapshot/restore (creates a new Tensorlake sandbox with a new sandbox_id) from suspend/resume (same sandbox, same id) — and does not suggest suspend/resume for this use case, since the user asked to restore into a fresh environment",
+        "The restore step uses the documented Tensorlake create-from-snapshot primitive with the snapshot id — does not hallucinate sandbox.restore(), client.sandboxes.create_from_snapshot(), or a snapshot.restore() method"
+      ]
+    }
+  ]
+}
