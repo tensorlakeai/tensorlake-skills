@@ -29,6 +29,27 @@ Last verified: 2026-04-22
 
 # TensorLake Applications SDK Reference
 
+## Table of Contents
+
+- [Imports](#imports)
+- [Decorators](#decorators)
+- [Calling Functions](#calling-functions)
+- [Input/Output Serialization](#inputoutput-serialization)
+- [Map & Reduce](#map--reduce)
+- [Future API](#future-api)
+- [Async Functions](#async-functions)
+- [Running Applications](#running-applications)
+- [Durable Execution](#durable-execution)
+- [RequestContext](#requestcontext)
+- [Image Builder](#image-builder)
+- [File Type](#file-type)
+- [Retries](#retries)
+- [Scaling](#scaling)
+- [Cron Scheduler](#cron-scheduler)
+- [Exceptions](#exceptions)
+- [Secrets](#secrets)
+- [Observability](#observability)
+
 ## Imports
 
 ```python

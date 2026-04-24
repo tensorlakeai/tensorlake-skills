@@ -10,6 +10,13 @@ Last verified: 2026-04-22
 
 # TensorLake Troubleshooting & Production Guide
 
+## Table of Contents
+
+- [Applications — Common Issues](#applications--common-issues)
+- [Document Ingestion — Production Integration](#document-ingestion--production-integration)
+- [Document Ingestion — Benchmarks](#document-ingestion--benchmarks)
+- [Architecture Overview](#architecture-overview)
+
 ## Applications — Common Issues
 
 ### Function Timeout

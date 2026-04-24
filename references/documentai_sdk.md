@@ -25,6 +25,26 @@ Last verified: 2026-04-22
 
 # TensorLake DocumentAI SDK Reference
 
+## Table of Contents
+
+- [Imports](#imports)
+- [Client Initialization](#client-initialization)
+- [File Operations](#file-operations)
+- [Parsing](#parsing)
+- [Read](#read)
+- [Extract](#extract)
+- [Classify](#classify)
+- [Edit (Form Filling)](#edit-form-filling)
+- [DOCX Tracked Changes & Comments](#docx-tracked-changes--comments)
+- [Datasets](#datasets)
+- [Parsing Options](#parsing-options)
+- [Structured Extraction Options](#structured-extraction-options)
+- [Enrichment Options](#enrichment-options)
+- [Page Classification](#page-classification)
+- [Result Models](#result-models)
+- [Supported File Types](#supported-file-types)
+- [Async Support](#async-support)
+
 ## Imports
 
 ```python

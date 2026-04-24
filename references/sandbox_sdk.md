@@ -20,6 +20,17 @@ Last verified: 2026-04-22
 
 For state management (snapshots, suspend/resume, clone, ephemeral vs named, state machine), see [sandbox_persistence.md](sandbox_persistence.md).
 
+## Table of Contents
+
+- [Imports](#imports)
+- [SandboxClient — Lifecycle Management](#sandboxclient--lifecycle-management)
+- [Sandbox — Interact with Running Sandbox](#sandbox--interact-with-running-sandbox)
+- [Computer Use (Desktop Automation)](#computer-use-desktop-automation)
+- [Sandbox Images](#sandbox-images)
+- [Networking](#networking)
+- [Enums](#enums)
+- [CLI Quick Reference](#cli-quick-reference)
+
 ## Imports
 
 **Python:**
@@ -213,6 +224,8 @@ result.exit_code   # int
 result.stdout      # str
 result.stderr      # str
 ```
+
+> **Canonical forms — don't invent variants.** For LLM tool-use, the idiom is `sandbox.run("python", ["-c", code])`. There is no `sandbox.exec()`, `sandbox.python()`, `sandbox.eval()`, or `sandbox.repl()`. The return object exposes exactly `stdout`, `stderr`, `exit_code` (Python) / `stdout`, `stderr`, `exitCode` (TypeScript) — don't reference `.output`, `.result`, `.logs`, or streaming fields like `.stream` / `.lines` on the result. For live stdout from a long-running process, use `start_process` + `follow_output` (see [Process Management](#process-management)), not a fabricated field on `run()`.
 
 **TypeScript:**
 
