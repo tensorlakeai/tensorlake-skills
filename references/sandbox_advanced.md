@@ -8,8 +8,8 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/agentic-rl-reproducible-env.md
   - https://docs.tensorlake.ai/sandboxes/agentic-swarm-intelligence.md
   - https://docs.tensorlake.ai/sandboxes/gspo-agentic-rl.md
-SDK version: tensorlake 0.4.49
-Last verified: 2026-04-22
+SDK version: tensorlake 0.5.0
+Last verified: 2026-04-24
 -->
 
 # TensorLake Sandbox Advanced Patterns
@@ -110,23 +110,24 @@ const image = new Image({
 
 ```bash
 tl sbx image create Dockerfile --registered-name claude-code-skills
-tl sbx new --image claude-code-skills
+tl sbx create --image claude-code-skills
 ```
 
 ### Runtime Installation (SDK)
 
 ```python
-from tensorlake.sandbox import SandboxClient
+from tensorlake.sandbox import Sandbox
 
-client = SandboxClient()
-
-with client.create_and_connect() as sandbox:
+sandbox = Sandbox.create()
+try:
     sandbox.run("bash", ["-c", "apt-get update && apt-get install -y nodejs npm"])
     sandbox.run("bash", ["-c", "npm install -g skills"])
     sandbox.run("bash", ["-c", "skills add tensorlakeai/tensorlake-skills --all -y --copy"])
 
     result = sandbox.run("find", ["/", "-name", "SKILL.md", "-type", "f", "-not", "-path", "*/node_modules/*"])
     print(result.stdout)
+finally:
+    sandbox.terminate()
 ```
 
 ---
@@ -146,11 +147,13 @@ Use sandboxes as LLM tool-call targets for safe code execution.
 **Python:**
 
 ```python
-sandbox = client.create_and_connect(
+from tensorlake.sandbox import Sandbox
+
+sandbox = Sandbox.create(
     cpus=1.0,
     memory_mb=1024,
     timeout_secs=600,
-    allow_internet_access=False  # important for untrusted code
+    allow_internet_access=False,  # important for untrusted code
 )
 
 result = sandbox.run("python", ["-c", code])
@@ -160,13 +163,9 @@ result = sandbox.run("python", ["-c", code])
 **TypeScript:**
 
 ```typescript
-import { SandboxClient } from "tensorlake";
+import { Sandbox } from "tensorlake";
 
-const client = SandboxClient.forCloud({
-  apiKey: process.env.TENSORLAKE_API_KEY,
-});
-
-const sandbox = await client.createAndConnect({
+const sandbox = await Sandbox.create({
   cpus: 1.0,
   memoryMb: 1024,
   timeoutSecs: 600,
@@ -189,15 +188,14 @@ try {
   console.log(output);
 } finally {
   await sandbox.terminate();
-  client.close();
 }
 ```
 
 ### Snapshots for Pre-installed Dependencies
 
 ```python
-snapshot = client.snapshot_and_wait(sandbox.sandbox_id)
-sandbox = client.create_and_connect(snapshot_id=snapshot.snapshot_id)
+snapshot = sandbox.checkpoint()
+sandbox = Sandbox.create(snapshot_id=snapshot.snapshot_id)
 ```
 
 ### Integration Patterns
@@ -213,7 +211,7 @@ sandbox = client.create_and_connect(snapshot_id=snapshot.snapshot_id)
 - **Reuse sandboxes** — creating new ones per tool call adds cold-start latency and loses filesystem state
 - **Set `allow_internet_access=False`** for untrusted code. If you need `pip install` on demand, pre-bake deps into a custom image or snapshot instead of flipping internet access on for untrusted code
 - **Pre-install deps via snapshots** or let agents `pip install` on demand (only in trusted setups)
-- **Tear down** with `sandbox.close()` or `sandbox.terminate()` when the session ends
+- **Tear down** with `sandbox.terminate()` when the session ends
 
 ### Anti-patterns
 
@@ -234,12 +232,11 @@ Run parallel data analysis and model benchmarking in isolated sandboxes.
 
 ```python
 import asyncio, json
-from tensorlake.sandbox import SandboxClient
+from tensorlake.sandbox import Sandbox
 
 def run_model_benchmark(model_name, sklearn_path):
     """Synchronous benchmark — one sandbox per model."""
-    client = SandboxClient()
-    sandbox = client.create_and_connect()
+    sandbox = Sandbox.create()
     try:
         sandbox.run("pip", ["install", "--user", "--break-system-packages", "numpy", "scikit-learn"])
         module, cls = sklearn_path.rsplit(".", 1)
@@ -262,7 +259,7 @@ print(json.dumps({{"model": "{model_name}", "accuracy": round(acc, 4), "time": r
         result = sandbox.run("python", ["-c", code])
         return json.loads(result.stdout)
     finally:
-        sandbox.close()
+        sandbox.terminate()
 
 async def main():
     models = {
@@ -303,7 +300,7 @@ Use sandboxes as ephemeral, isolated build containers.
 
 ```python
 import os
-from tensorlake.sandbox import SandboxClient
+from tensorlake.sandbox import Sandbox
 
 def copy_to_sandbox(sandbox, local_dir, sandbox_dir):
     """Recursively copy a local directory into the sandbox."""
@@ -315,8 +312,7 @@ def copy_to_sandbox(sandbox, local_dir, sandbox_dir):
             with open(os.path.join(root, f), "rb") as fh:
                 sandbox.write_file(f"{dest}/{f}", fh.read())
 
-client = SandboxClient()
-sandbox = client.create_and_connect()
+sandbox = Sandbox.create()
 try:
     # Upload project files
     copy_to_sandbox(sandbox, "./my_project", "/workspace/project")
@@ -340,7 +336,7 @@ try:
     # Download artifacts from the sandbox
     wheel_bytes = sandbox.read_file("/workspace/project/dist/my_project.whl")
 finally:
-    sandbox.close()
+    sandbox.terminate()
 ```
 
 **Key `sandbox.run()` parameters:**

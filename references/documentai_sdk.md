@@ -19,8 +19,8 @@ Source:
   - https://docs.tensorlake.ai/document-ingestion/datasets/data.md
   - https://docs.tensorlake.ai/document-ingestion/file-management/overview.md
   - https://docs.tensorlake.ai/document-ingestion/parsing/on-prem.md
-SDK version: tensorlake 0.4.49
-Last verified: 2026-04-22
+SDK version: tensorlake 0.5.0
+Last verified: 2026-04-24
 -->
 
 # TensorLake DocumentAI SDK Reference

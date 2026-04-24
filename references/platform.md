@@ -14,8 +14,8 @@ Source:
   - https://docs.tensorlake.ai/platform/playground/sample-documents.md
   - https://docs.tensorlake.ai/platform/security.md
   - https://docs.tensorlake.ai/platform/sso.md
-SDK version: tensorlake 0.4.49
-Last verified: 2026-04-22
+SDK version: tensorlake 0.5.0
+Last verified: 2026-04-24
 -->
 
 # TensorLake Platform Reference

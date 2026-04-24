@@ -3,6 +3,7 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/introduction.md
   - https://docs.tensorlake.ai/sandboxes/quickstart.md
   - https://docs.tensorlake.ai/sandboxes/concepts.md
+  - https://docs.tensorlake.ai/sandboxes/lifecycle.md
   - https://docs.tensorlake.ai/sandboxes/commands.md
   - https://docs.tensorlake.ai/sandboxes/file-operations.md
   - https://docs.tensorlake.ai/sandboxes/processes.md
@@ -12,23 +13,25 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/pty-sessions.md
   - https://docs.tensorlake.ai/sandboxes/computer-use.md
   - https://docs.tensorlake.ai/sandboxes/docker.md
-SDK version: tensorlake 0.4.49
-Last verified: 2026-04-22
+SDK version: tensorlake 0.5.0
+Last verified: 2026-04-24
 -->
 
 # TensorLake Sandbox SDK Reference
 
-For state management (snapshots, suspend/resume, clone, ephemeral vs named, state machine), see [sandbox_persistence.md](sandbox_persistence.md).
+For state management (snapshots, suspend/resume, ephemeral vs named, state machine), see [sandbox_persistence.md](sandbox_persistence.md).
+
+> **0.5.0 breaking change:** `SandboxClient` has been removed. The entry point is the `Sandbox` class itself — use static methods (`Sandbox.create`, `Sandbox.connect`, `Sandbox.list`, `Sandbox.update`, `Sandbox.expose_ports`, `Sandbox.unexpose_ports`, `Sandbox.get_snapshot`, `Sandbox.delete_snapshot`) plus instance methods on the returned handle (`.suspend()`, `.resume()`, `.terminate()`, `.checkpoint()`, `.list_snapshots()`, `.run()`, file/process/PTY ops). Snapshot creation is now `sandbox.checkpoint()` (was `client.snapshot_and_wait()`); restore is `Sandbox.create(snapshot_id=...)` (was `client.create_and_connect(snapshot_id=...)`).
 
 ## Table of Contents
 
 - [Imports](#imports)
-- [SandboxClient — Lifecycle Management](#sandboxclient--lifecycle-management)
-- [Sandbox — Interact with Running Sandbox](#sandbox--interact-with-running-sandbox)
+- [Sandbox — Static Methods](#sandbox--static-methods)
+- [Sandbox — Instance Methods](#sandbox--instance-methods)
 - [Computer Use (Desktop Automation)](#computer-use-desktop-automation)
 - [Sandbox Images](#sandbox-images)
 - [Networking](#networking)
-- [Enums](#enums)
+- [Data Models](#data-models)
 - [CLI Quick Reference](#cli-quick-reference)
 
 ## Imports
@@ -36,177 +39,197 @@ For state management (snapshots, suspend/resume, clone, ephemeral vs named, stat
 **Python:**
 
 ```python
-from tensorlake.sandbox import SandboxClient
+from tensorlake.sandbox import Sandbox
 ```
 
 **TypeScript:**
 
 ```typescript
-import { SandboxClient } from "tensorlake";
+import { Sandbox } from "tensorlake";
 ```
 
 Install: `pip install tensorlake` (Python) or `npm install tensorlake` (TypeScript). Both ship with the `tl` and `tensorlake` CLI tools. Authenticate once with `tl login`, or export `TENSORLAKE_API_KEY` in the environment.
 
-## SandboxClient — Lifecycle Management
+## Sandbox — Static Methods
 
-**Python:**
+All sandbox lifecycle operations live as static methods on the `Sandbox` class.
 
-```python
-client = SandboxClient()
-```
-
-**TypeScript:**
-
-```typescript
-const client = SandboxClient.forCloud({
-  apiKey: process.env.TENSORLAKE_API_KEY,
-});
-```
-
-### Create Sandboxes
+### Create a Sandbox
 
 **Python:**
 
 ```python
 # Ephemeral sandbox — no name, cannot be suspended
-sandbox = client.create(
-    cpus: float = 1.0,                    # CPU cores
-    memory_mb: int = 1024,                # Memory in MiB (1024-8192 per CPU)
-    timeout_secs: int = 0,                # 0 = no timeout
-    secret_names: list[str] | None = None,
-    allow_internet_access: bool = True,
-    deny_out: list[str] | None = None,    # Blocked outbound destinations (domains/IPs/CIDRs)
+sandbox = Sandbox.create(
+    name=None,                          # str | None — promote to named by passing a value
+    cpus=1.0,                           # float, 1.0–8.0
+    memory_mb=1024,                     # int, 1024–8192 per CPU
+    timeout_secs=None,                  # int | None — None means no timeout
+    image=None,                         # str | None — registered image name or base image
+    snapshot_id=None,                   # str | None — restore from a snapshot
+    secret_names=None,                  # list[str] | None — secrets to inject as env vars
+    expose_ports=None,                  # list[int] | None — user ports the proxy should route to
+    allow_unauthenticated_access=False, # bool — make exposed user ports public
 )
 
-# Named sandbox — can be suspended and resumed
-sandbox = client.create(name="my-agent-env", cpus=2.0, memory_mb=2048)
+# Named sandbox — eligible for suspend/resume
+named = Sandbox.create(name="my-agent-env", cpus=2.0, memory_mb=2048, timeout_secs=300)
 
-sandbox_id = sandbox.sandbox_id
-print(sandbox.status)
+print(named.sandbox_id)   # server-assigned UUID
+print(named.name)         # "my-agent-env"
+print(named.status)       # "Pending" → "Running"
 ```
 
 **TypeScript:**
 
 ```typescript
-// Ephemeral sandbox
-const sandbox = await client.create({
+const ephemeral = await Sandbox.create({
   cpus: 1.0,
   memoryMb: 1024,
   timeoutSecs: 300,
 });
 
-// Named sandbox
-const named = await client.create({
+const named = await Sandbox.create({
   name: "my-agent-env",
   cpus: 2.0,
   memoryMb: 2048,
+  image: "data-tools-image",
+  snapshotId: undefined,
+  secretNames: ["OPENAI_API_KEY"],
+  exposePorts: [8080],
+  allowUnauthenticatedAccess: false,
 });
 
-console.log(named.sandboxId);  // server-assigned UUID
-console.log(named.name);       // "my-agent-env"
+console.log(named.sandboxId);
+console.log(named.name);
+console.log(named.status);
 ```
 
-### Connect to Existing Sandbox
+`Sandbox.create()` returns an operable `Sandbox` handle that is already connected — you can call instance methods on it directly without a separate `connect()` step.
+
+### Connect to an Existing Sandbox
 
 **Python:**
 
 ```python
-# `identifier` accepts sandbox_id (UUID) or name
-sandbox = client.connect(identifier="my-env")
+# accepts sandbox_id (UUID) or name
+sandbox = Sandbox.connect("my-agent-env")
 print(sandbox.sandbox_id)  # server UUID, e.g. "s7jus08qec4axzgbpq76h"
-print(sandbox.name)        # "my-env"
+print(sandbox.name)        # "my-agent-env"
+
+result = sandbox.run("python", ["main.py"])
+print(result.stdout)
 ```
 
 **TypeScript:**
 
 ```typescript
-// Accepts sandbox ID or name
-const sandbox = client.connect("my-env");
-console.log(sandbox.sandboxId);  // server UUID
-console.log(sandbox.name);       // "my-env"
+const sandbox = await Sandbox.connect("my-agent-env");
+console.log(sandbox.sandboxId);
+console.log(sandbox.name);
+
+const result = await sandbox.run("python", { args: ["main.py"] });
+console.log(result.stdout);
 ```
 
-### Query, Update & Delete
+### List, Update
 
 **Python:**
 
 ```python
-info = client.get("my-env")            # -> SandboxInfo (accepts name or sandbox_id)
-sandboxes = client.list()              # -> list[SandboxInfo]
-client.update_sandbox("my-env", "new-name")  # Rename sandbox
-client.delete("new-name")             # Terminates the sandbox (accepts name or sandbox_id)
+sandboxes = Sandbox.list()                       # -> list[SandboxInfo]
+for sb in sandboxes:
+    print(sb.sandbox_id, sb.status)
+
+# Rename / promote ephemeral → named (positional args)
+renamed = Sandbox.update("sbx-123", "my-env")
+print(renamed.name)
 ```
 
 **TypeScript:**
 
 ```typescript
-const info = await client.get("my-env");     // accepts name or sandboxId
-const sandboxes = await client.list();
-await client.update("my-env", { name: "new-name" });
-await client.delete("new-name");
-```
-
-### Sandbox Properties
-
-**Python:** `sandbox.sandbox_id` (str), `sandbox.name` (str | None), `sandbox.status` (str)
-
-**TypeScript:** `sandbox.sandboxId` (string), `sandbox.name` (string | null)
-
-### SandboxInfo Attributes
-
-`sandbox_id`/`sandboxId`, `name`, `namespace`, `status`, `image`, `resources` (`ContainerResourcesInfo`: `.cpus`, `.memory_mb`/`.memoryMb`), `secret_names`, `timeout_secs`, `entrypoint`, `created_at`, `terminated_at`
-
-### Create & Connect to a Sandbox
-
-**Python:**
-
-```python
-# Context manager (auto-terminates on exit)
-with client.create_and_connect(
-    name: str | None = None,
-    cpus: float = 1.0,
-    memory_mb: int = 1024,
-    timeout_secs: int | None = None,
-    secret_names: list[str] | None = None,
-    allow_internet_access: bool = True,
-    deny_out: list[str] | None = None,
-    snapshot_id: str | None = None,
-) as sandbox:
-    result = sandbox.run("echo", ["hello"])
-
-# Manual lifecycle (call close() or terminate() when done)
-sandbox = client.create_and_connect(cpus=1.0)
-# ... use sandbox ...
-sandbox.close()       # Terminates sandbox and closes connection
-# or: sandbox.terminate()  # Equivalent — stops the sandbox
-```
-
-**TypeScript:**
-
-```typescript
-const sandbox = await client.createAndConnect({
-  name: "my-env",          // optional
-  cpus: 1.0,
-  memoryMb: 1024,
-  timeoutSecs: 600,
-  allowInternetAccess: false,
-  snapshotId: "snap-xxx",  // optional — restore from snapshot
-});
-
-try {
-  const result = await sandbox.run("echo", { args: ["hello"] });
-  console.log(result.stdout);
-} finally {
-  await sandbox.terminate();
-  client.close();
+const sandboxes = await Sandbox.list();
+for (const sb of sandboxes) {
+  console.log(sb.sandboxId, sb.status);
 }
+
+const renamed = await Sandbox.update("sbx-123", { name: "my-env" });
+console.log(renamed.name);
 ```
 
-### Persistence
+> Termination is an **instance** method (`sandbox.terminate()`), not a static. Get a handle via `Sandbox.connect(...)` first if you only have an identifier.
 
-Snapshots, suspend/resume, clone, ephemeral vs named, and the full state machine live in [sandbox_persistence.md](sandbox_persistence.md).
+### Snapshot Management (Static)
 
-## Sandbox — Interact with Running Sandbox
+```python
+info = Sandbox.get_snapshot("snap-xyz")          # -> SnapshotInfo
+Sandbox.delete_snapshot("snap-xyz")              # -> None
+```
+
+```typescript
+const info = await Sandbox.getSnapshot("snap-xyz");
+await Sandbox.deleteSnapshot("snap-xyz");
+```
+
+### Port Exposure (Static)
+
+`Sandbox.expose_ports(identifier, ports, allow_unauthenticated_access=False)` and `Sandbox.unexpose_ports(identifier, ports)` mutate an existing sandbox's routed-port list. Full examples and the auth-vs-public trade-off live in [Networking → Port Exposure](#port-exposure) below.
+
+## Sandbox — Instance Methods
+
+Once you have a `Sandbox` handle (from `create` or `connect`), use these methods directly on it.
+
+### Lifecycle
+
+**Python:**
+
+```python
+sandbox.suspend()    # named only — pause in place; keeps sandbox_id and name
+sandbox.resume()     # bring same sandbox back to Running
+sandbox.terminate()  # final state; cannot be reversed
+```
+
+**TypeScript:**
+
+```typescript
+await sandbox.suspend();
+await sandbox.resume();
+await sandbox.terminate();
+```
+
+Suspend/resume only works on **named** sandboxes. Ephemeral sandboxes return an error. To convert an ephemeral sandbox into a named one after creation, call `Sandbox.update(id, name)`.
+
+### Snapshots (Instance)
+
+Snapshots persist a sandbox's filesystem, memory, and running processes into a reusable artifact. Unlike suspend, the source sandbox keeps running.
+
+**Python:**
+
+```python
+snapshot = sandbox.checkpoint()     # -> SnapshotInfo
+print(snapshot.snapshot_id)
+
+snapshots = sandbox.list_snapshots()   # snapshots created from THIS sandbox
+for s in snapshots:
+    print(s.snapshot_id, s.status, s.size_bytes)
+
+# Restore to a NEW sandbox
+restored = Sandbox.create(snapshot_id=snapshot.snapshot_id)
+```
+
+**TypeScript:**
+
+```typescript
+const snapshot = await sandbox.checkpoint();
+console.log(snapshot.snapshotId);
+
+const snapshots = await sandbox.listSnapshots();
+
+const restored = await Sandbox.create({ snapshotId: snapshot.snapshotId });
+```
+
+When restoring, the new sandbox inherits image, resources, entrypoint, and secrets from the snapshot — these cannot be overridden. If you need different resources, create a fresh sandbox instead.
 
 ### Execute Commands
 
@@ -214,11 +237,11 @@ Snapshots, suspend/resume, clone, ephemeral vs named, and the full state machine
 
 ```python
 result = sandbox.run(
-    command: str,                        # e.g., "python", "bash"
-    args: list[str] | None = None,       # e.g., ["-c", "print('hello')"]
-    env: dict[str, str] | None = None,
-    working_dir: str | None = None,
-    timeout: float | None = None,
+    command,                             # str — e.g., "python", "bash"
+    args=None,                           # list[str] | None — e.g., ["-c", "print('hi')"]
+    env=None,                            # dict[str, str] | None
+    working_dir=None,                    # str | None
+    timeout=None,                        # float | None — seconds
 )
 result.exit_code   # int
 result.stdout      # str
@@ -240,24 +263,15 @@ console.log(result.stdout);
 console.log(result.exitCode);
 ```
 
-Shell commands (pipes, redirects, chaining) require wrapping in bash:
-
-**Python:**
+Shell features (pipes, redirects, chaining) require wrapping in bash:
 
 ```python
 sandbox.run("bash", ["-c", "ls -la /workspace | grep '.py'"])
 sandbox.run("bash", ["-c", "cd /workspace && pip install -r requirements.txt && python main.py"])
 ```
 
-**TypeScript:**
-
 ```typescript
-await sandbox.run("bash", {
-  args: ["-lc", "ls -la /workspace | grep '.py' | wc -l"],
-});
-await sandbox.run("bash", {
-  args: ["-lc", "cd /workspace && pip install -r requirements.txt && python main.py"],
-});
+await sandbox.run("bash", { args: ["-lc", "ls -la /workspace | grep '.py' | wc -l"] });
 ```
 
 ### File Operations
@@ -265,11 +279,11 @@ await sandbox.run("bash", {
 **Python:**
 
 ```python
-sandbox.write_file(path: str, content: bytes)
-data = sandbox.read_file(path: str)          # -> bytes (use bytes(data).decode() for text)
-sandbox.delete_file(path: str)
-entries = sandbox.list_directory(path: str)   # -> ListDirectoryResponse
-# entries.entries[].name, entries.entries[].size
+sandbox.write_file("/workspace/data.csv", b"name,score\nAlice,95")
+data = sandbox.read_file("/workspace/data.csv")          # -> bytes
+print(bytes(data).decode())
+entries = sandbox.list_directory("/workspace")           # entries[].name, entries[].size
+sandbox.delete_file("/workspace/data.csv")
 ```
 
 **TypeScript:**
@@ -277,7 +291,7 @@ entries = sandbox.list_directory(path: str)   # -> ListDirectoryResponse
 ```typescript
 await sandbox.writeFile(
   "/workspace/data.csv",
-  new TextEncoder().encode("name,score\nAlice,95\nBob,87"),
+  new TextEncoder().encode("name,score\nAlice,95"),
 );
 
 const content = await sandbox.readFile("/workspace/data.csv");
@@ -286,36 +300,34 @@ console.log(new TextDecoder().decode(content));
 await sandbox.deleteFile("/workspace/data.csv");
 ```
 
-Best practice: Use `/workspace` as the default working directory.
+Best practice: use `/workspace` as the default working directory.
 
 ### Environment Variables
 
-Pass `env` on each invocation, choosing the scope that matches the lifetime you want:
+Pass `env` per invocation — choose the scope that matches the lifetime you want:
 
-| Scope | API | Lifetime |
-|---|---|---|
-| Command | `sandbox.run(..., env={...})` | Single command execution |
-| Process | `sandbox.start_process(..., env={...})` | Life of the background process |
-| PTY | `sandbox.create_pty(..., env={...})` | Life of the interactive terminal session |
-
-**Python:**
+| Scope   | API                                | Lifetime                            |
+|---------|------------------------------------|-------------------------------------|
+| Command | `sandbox.run(..., env={...})`      | Single command execution            |
+| Process | `sandbox.start_process(..., env=)` | Life of the background process      |
+| PTY     | `sandbox.create_pty(..., env=)`    | Life of the interactive terminal    |
 
 ```python
-sandbox.run("bash", ["-lc", "echo $MODE"], env={"MODE": "prod", "DEBUG": "0"})
+sandbox.run("bash", ["-lc", "echo $MODE"], env={"MODE": "prod"})
 
 pty = sandbox.create_pty(
     command="/bin/bash",
     env={"TERM": "xterm-256color", "APP_ENV": "dev"},
     working_dir="/workspace",
+    cols=80,
+    rows=24,
 )
 ```
-
-**TypeScript:**
 
 ```typescript
 await sandbox.run("bash", {
   args: ["-lc", "echo $MODE"],
-  env: { MODE: "prod", DEBUG: "0" },
+  env: { MODE: "prod" },
 });
 
 const pty = await sandbox.createPty({
@@ -329,7 +341,7 @@ const pty = await sandbox.createPty({
 
 ```bash
 tl sbx exec <sandbox-id> --env MODE=prod --env DEBUG=0 bash -lc 'echo $MODE'
-tl sbx ssh  <sandbox-id> --env APP_ENV=dev --env TERM=screen-256color
+tl sbx ssh  <sandbox-id> --env APP_ENV=dev
 ```
 
 ### Process Management
@@ -337,30 +349,28 @@ tl sbx ssh  <sandbox-id> --env APP_ENV=dev --env TERM=screen-256color
 **Python:**
 
 ```python
-# Start a long-running process
 proc = sandbox.start_process(
-    command: str,
-    args: list[str] | None = None,
-    env: dict[str, str] | None = None,
-    working_dir: str | None = None,
-    stdin_mode: str | None = None,           # "pipe" to enable stdin writing
-    stdout_mode: str | None = None,          # "capture" to capture stdout
-    stderr_mode: str | None = None,          # "capture" to capture stderr
+    "python",
+    args=["-c", "import time\nfor i in range(5):\n print(i); time.sleep(1)"],
+    env=None,
+    working_dir=None,
+    stdin_mode=None,    # "pipe" to enable write_stdin
+    stdout_mode=None,   # "capture" to retain stdout
+    stderr_mode=None,
 )
-# proc.pid, proc.status (SandboxProcessStatus), proc.stdin_writable
+# proc.pid, proc.status, proc.stdin_writable
 # proc.command, proc.args, proc.started_at, proc.ended_at
 # proc.exit_code, proc.signal
 
-sandbox.list_processes()                     # -> list[ProcessInfo]
+procs = sandbox.list_processes()                # -> list[ProcessInfo]
 
 # Stream output as it arrives (SSE)
 for event in sandbox.follow_output(proc.pid):
     print(event.line, end="")
 
-# Signal handling
 import signal
-sandbox.send_signal(proc.pid, signal.SIGTERM)  # Graceful stop
-sandbox.send_signal(proc.pid, signal.SIGKILL)  # Force kill
+sandbox.send_signal(proc.pid, signal.SIGTERM)   # graceful stop
+sandbox.send_signal(proc.pid, signal.SIGKILL)   # force kill
 ```
 
 **TypeScript:**
@@ -369,44 +379,36 @@ sandbox.send_signal(proc.pid, signal.SIGKILL)  # Force kill
 import { ProcessStatus } from "tensorlake";
 
 const proc = await sandbox.startProcess("python", {
-  args: ["-c", "import time\nfor i in range(5):\n print(f'Step {i+1}/5')\n time.sleep(1)"],
+  args: ["-c", "import time\nfor i in range(5):\n print(i); time.sleep(1)"],
 });
 
-// Poll for completion
 let info = await sandbox.getProcess(proc.pid);
 while (info.status === ProcessStatus.RUNNING) {
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  await new Promise((r) => setTimeout(r, 100));
   info = await sandbox.getProcess(proc.pid);
 }
 
-// Get captured output
 console.log((await sandbox.getStdout(proc.pid)).lines);
 console.log((await sandbox.getStderr(proc.pid)).lines);
-console.log((await sandbox.getOutput(proc.pid)).lines);  // combined
+console.log((await sandbox.getOutput(proc.pid)).lines); // combined
 
-// Stream output as it arrives (SSE)
 for await (const event of sandbox.followOutput(proc.pid)) {
   process.stdout.write(event.line);
 }
 
-// Signal / kill
-await sandbox.sendSignal(proc.pid, 15);   // SIGTERM — graceful stop
-await sandbox.killProcess(proc.pid);       // Dedicated kill convenience (no Python equivalent)
+await sandbox.sendSignal(proc.pid, 15);   // SIGTERM
+await sandbox.killProcess(proc.pid);       // dedicated kill (no Python equivalent)
 ```
 
-### Process Stdin/Stdout/Stderr (Granular APIs)
+### Process stdin/stdout/stderr (Granular)
 
-For fine-grained I/O control, use `stdin_mode="pipe"` (Python) or `stdinMode: "pipe"` (TypeScript) when starting a process:
-
-**Python:**
+Use `stdin_mode="pipe"` (Python) / `stdinMode: "pipe"` (TypeScript) to write to a process's stdin:
 
 ```python
 proc = sandbox.start_process("python", ["-i"], stdin_mode="pipe")
 sandbox.write_stdin(proc.pid, b"print('hello')\n")
-sandbox.close_stdin(proc.pid)  # delivers EOF without terminating the process
+sandbox.close_stdin(proc.pid)   # delivers EOF without terminating the process
 ```
-
-**TypeScript:**
 
 ```typescript
 const proc = await sandbox.startProcess("python", {
@@ -417,16 +419,14 @@ await sandbox.writeStdin(proc.pid, new TextEncoder().encode("print('hello')\n"))
 await sandbox.closeStdin(proc.pid);
 ```
 
-**REST equivalents:**
-- Stream output: `GET /api/v1/processes/<pid>/output/follow` (SSE — emits `output` and `eof` events)
-- Write stdin: `POST /api/v1/processes/<pid>/stdin` (body: raw bytes)
+REST equivalents:
+- Stream output: `GET /api/v1/processes/<pid>/output/follow` (SSE — `output` and `eof` events)
+- Write stdin: `POST /api/v1/processes/<pid>/stdin` (raw bytes)
 - Close stdin: `POST /api/v1/processes/<pid>/stdin/close`
-- Send signal: `POST /api/v1/processes/<pid>/signal` (body: `{"signal": 15}`)
+- Send signal: `POST /api/v1/processes/<pid>/signal` (`{"signal": 15}`)
 - Kill process: `DELETE /api/v1/processes/<pid>`
 
 ### Interactive PTY Session
-
-**Python:**
 
 ```python
 pty = sandbox.create_pty(
@@ -447,8 +447,6 @@ print(pty.wait())
 pty = sandbox.connect_pty(session_id, token)
 ```
 
-**TypeScript:**
-
 ```typescript
 const pty = await sandbox.createPty({
   command: "/bin/bash",
@@ -467,63 +465,60 @@ Use the `ubuntu-vnc` image to get a desktop-enabled sandbox with XFCE, TigerVNC,
 **Python:**
 
 ```python
-from tensorlake.sandbox import SandboxClient
+from tensorlake.sandbox import Sandbox
 from pathlib import Path
 import time
 
-client = SandboxClient()
-
-# Screenshot
-with client.create_and_connect(image="ubuntu-vnc") as sandbox:
+sandbox = Sandbox.create(image="ubuntu-vnc")
+try:
     with sandbox.connect_desktop(password="tensorlake") as desktop:
         Path("sandbox-desktop.png").write_bytes(desktop.screenshot())
 
-# Send keyboard input and verify
-with client.create_and_connect(image="ubuntu-vnc") as sandbox:
-    with sandbox.connect_desktop(password="tensorlake") as desktop:
         desktop.press(["ctrl", "alt", "t"])
         time.sleep(1.0)
         desktop.type_text("echo docs-test > /tmp/desktop-test.txt")
         desktop.press("enter")
+
     result = sandbox.run("bash", ["-lc", "cat /tmp/desktop-test.txt"])
     print(result.stdout.strip())
+finally:
+    sandbox.terminate()
 ```
 
 ### Reconnecting to an Existing Desktop Sandbox
 
 ```python
-sandbox_id = "your-running-sandbox-id"
-with client.connect(sandbox_id) as sandbox:
-    with sandbox.connect_desktop(password="tensorlake") as desktop:
-        Path("existing-sandbox.png").write_bytes(desktop.screenshot())
+sandbox = Sandbox.connect("your-running-sandbox-id")
+with sandbox.connect_desktop(password="tensorlake") as desktop:
+    Path("existing-sandbox.png").write_bytes(desktop.screenshot())
 ```
 
 ### Desktop Methods
 
-| Method | Description |
-|---|---|
-| `screenshot()` | Returns PNG bytes of current desktop |
-| `press(key)` | Press key or key combo (e.g., `["ctrl", "alt", "t"]`) |
-| `type_text(text)` | Type text input |
-| `move_mouse()` | Move cursor |
-| `click()` | Single mouse click |
-| `double_click()` | Double mouse click |
-| `scroll()` | Scroll |
-| `key_down()` | Key press (held) |
-| `key_up()` | Key release |
+| Method            | Description                                              |
+|-------------------|----------------------------------------------------------|
+| `screenshot()`    | Returns PNG bytes of the current desktop                 |
+| `press(key)`      | Press key or key combo (e.g., `["ctrl", "alt", "t"]`)    |
+| `type_text(text)` | Type text input                                          |
+| `move_mouse()`    | Move cursor                                              |
+| `click()`         | Single mouse click                                       |
+| `double_click()`  | Double mouse click                                       |
+| `scroll_up()`     | Scroll up                                                |
+| `scroll_down()`   | Scroll down                                              |
+| `key_down()`      | Key press (held)                                         |
+| `key_up()`        | Key release                                              |
+| `close()`         | Close desktop connection (auto on context-manager exit)  |
 
 ### Browser Access with noVNC
 
-For a live human-facing desktop stream (instead of polling `screenshot()`), bridge the sandbox's VNC port to the browser with [`noVNC`](https://novnc.com/info.html). Recommended architecture:
+For a live human-facing desktop stream (instead of polling `screenshot()`), bridge the sandbox's VNC port to the browser with [`noVNC`](https://novnc.com/info.html):
 
 1. Keep `TENSORLAKE_API_KEY` on the backend.
 2. Backend opens a TCP tunnel to the sandbox's VNC port `5901`.
 3. Bridge that tunnel to a browser WebSocket endpoint (e.g. `/vnc/<session-id>`).
 4. Point `noVNC` at your backend WebSocket; authenticate with desktop password `tensorlake`.
 
-Sandbox proxy auth stays server-side — you do **not** need to expose port `5901` publicly. For hybrid agent + human sessions, use `noVNC` for the live view and `sandbox.connect_desktop()` / `sandbox.connectDesktop()` for programmatic actions on the backend.
-
-**Browser client:**
+You do **not** need to expose port `5901` publicly. For hybrid agent + human sessions, use `noVNC` for the live view and `sandbox.connect_desktop()` for programmatic actions on the backend.
 
 ```bash
 npm install @novnc/novnc
@@ -551,12 +546,11 @@ rfb.scaleViewport = true;
 
 - Default VNC password for managed `ubuntu-vnc` image: `"tensorlake"`
 - Desktop connection is proxied through an authenticated endpoint (no port exposure needed)
-- `client.connect()` does not terminate sandbox on exit (unlike `create_and_connect` context manager)
-- Context manager pattern (`with`) auto-closes desktop connections
+- `Sandbox.connect()` returns a handle that does **not** auto-terminate the sandbox; call `.terminate()` explicitly when done
 
 ## Sandbox Images
 
-A sandbox image is a project-scoped, named snapshot built from a base image plus build steps. Three definition formats — Python DSL, TypeScript DSL, Dockerfile — and two registration paths (CLI or TypeScript SDK).
+A sandbox image is a project-scoped, named snapshot built from a base image plus build steps. Three definition formats — Python DSL, TypeScript DSL, Dockerfile — and three build paths.
 
 ### Define an Image
 
@@ -565,7 +559,7 @@ A sandbox image is a project-scoped, named snapshot built from a base image plus
 ```python
 from tensorlake import Image
 
-SANDBOX_IMAGE = (
+image = (
     Image(name="data-tools-image", base_image="tensorlake/ubuntu-systemd")
     .copy("requirements.txt", "/tmp/requirements.txt")
     .run("apt-get update && apt-get install -y python3 python3-pip")
@@ -573,6 +567,8 @@ SANDBOX_IMAGE = (
     .run("mkdir -p /workspace/cache")
     .env("APP_ENV", "prod")
 )
+
+image.build()
 ```
 
 **TypeScript:**
@@ -590,6 +586,8 @@ const image = new Image({
   .run("mkdir -p /workspace/cache")
   .env("APP_ENV", "prod")
   .workdir("/workspace");
+
+await image.build();
 ```
 
 **Dockerfile:**
@@ -605,7 +603,17 @@ ENV APP_ENV=prod
 WORKDIR /workspace
 ```
 
-### Register the Image
+### Build / Register the Image
+
+**Python or TypeScript SDK:**
+
+```python
+image.build()
+```
+
+```typescript
+await image.build();
+```
 
 **CLI (Dockerfile only):**
 
@@ -615,50 +623,25 @@ tl sbx image create ./Dockerfile --registered-name data-tools-image
 
 The positional argument is a Dockerfile path. The `-n/--registered-name` flag sets the registered name; if omitted, it defaults to the parent directory when the file is named `Dockerfile`, otherwise the file stem. Names must be unique within a project.
 
-**TypeScript SDK:**
-
-```typescript
-import { createSandboxImage, Image } from "tensorlake";
-
-const image = new Image({ name: "data-tools-image", baseImage: "tensorlake/ubuntu-systemd" })
-  .run("apt-get update && apt-get install -y python3 python3-pip");
-
-await createSandboxImage(image, {
-  contextDir: ".",            // resolves relative copy()/add() sources
-  cpus: 4,
-  memoryMb: 4096,
-});
-```
-
-`createSandboxImage()` reads cloud context from the environment — set `TENSORLAKE_API_KEY`, `TENSORLAKE_ORGANIZATION_ID`, and `TENSORLAKE_PROJECT_ID` before calling.
-
-**Python SDK:** There is no public Python equivalent of TypeScript's `createSandboxImage(image, opts)` that takes an `Image` DSL object. A `create_sandbox_image(dockerfile_path, registered_name, cpus, memory_mb, is_public=False)` function does exist in `tensorlake.cli.create_sandbox_image`, but it is the CLI internal that powers `tl sbx image create` — it takes a **Dockerfile path** and emits NDJSON events for the CLI shell, not a user-facing API.
-
-Practical paths for Python users:
-
-1. Write a Dockerfile and run `tl sbx image create ./Dockerfile --registered-name <name>` (recommended).
-2. Define in TypeScript and call `createSandboxImage()`.
-3. The `Image` DSL is otherwise consumed by the Applications/Workflows API; `tensorlake.image.utils.dockerfile_content(img)` can render it to Dockerfile text but injects Applications-specific lines (`WORKDIR /app`, `RUN pip install tensorlake==X.Y.Z`) so it isn't a clean sandbox-image path.
-
-Before registering, run `tl login` and `tl init` (or `npx tl init`) to select the target project.
+Before building, run `tl login` and `tl init` (or `npx tl init`) to select the target project.
 
 ### Base Images
 
-| Base Image | Description |
-|---|---|
-| `tensorlake/ubuntu-minimal` | Default. No systemd, boots in hundreds of ms. |
-| `tensorlake/ubuntu-systemd` | Includes systemd, supports Docker/K8s inside sandbox. |
-| `tensorlake/ubuntu-vnc` | Desktop-enabled (XFCE + TigerVNC + Firefox) — use with `sandbox.connect_desktop()` for computer-use / browser automation. |
+| Base Image                  | Description                                                                                              |
+|-----------------------------|----------------------------------------------------------------------------------------------------------|
+| `tensorlake/ubuntu-minimal` | Default. No systemd, boots in hundreds of ms.                                                            |
+| `tensorlake/ubuntu-systemd` | Includes systemd, supports Docker/K8s inside the sandbox.                                                |
+| `tensorlake/ubuntu-vnc`     | Desktop-enabled (XFCE + TigerVNC + Firefox) — use with `sandbox.connect_desktop()` for computer-use.     |
 
 Use these prefixed names in `base_image=` / `baseImage:` and in `FROM`. When launching a sandbox from a base image directly via `image=`, the unprefixed form (`image="ubuntu-vnc"`) is also accepted.
 
 ### Image Builder Methods (chainable)
 
-- `.run(command)` — Execute shell command during build
-- `.env(key, value)` — Set environment variable
-- `.copy(src, dest)` — Copy file from local build context
-- `.add(src, dest)` — Add file from local build context
-- `.workdir(path)` — Set working directory (TypeScript only — Python `Image` has no `workdir` method as of 0.4.49; use a `WORKDIR` line in a Dockerfile if needed)
+- `.run(command)` — execute shell command during build
+- `.env(key, value)` — set environment variable
+- `.copy(src, dest)` — copy file from local build context
+- `.add(src, dest)` — add file from local build context
+- `.workdir(path)` — set working directory (TypeScript). For Python, set `WORKDIR` via a Dockerfile if needed.
 
 ### Supported Build Operations
 
@@ -669,19 +652,19 @@ Materialized into the snapshot: `RUN`, `WORKDIR`, `ENV`, `COPY`, `ADD`. Preserve
 **Python:**
 
 ```python
-with client.create_and_connect(
+sandbox = Sandbox.create(
     image="data-tools-image",
     cpus=4.0,
     memory_mb=4096,
     timeout_secs=1800,
-) as sandbox:
-    result = sandbox.run("python3", ["-c", "import pandas; print('ready')"])
+)
+result = sandbox.run("python3", ["-c", "import pandas; print('ready')"])
 ```
 
 **TypeScript:**
 
 ```typescript
-const sandbox = await client.createAndConnect({
+const sandbox = await Sandbox.create({
   image: "data-tools-image",
   cpus: 4.0,
   memoryMb: 4096,
@@ -692,8 +675,8 @@ const sandbox = await client.createAndConnect({
 **CLI:**
 
 ```bash
-tl sbx new --image data-tools-image
-tl sbx new --image data-tools-image --cpus 4.0 --memory 4096 --timeout 1800
+tl sbx create --image data-tools-image
+tl sbx create --image data-tools-image --cpus 4.0 --memory 4096 --timeout 1800
 ```
 
 `tl sbx image describe <name>` shows the registered Dockerfile and snapshot metadata for a sandbox image.
@@ -704,35 +687,35 @@ Docker requires systemd, so launch with the `tensorlake/ubuntu-systemd` base ima
 
 ## Networking
 
-| Python Parameter | TypeScript Parameter | Type | Default | Description |
-|---|---|---|---|---|
-| `allow_internet_access` | `allowInternetAccess` | `bool` | `True` | Global internet toggle |
-| `deny_out` | `denyOut` | `list[str]` | `[]` | Blocked outbound destinations (domains/IPs/CIDRs) |
-| `allow_out` | `allowOut` | `list[str]` | `[]` | Allowed outbound destinations (when internet disabled) |
+| Python Parameter       | TypeScript Parameter        | Type        | Default | Description                                                  |
+|------------------------|-----------------------------|-------------|---------|--------------------------------------------------------------|
+| `allow_internet_access`| `allowInternetAccess`       | `bool`      | `True`  | Global outbound internet toggle                              |
+| `deny_out`             | `denyOut`                   | `list[str]` | `[]`    | Blocked outbound destinations (domains/IPs/CIDRs)            |
+| `allow_out`            | `allowOut`                  | `list[str]` | `[]`    | Allowed outbound destinations (when internet disabled)       |
+| `expose_ports`         | `exposePorts`               | `list[int]` | `[]`    | User ports the sandbox proxy should route to                 |
+| `allow_unauthenticated_access` | `allowUnauthenticatedAccess` | `bool` | `False` | Skip TensorLake auth for exposed user ports         |
+
+These are all parameters on `Sandbox.create()`.
 
 ### Public URLs
 
-- Management API: `https://<sandbox-id>.sandbox.tensorlake.ai`
-- User services: `https://<port>-<sandbox-id>.sandbox.tensorlake.ai`
-- Supports HTTP/1.1, HTTP/2, WebSocket upgrades
+- Management API: `https://<sandbox-id-or-name>.sandbox.tensorlake.ai` (port `9501`, always authenticated)
+- User services: `https://<port>-<sandbox-id-or-name>.sandbox.tensorlake.ai`
+- Supports HTTP/1.1, HTTP/2, WebSocket upgrades, gRPC
+
+The hostname accepts either the sandbox ID or a sandbox name.
 
 ### Port Exposure
 
-**Python:**
-
 ```python
-client.expose_ports(sandbox_id, ports=[8080], allow_unauthenticated_access=False)
-client.unexpose_ports(sandbox_id, ports=[8080])
+Sandbox.expose_ports("my-env", [8080], allow_unauthenticated_access=False)
+Sandbox.unexpose_ports("my-env", [8080])
 ```
-
-**TypeScript:**
 
 ```typescript
-await client.exposePorts("my-env", [8080], { allowUnauthenticatedAccess: false });
-await client.unexposePorts("my-env", [8080]);
+await Sandbox.exposePorts("my-env", [8080], { allowUnauthenticatedAccess: false });
+await Sandbox.unexposePorts("my-env", [8080]);
 ```
-
-**CLI:**
 
 ```bash
 tl sbx port expose <sandbox-id> 8080
@@ -740,46 +723,98 @@ tl sbx port ls <sandbox-id>
 tl sbx port rm <sandbox-id> 8080
 ```
 
+The CLI `tl sbx port expose` workflow sets both `exposed_ports` and `allow_unauthenticated_access=true`, making traffic to the user port publicly reachable from the internet without TensorLake auth. Use `Sandbox.expose_ports(..., allow_unauthenticated_access=False)` for the authenticated-only mode.
+
 Idle auto-suspend and auto-resume for named sandboxes are covered in [sandbox_persistence.md](sandbox_persistence.md#idle-auto-suspend-and-auto-resume).
 
-## Enums
+### Outbound Internet Control
 
-### SandboxProcessStatus
+```python
+# Disable outbound internet entirely (good for untrusted code)
+sandbox = Sandbox.create(allow_internet_access=False)
 
-| Value | Meaning |
-|---|---|
-| `running` | Process is executing |
-| `exited` | Process exited normally |
-| `signaled` | Process terminated by signal |
+# Disable internet but allow specific destinations
+sandbox = Sandbox.create(
+    allow_internet_access=False,
+    allow_out=["10.0.0.0/8", "8.8.8.8"],
+)
 
-### SandboxProcessStdinMode
+# Internet on, but block specific destinations
+sandbox = Sandbox.create(deny_out=["example.com"])
+```
 
-| Value | Meaning |
-|---|---|
-| `closed` | Stdin is not writable (default) |
-| `pipe` | Stdin accepts writes via `write_stdin()` |
+`allow_out` rules are evaluated before `deny_out`. Values may be IPs, CIDR ranges, or domain names.
 
-### SandboxProcessOutputMode
+## Data Models
 
-| Value | Meaning |
-|---|---|
-| `capture` | Capture output for later retrieval |
-| `discard` | Discard output |
+### SandboxInfo
+
+| Field                          | Type                     | Description                                          |
+|--------------------------------|--------------------------|------------------------------------------------------|
+| `sandbox_id` / `sandboxId`     | `str`                    | Server-assigned UUID                                 |
+| `name`                         | `str \| None`            | Name, or `None` for ephemeral                        |
+| `namespace`                    | `str`                    | Namespace                                            |
+| `status`                       | `str`                    | `"Pending" \| "Running" \| "Suspending" \| "Suspended" \| "Snapshotting" \| "Terminated"` |
+| `image`                        | `str`                    | Container image used                                 |
+| `resources`                    | `ContainerResourcesInfo` | `.cpus`, `.memory_mb` / `.memoryMb`                  |
+| `secret_names`                 | `list[str]`              | Injected secret names                                |
+| `timeout_secs`                 | `int`                    | Timeout in seconds                                   |
+| `exposed_ports`                | `list[int]`              | User ports routed by the proxy                       |
+| `allow_unauthenticated_access` | `bool`                   | Whether exposed user ports skip TensorLake auth      |
+| `entrypoint`                   | `list[str]`              | Custom entrypoint command                            |
+| `created_at`                   | `datetime \| None`       | Creation timestamp                                   |
+| `terminated_at`                | `datetime \| None`       | Termination timestamp                                |
+
+### CommandResult
+
+```python
+result.stdout       # str
+result.stderr       # str
+result.exit_code    # int
+```
+
+```typescript
+result.stdout       // string
+result.stderr       // string
+result.exitCode     // number
+```
+
+### ProcessInfo
+
+`pid`, `command`, `args`, `status`, `exit_code`, `signal`, `started_at`, `ended_at`, `stdin_writable`.
+
+### SnapshotInfo
+
+`snapshot_id` / `snapshotId`, `sandbox_id`, `status` (`"Pending" | "Ready" | "Failed"`), `size_bytes`, `created_at`.
+
+### Process Status / Mode Enums
+
+- **`SandboxProcessStatus`** — `running`, `exited`, `signaled`
+- **`SandboxProcessStdinMode`** — `closed` (default), `pipe`
+- **`SandboxProcessOutputMode`** — `capture`, `discard`
 
 ## CLI Quick Reference
 
 ```bash
-tl sbx new                              # Create ephemeral sandbox
-tl sbx new my-env                       # Create named sandbox
-tl sbx exec <id> <command>              # Execute command
-tl sbx run <command>                    # Create, run, teardown
-tl sbx ssh <id>                         # Interactive shell
-tl sbx cp file.txt <id>:/path           # Upload file (file-only, no dirs)
-tl sbx cp <id>:/path ./local            # Download file
-tl sbx clone <id>                       # Snapshot + restore
-tl sbx snapshot <id>                    # Create snapshot
-tl sbx suspend <id>                     # Suspend named sandbox
-tl sbx terminate <id>                   # Terminate sandbox (by name or ID)
-tl sbx image create Dockerfile --registered-name NAME  # Build image
-tl sbx port expose <id> 8080            # Expose port
+tl sbx create                            # Create ephemeral sandbox
+tl sbx create my-env                     # Create named sandbox
+tl sbx create --image data-tools-image --cpus 2 --memory 2048 --timeout 600
+tl sbx ls                                # List active sandboxes
+tl sbx ls --all                          # Include suspended/terminated
+tl sbx exec <id> <command>               # Execute command
+tl sbx run <command>                     # Create, run, teardown
+tl sbx ssh <id>                          # Interactive shell
+tl sbx cp file.txt <id>:/path            # Upload file (file-only, no dirs)
+tl sbx cp <id>:/path ./local             # Download file
+tl sbx checkpoint <id>                   # Create snapshot from running sandbox
+tl sbx checkpoint <id> --timeout 600
+tl sbx suspend <id>                      # Suspend named sandbox
+tl sbx resume <id>                       # Resume named sandbox
+tl sbx terminate <id>                    # Terminate sandbox (by name or ID)
+tl sbx name <id> <new-name>              # Rename or promote ephemeral → named
+tl sbx image create Dockerfile --registered-name NAME   # Build image from Dockerfile
+tl sbx image describe NAME               # Show registered Dockerfile + metadata
+tl sbx port expose <id> 8080             # Expose port (sets allow_unauthenticated_access=true)
+tl sbx port ls <id>
+tl sbx port rm <id> 8080
 ```

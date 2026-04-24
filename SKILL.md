@@ -12,7 +12,7 @@ description: >
   database, or API as the infrastructure layer.
 metadata:
   author: tensorlake
-  version: 2.4.1
+  version: 2.5.0
 ---
 
 # Tensorlake SDK
@@ -76,7 +76,7 @@ if __name__ == "__main__":
 - **DAG composition**: Chain functions via `.future()`, `.map()`, `.reduce()` to form parallel pipelines
 - **Agentic + Sandbox**: Use Sandbox for agent execution environments and isolated tool calls, Orchestration for durable workflow coordination
 - **Persistent named sandboxes**: Create sandboxes with `name=` when state must survive between steps. Named sandboxes support suspend/resume, can be auto-suspended when idle, and auto-resume on the next sandbox-proxy request. See [references/sandbox_persistence.md](references/sandbox_persistence.md) for the full state model.
-- **LLM code-execution tool**: One sandbox per agent session, reused across every tool call. Create with `allow_internet_access=False` for untrusted code. Each call is `sandbox.run("python", ["-c", code])` and returns `.stdout` / `.stderr` / `.exit_code` — no `sandbox.exec()`, `sandbox.python()`, `sandbox.eval()`, or `sandbox.repl()`. **Each call is a fresh Python process: files written to disk and `pip install`ed packages persist across calls, but in-memory variables, imports, and module state do NOT.** If a user describes this as "one long REPL session," correct the framing. See [references/sandbox_advanced.md](references/sandbox_advanced.md#ai-code-execution).
+- **LLM code-execution tool**: One sandbox per agent session, reused across every tool call. Create with `Sandbox.create(allow_internet_access=False)` for untrusted code (`from tensorlake.sandbox import Sandbox`). Each call is `sandbox.run("python", ["-c", code])` and returns `.stdout` / `.stderr` / `.exit_code` — no `sandbox.exec()`, `sandbox.python()`, `sandbox.eval()`, or `sandbox.repl()`. **Each call is a fresh Python process: files written to disk and `pip install`ed packages persist across calls, but in-memory variables, imports, and module state do NOT.** If a user describes this as "one long REPL session," correct the framing. See [references/sandbox_advanced.md](references/sandbox_advanced.md#ai-code-execution).
 - **Document extraction**: Use DocumentAI with Pydantic schemas to extract structured data from PDFs/images
 - **LLM integration**: Use any LLM provider inside `@function()` — install deps via `Image`, pass keys via `secrets`
 - **Framework integration**: Use Sandbox as a code execution tool for LangChain agents or OpenAI function calling, or DocumentAI as a document loader for any RAG pipeline
@@ -116,6 +116,8 @@ tl deploy path/to/app.py                            # Deploy to cloud
 tl parse doc.pdf                                   # Parse document
 tl login                                           # Authenticate
 tl secrets ls                                      # List secrets
-tl sbx new                                         # Create a new sandbox
+tl sbx create                                      # Create a new ephemeral sandbox
+tl sbx create my-env                               # Create a named sandbox (suspend/resume)
+tl sbx checkpoint <id>                             # Create a snapshot from a running sandbox
 tl sbx image create Dockerfile --registered-name NAME  # Register a sandbox image
 ```

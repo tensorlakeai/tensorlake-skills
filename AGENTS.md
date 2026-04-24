@@ -1,5 +1,5 @@
 # Tensorlake SDK
-<!-- version: 2.4.1 -->
+<!-- version: 2.5.0 -->
 
 Tensorlake provides two APIs for building agentic applications:
 
@@ -100,6 +100,8 @@ tl deploy path/to/app.py                            # Deploy to cloud
 tl parse doc.pdf                                   # Parse document
 tl login                                           # Authenticate
 tl secrets ls                                      # List secrets
-tl sbx new                                         # Create a new sandbox
+tl sbx create                                      # Create a new ephemeral sandbox
+tl sbx create my-env                               # Create a named sandbox (suspend/resume)
+tl sbx checkpoint <id>                             # Create a snapshot from a running sandbox
 tl sbx image create Dockerfile --registered-name NAME  # Register a sandbox image
 ```
