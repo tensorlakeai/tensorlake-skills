@@ -20,6 +20,13 @@ Last verified: 2026-04-22
 
 # TensorLake Platform Reference
 
+## Table of Contents
+
+- [Authentication](#authentication)
+- [Access Control](#access-control)
+- [Webhooks](#webhooks)
+- [EU Data Residency](#eu-data-residency)
+
 ## Authentication
 
 ### API Key Management

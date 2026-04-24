@@ -12,6 +12,17 @@ State-centric reference for keeping sandbox state across time: state machine, ep
 
 For creating, connecting to, and running commands in a sandbox, see [sandbox_sdk.md](sandbox_sdk.md).
 
+## Table of Contents
+
+- [State Machine](#state-machine)
+- [Ephemeral vs Named](#ephemeral-vs-named)
+- [Snapshots](#snapshots)
+- [Clone](#clone)
+- [Suspend & Resume](#suspend--resume)
+- [Suspend vs Snapshot — When to Use Which](#suspend-vs-snapshot--when-to-use-which)
+- [Limitations](#limitations)
+- [See Also](#see-also)
+
 ## State Machine
 
 Every sandbox moves through the states below. `create` starts the sandbox in `Pending`. From `Running` you can snapshot, suspend (named only), or terminate. `Terminated` is final.

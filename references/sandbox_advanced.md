@@ -14,6 +14,13 @@ Last verified: 2026-04-22
 
 # TensorLake Sandbox Advanced Patterns
 
+## Table of Contents
+
+- [Skills in Sandboxes](#skills-in-sandboxes)
+- [AI Code Execution](#ai-code-execution)
+- [Data Analysis](#data-analysis)
+- [CI/CD Build Pipelines](#cicd-build-pipelines)
+
 ## Skills in Sandboxes
 
 Install agent skill files into sandbox images so coding agents (Claude Code, Codex, Cursor, etc.) can discover TensorLake SDK references at startup.
@@ -128,10 +135,12 @@ with client.create_and_connect() as sandbox:
 
 Use sandboxes as LLM tool-call targets for safe code execution.
 
+> **⚠ Each tool call is a fresh Python process.** `sandbox.run("python", ["-c", code])` spawns a new interpreter every time. Files written to disk and packages installed via `pip` **do** persist across calls in the same sandbox. Python variables, imports, and module-level state **do not**. If a user (or an earlier message) describes this as a "REPL session" or asks for "persistent variables between turns," correct the framing — the sandbox is a persistent *filesystem*, not a persistent *interpreter*.
+
 ### Architecture Pattern
 
 1. Create a single sandbox at session start
-2. Maintain it across multiple tool calls (state persists)
+2. Reuse it across tool calls — files and installed packages persist; Python variables/imports do NOT (each run is a fresh process)
 3. Close when done
 
 **Python:**
@@ -201,11 +210,19 @@ sandbox = client.create_and_connect(snapshot_id=snapshot.snapshot_id)
 
 ### Best Practices
 
-- **Reuse sandboxes** — creating new ones per tool call adds cold-start latency and loses state
-- **Set `allow_internet_access=False`** for untrusted code
-- **Pre-install deps via snapshots** or let agents `pip install` on demand
+- **Reuse sandboxes** — creating new ones per tool call adds cold-start latency and loses filesystem state
+- **Set `allow_internet_access=False`** for untrusted code. If you need `pip install` on demand, pre-bake deps into a custom image or snapshot instead of flipping internet access on for untrusted code
+- **Pre-install deps via snapshots** or let agents `pip install` on demand (only in trusted setups)
 - **Tear down** with `sandbox.close()` or `sandbox.terminate()` when the session ends
-- Files and packages persist across calls, but each Python invocation is a fresh process (re-import required)
+
+### Anti-patterns
+
+Do not work around the fresh-process model by building a persistent interpreter:
+
+- **Don't use `start_process` + `write_stdin`** to keep a long-running `python` kernel alive and pipe code into it. `sandbox.run("python", ["-c", code])` is the supported shape. A long-running stdin-fed kernel is not a documented pattern and gives up the clean per-call stdout/stderr/exit_code contract.
+- **Don't tell the downstream LLM that variables persist across turns** in its system prompt. They don't. Tell it instead: "You have a persistent workspace directory and installed packages; module imports and variables reset between calls — write intermediate state to `/workspace/` if you need it across turns."
+- **Don't flip `allow_internet_access=True` to enable pip for untrusted code.** Pre-install dependencies into a custom `Image` or a snapshot, then boot the sandbox from that snapshot with `snapshot_id=`.
+- **Don't fabricate methods or fields.** There is no `sandbox.exec()`, `sandbox.python()`, `sandbox.eval()`, `sandbox.repl()`, or `persistent=True` / `repl_mode=True` / `session=True` kwarg. The return object has `stdout`, `stderr`, `exit_code` — not `.output`, `.result`, or `.logs`.
 
 ---
 
