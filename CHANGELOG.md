@@ -2,6 +2,18 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [2.5.1] — SDK 0.5.1 — 2026-04-25
+
+### Changed (Sandbox SDK 0.5.1)
+- **sandbox_sdk.md** — updated to reflect 0.5.1 API surface:
+  - Rename and port exposure now live on the `Sandbox` instance via `sandbox.update(name=..., exposed_ports=..., allow_unauthenticated_access=...)`. `SandboxClient.update_sandbox` / `expose_ports` / `unexpose_ports` still work but are deprecated.
+  - `expose_ports` / `allow_unauthenticated_access` removed from `Sandbox.create()` parameters — port exposure is now a post-create operation.
+  - `SandboxClient` construction emits a `DeprecationWarning`. Only `client.list()` lacks a direct `Sandbox`-level replacement.
+  - `sandbox.status` returns a `SandboxStatus` enum (e.g., `SandboxStatus.RUNNING`); use `.value` for the lowercase string form.
+  - `sandbox.read_file(...)` / `sandbox.list_directory(...)` now return `Traced[...]` — unwrap with `.value`.
+- **sources.yaml** — bumped `sandbox_sdk.md` to `sdk_version: 0.5.1`, `last_verified: 2026-04-25`.
+- Verified all examples in **sandbox_persistence.md** continue to run cleanly against `tensorlake==0.5.1` (no doc changes needed).
+
 ## [2.5.0] — SDK 0.5.0 — 2026-04-24
 
 ### Changed (breaking — Sandbox SDK 0.5.0)
