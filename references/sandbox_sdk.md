@@ -13,15 +13,15 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/pty-sessions.md
   - https://docs.tensorlake.ai/sandboxes/computer-use.md
   - https://docs.tensorlake.ai/sandboxes/docker.md
-SDK version: tensorlake 0.5.0
-Last verified: 2026-04-24
+SDK version: tensorlake 0.5.1
+Last verified: 2026-04-25
 -->
 
 # TensorLake Sandbox SDK Reference
 
 For state management (snapshots, suspend/resume, ephemeral vs named, state machine), see [sandbox_persistence.md](sandbox_persistence.md).
 
-> **0.5.0 note:** `Sandbox` is now the preferred handle for create/connect/run/suspend/resume/checkpoint flows, but `SandboxClient` still ships in `0.5.0` and is marked deprecated rather than removed. In the installed package, `Sandbox.create`, `Sandbox.connect`, `Sandbox.get_snapshot`, and `Sandbox.delete_snapshot` exist; namespace-level management helpers such as list, rename/update, and port exposure still live on `SandboxClient`. Snapshot creation is now `sandbox.checkpoint()`; restore is `Sandbox.create(snapshot_id=...)`.
+> **0.5.1 note:** `Sandbox` is the preferred handle for create/connect/run/suspend/resume/checkpoint and now also for **rename and port exposure** via the `sandbox.update(name=..., exposed_ports=..., allow_unauthenticated_access=...)` instance method. `SandboxClient` still ships and emits a `DeprecationWarning` on construction; only `client.list()` lacks a direct `Sandbox`-level replacement. `Sandbox.name`, `Sandbox.status`, and `Sandbox.sandbox_id` are properties (no parens). `sandbox.status` returns a `SandboxStatus` enum (`SandboxStatus.RUNNING`, `.SUSPENDED`, etc.) — use `sandbox.status.value` for the lowercase string form. Snapshot creation is `sandbox.checkpoint()`; restore is `Sandbox.create(snapshot_id=...)`.
 
 ## Table of Contents
 
@@ -61,23 +61,30 @@ All sandbox lifecycle operations live as static methods on the `Sandbox` class.
 ```python
 # Ephemeral sandbox — no name, cannot be suspended
 sandbox = Sandbox.create(
-    name=None,                          # str | None — promote to named by passing a value
-    cpus=1.0,                           # float, 1.0–8.0
-    memory_mb=1024,                     # int, 1024–8192 per CPU
-    timeout_secs=None,                  # int | None — None means no timeout
-    image=None,                         # str | None — registered image name or base image
-    snapshot_id=None,                   # str | None — restore from a snapshot
-    secret_names=None,                  # list[str] | None — secrets to inject as env vars
-    expose_ports=None,                  # list[int] | None — user ports the proxy should route to
-    allow_unauthenticated_access=False, # bool — make exposed user ports public
+    name=None,             # str | None — promote to named by passing a value
+    cpus=1.0,              # float, 1.0–8.0
+    memory_mb=1024,        # int, 1024–8192 per CPU
+    timeout_secs=None,     # int | None — None means no timeout
+    image=None,            # str | None — registered image name or base image
+    snapshot_id=None,      # str | None — restore from a snapshot
+    secret_names=None,     # list[str] | None — secrets to inject as env vars
+    entrypoint=None,       # list[str] | None — custom entrypoint command
+    allow_internet_access=True,  # bool — see Networking
+    allow_out=None,        # list[str] | None — see Networking
+    deny_out=None,         # list[str] | None — see Networking
 )
 
 # Named sandbox — eligible for suspend/resume
 named = Sandbox.create(name="my-agent-env", cpus=2.0, memory_mb=2048, timeout_secs=300)
 
-print(named.sandbox_id)   # server-assigned UUID
-print(named.name)         # "my-agent-env"
-print(named.status)       # "Pending" → "Running"
+print(named.sandbox_id)        # server-assigned UUID, e.g. "5gm9wex8dm6ko1ed441ym"
+print(named.name)              # "my-agent-env"
+print(named.status)            # SandboxStatus.RUNNING
+print(named.status.value)      # "running"
+
+# Port exposure is a post-create operation in 0.5.1 — see "Port Exposure" below.
+# Use sandbox.update(exposed_ports=[8080], allow_unauthenticated_access=False)
+# or SandboxClient().expose_ports(...).
 ```
 
 **TypeScript:**
@@ -96,13 +103,13 @@ const named = await Sandbox.create({
   image: "data-tools-image",
   snapshotId: undefined,
   secretNames: ["OPENAI_API_KEY"],
-  exposePorts: [8080],
-  allowUnauthenticatedAccess: false,
 });
 
 console.log(named.sandboxId);
 console.log(named.name);
 console.log(named.status);
+
+// Port exposure is a post-create operation in 0.5.1 — see "Port Exposure" below.
 ```
 
 `Sandbox.create()` returns an operable `Sandbox` handle that is already connected — you can call instance methods on it directly without a separate `connect()` step.
@@ -134,21 +141,25 @@ console.log(result.stdout);
 
 ### List, Update
 
-`SandboxClient` is still the verified API surface for listing sandboxes, renaming/promoting them, and updating exposed ports in the installed `0.5.0` Python package.
+In 0.5.1, rename and port-exposure live on the `Sandbox` instance via `sandbox.update(...)`. `SandboxClient` is still required for listing sandboxes (no instance equivalent) and emits a `DeprecationWarning` on construction.
 
 **Python:**
 
 ```python
-from tensorlake.sandbox import SandboxClient
+from tensorlake.sandbox import Sandbox, SandboxClient
 
+# Rename / promote ephemeral → named, or change exposed ports — instance method
+info = sandbox.update(name="my-env")                            # -> Traced[SandboxInfo]
+info = sandbox.update(exposed_ports=[8080], allow_unauthenticated_access=False)
+print(info.value.name, info.value.exposed_ports)
+
+# Listing still requires SandboxClient
 client = SandboxClient()
-sandboxes = client.list()                        # -> iterator[SandboxInfo]
-for sb in sandboxes:
+for sb in client.list():                                        # -> iterator[SandboxInfo]
     print(sb.sandbox_id, sb.status)
 
-# Rename / promote ephemeral → named (positional args)
-renamed = client.update_sandbox("sbx-123", "my-env")
-print(renamed.name)
+# Equivalent client form (still works, takes sandbox_id)
+client.update_sandbox("sbx-123", "my-env")
 ```
 
 **TypeScript:**
@@ -180,7 +191,7 @@ await Sandbox.deleteSnapshot("snap-xyz");
 
 ### Port Exposure
 
-Use `SandboxClient.expose_ports(...)` / `SandboxClient.unexpose_ports(...)` in Python, the TypeScript client helpers, or the CLI. Full examples and the auth-vs-public trade-off live in [Networking → Port Exposure](#port-exposure) below.
+In 0.5.1, prefer `sandbox.update(exposed_ports=[...], allow_unauthenticated_access=...)` on the instance. `SandboxClient.expose_ports(...)` / `unexpose_ports(...)` and the CLI still work. Full examples and the auth-vs-public trade-off live in [Networking → Port Exposure](#port-exposure) below.
 
 ## Sandbox — Instance Methods
 
@@ -204,7 +215,7 @@ await sandbox.resume();
 await sandbox.terminate();
 ```
 
-Suspend/resume only works on **named** sandboxes. Ephemeral sandboxes return an error. To convert an ephemeral sandbox into a named one after creation, call `SandboxClient().update_sandbox(id, name)`.
+Suspend/resume only works on **named** sandboxes. Ephemeral sandboxes return an error. To convert an ephemeral sandbox into a named one after creation, call `sandbox.update(name="my-env")` (or the legacy `SandboxClient().update_sandbox(id, name)`).
 
 ### Snapshots (Instance)
 
@@ -286,9 +297,9 @@ await sandbox.run("bash", { args: ["-lc", "ls -la /workspace | grep '.py' | wc -
 
 ```python
 sandbox.write_file("/workspace/data.csv", b"name,score\nAlice,95")
-data = sandbox.read_file("/workspace/data.csv")          # -> bytes
-print(bytes(data).decode())
-entries = sandbox.list_directory("/workspace")           # entries[].name, entries[].size
+data = sandbox.read_file("/workspace/data.csv").value    # -> bytes (unwrap Traced)
+print(data.decode())
+entries = sandbox.list_directory("/workspace").value.entries  # entries[].name, entries[].size
 sandbox.delete_file("/workspace/data.csv")
 ```
 
@@ -698,10 +709,8 @@ Docker requires systemd, so launch with the `tensorlake/ubuntu-systemd` base ima
 | `allow_internet_access`| `allowInternetAccess`       | `bool`      | `True`  | Global outbound internet toggle                              |
 | `deny_out`             | `denyOut`                   | `list[str]` | `[]`    | Blocked outbound destinations (domains/IPs/CIDRs)            |
 | `allow_out`            | `allowOut`                  | `list[str]` | `[]`    | Allowed outbound destinations (when internet disabled)       |
-| `expose_ports`         | `exposePorts`               | `list[int]` | `[]`    | User ports the sandbox proxy should route to                 |
-| `allow_unauthenticated_access` | `allowUnauthenticatedAccess` | `bool` | `False` | Skip TensorLake auth for exposed user ports         |
 
-These are all parameters on `Sandbox.create()`.
+These are parameters on `Sandbox.create()`. Port exposure (`exposed_ports`, `allow_unauthenticated_access`) is a separate post-create operation in 0.5.1 — see [Port Exposure](#port-exposure).
 
 ### Public URLs
 
@@ -712,6 +721,15 @@ These are all parameters on `Sandbox.create()`.
 The hostname accepts either the sandbox ID or a sandbox name.
 
 ### Port Exposure
+
+In 0.5.1, prefer the `Sandbox` instance method:
+
+```python
+sandbox.update(exposed_ports=[8080], allow_unauthenticated_access=False)
+sandbox.update(exposed_ports=[])  # remove all exposed ports
+```
+
+The legacy `SandboxClient` form still works:
 
 ```python
 from tensorlake.sandbox import SandboxClient
