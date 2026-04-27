@@ -6,8 +6,8 @@ Source:
   - https://docs.tensorlake.ai/integrations/qdrant.md
   - https://docs.tensorlake.ai/integrations/databricks.md
   - https://docs.tensorlake.ai/integrations/motherduck.md
-SDK version: tensorlake 0.4.49
-Last verified: 2026-04-22
+SDK version: tensorlake 0.5.0
+Last verified: 2026-04-24
 -->
 
 # TensorLake Integration Patterns
@@ -153,20 +153,19 @@ Expose TensorLake Sandbox as a LangChain tool for code execution:
 
 ```python
 from langchain_core.tools import tool
-from tensorlake.sandbox import SandboxClient
+from tensorlake.sandbox import Sandbox
 
 @tool
 def execute_python(code: str) -> str:
     """Execute Python code in a secure TensorLake sandbox. Use for data analysis, calculations, or running scripts."""
-    client = SandboxClient()
-    sandbox = client.create_and_connect(memory_mb=2048, timeout_secs=120)
+    sandbox = Sandbox.create(memory_mb=2048, timeout_secs=120)
     try:
         result = sandbox.run("python", ["-c", code])
         if result.exit_code != 0:
             return f"Error (exit {result.exit_code}):\n{result.stderr}"
         return result.stdout
     finally:
-        sandbox.close()
+        sandbox.terminate()
 
 # Use with any LangChain agent
 from langchain_openai import ChatOpenAI
@@ -183,10 +182,9 @@ For multi-turn agents that need state across tool calls:
 
 ```python
 from langchain_core.tools import tool
-from tensorlake.sandbox import SandboxClient
+from tensorlake.sandbox import Sandbox
 
-client = SandboxClient()
-sandbox = client.create_and_connect(timeout_secs=600)
+sandbox = Sandbox.create(timeout_secs=600)
 
 @tool
 def run_python(code: str) -> str:
@@ -254,7 +252,7 @@ Wire TensorLake Sandbox directly into OpenAI's tool-use loop:
 ```python
 import json
 from openai import OpenAI
-from tensorlake.sandbox import SandboxClient
+from tensorlake.sandbox import Sandbox
 
 tools = [{
     "type": "function",
@@ -270,13 +268,12 @@ tools = [{
 }]
 
 def handle_tool_call(code: str) -> str:
-    client = SandboxClient()
-    sandbox = client.create_and_connect()
+    sandbox = Sandbox.create()
     try:
         result = sandbox.run("python", ["-c", code])
         return result.stdout if result.exit_code == 0 else f"Error: {result.stderr}"
     finally:
-        sandbox.close()
+        sandbox.terminate()
 
 # Agent loop
 client = OpenAI()
@@ -302,7 +299,7 @@ Use TensorLake Applications to orchestrate multiple specialized agents that each
 
 ```python
 from tensorlake.applications import application, function, Image
-from tensorlake.sandbox import SandboxClient
+from tensorlake.sandbox import Sandbox
 
 research_image = Image(name="agent-anthropic", base_image="python:3.11-slim").run("pip install anthropic")
 coding_image = Image(name="agent-openai", base_image="python:3.11-slim").run("pip install openai")
@@ -336,13 +333,12 @@ def coder(plan: str) -> str:
 
 @function(timeout=120)
 def executor(code: str) -> str:
-    client = SandboxClient()
-    sandbox = client.create_and_connect()
+    sandbox = Sandbox.create()
     try:
         result = sandbox.run("python", ["-c", code])
         return result.stdout if result.exit_code == 0 else f"Error: {result.stderr}"
     finally:
-        sandbox.close()
+        sandbox.terminate()
 
 @function(image=research_image, secrets=["ANTHROPIC_API_KEY"])
 def reviewer(task: str, output: str) -> str:

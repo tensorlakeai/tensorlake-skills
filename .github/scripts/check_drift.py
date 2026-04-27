@@ -309,7 +309,26 @@ OBJECT_MODULES = {
 
 VERIFIED_FALSE_POSITIVES = {
     "sandbox_sdk.md": {
-        "in_ref_not_docs": {"close"},
+        # `close` is the old 0.4.x cleanup method; the 0.5.0 ref standardizes on
+        # `sandbox.terminate()`. `eval`/`exec`/`repl` appear in the ref ONLY inside
+        # the anti-pattern warning ("There is no sandbox.exec() / eval() / repl()"),
+        # verified missing via `hasattr(Sandbox, ...)` on tensorlake 0.5.0 — the
+        # checker has no negation awareness, so it sees them as ref-only.
+        # `SandboxClient`, `update_sandbox`, `update` are all real 0.5.0 APIs
+        # (verified: `SandboxClient` class exists in both Python and TS;
+        # `update_sandbox` is a Python method; `update` is the TS equivalent on
+        # `dist/index.d.ts:336`) and appear in this ref's "List, Update" section.
+        # Doc-side extractor buckets them differently than the ref-side extractor,
+        # so the checker sees them as ref-only. They're not drift.
+        "in_ref_not_docs": {
+            "close",
+            "eval",
+            "exec",
+            "repl",
+            "SandboxClient",
+            "update",
+            "update_sandbox",
+        },
         # SandboxProcessStdinMode is a Python enum that shows up in the reference as
         # a `###` heading (which isn't extracted because PROSE is disabled for this
         # ref). The docs contain the TypeScript alias `StdinMode`, which canonicalizes
@@ -341,6 +360,7 @@ VERIFIED_FALSE_POSITIVES = {
             "SandboxClient",
             "connect",
             "delete",
+            "terminate",
             "tensorlake.sandbox",
         },
     },
@@ -351,6 +371,20 @@ VERIFIED_FALSE_POSITIVES = {
         # never puts it in a bucket. With the HIGH-confidence text-level fallback now
         # disabled (see main() below), the checker would otherwise flag it as drift.
         "in_ref_not_docs": {"ReplayMode"},
+    },
+    "sandbox_advanced.md": {
+        # Upstream `sandboxes/*` pages still use the older `Client.close()` /
+        # `sandbox.close()` cleanup pattern; this ref standardizes on
+        # `Sandbox.create()` + `sandbox.terminate()` per the 0.5.0 SDK (see
+        # sandbox_sdk.md:167). `close` is canonical in sandbox_sdk.md's
+        # verified list for the same reason — mirror it here.
+        "in_docs_not_ref": {"close"},
+        # `eval`, `exec`, `repl` appear in the ref ONLY inside an anti-pattern
+        # warning ("There is no sandbox.exec() / eval() / repl()..."). The
+        # checker has no negation awareness, so it sees them as ref-only
+        # symbols. The whole point of listing them is that they DON'T exist
+        # upstream.
+        "in_ref_not_docs": {"eval", "exec", "repl"},
     },
 }
 

@@ -23,8 +23,8 @@ Source:
   - https://docs.tensorlake.ai/applications/sandboxes.md
   - https://docs.tensorlake.ai/applications/guides/streaming-progress.md
   - https://docs.tensorlake.ai/applications/guides/logging.md
-SDK version: tensorlake 0.4.49
-Last verified: 2026-04-22
+SDK version: tensorlake 0.5.0
+Last verified: 2026-04-24
 -->
 
 # TensorLake Applications SDK Reference

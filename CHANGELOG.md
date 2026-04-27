@@ -2,6 +2,36 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [2.5.1] — SDK 0.5.1 — 2026-04-25
+
+### Changed (Sandbox SDK 0.5.1)
+- **sandbox_sdk.md** — updated to reflect 0.5.1 API surface:
+  - Rename and port exposure now live on the `Sandbox` instance via `sandbox.update(name=..., exposed_ports=..., allow_unauthenticated_access=...)`. `SandboxClient.update_sandbox` / `expose_ports` / `unexpose_ports` still work but are deprecated.
+  - `expose_ports` / `allow_unauthenticated_access` removed from `Sandbox.create()` parameters — port exposure is now a post-create operation.
+  - `SandboxClient` construction emits a `DeprecationWarning`. Only `client.list()` lacks a direct `Sandbox`-level replacement.
+  - `sandbox.status` returns a `SandboxStatus` enum (e.g., `SandboxStatus.RUNNING`); use `.value` for the lowercase string form.
+  - `sandbox.read_file(...)` / `sandbox.list_directory(...)` now return `Traced[...]` — unwrap with `.value`.
+- **sources.yaml** — bumped `sandbox_sdk.md` to `sdk_version: 0.5.1`, `last_verified: 2026-04-25`.
+- Verified all examples in **sandbox_persistence.md** continue to run cleanly against `tensorlake==0.5.1` (no doc changes needed).
+
+## [2.5.0] — SDK 0.5.0 — 2026-04-24
+
+### Changed (breaking — Sandbox SDK 0.5.0)
+- **sandbox_sdk.md** — rewritten for the 0.5.0 Sandbox API. `SandboxClient` is **removed**; the entry point is now the `Sandbox` class itself:
+  - Static methods: `Sandbox.create()`, `Sandbox.connect()`, `Sandbox.list()`, `Sandbox.update()`, `Sandbox.expose_ports()`, `Sandbox.unexpose_ports()`, `Sandbox.get_snapshot()`, `Sandbox.delete_snapshot()`
+  - Instance methods on returned handles: `.suspend()`, `.resume()`, `.terminate()`, `.checkpoint()` (replaces `snapshot_and_wait`), `.list_snapshots()`, `.run()`, file / process / PTY operations
+  - `create_and_connect()` is gone — `Sandbox.create()` now returns a ready-to-use handle
+  - Snapshot restore: `Sandbox.create(snapshot_id=...)` (was `client.create_and_connect(snapshot_id=...)`)
+  - New creation parameters: `expose_ports`, `allow_unauthenticated_access`
+  - `Image.build()` now exists in Python too (was TypeScript-only via `createSandboxImage()`)
+  - `tl sbx new` → `tl sbx create`; `tl sbx snapshot <id>` → `tl sbx checkpoint <id>`
+- **sandbox_persistence.md** — updated every snippet to the new static/instance split. `client.snapshot_and_wait()` → `sandbox.checkpoint()`; `client.suspend()` / `client.resume()` → `sandbox.suspend()` / `sandbox.resume()`; restore via `Sandbox.create(snapshot_id=...)`. Added top-of-file 0.5.0 upgrade note.
+- **sandbox_advanced.md** — replaced every `SandboxClient` / `create_and_connect` / `snapshot_and_wait` / `sandbox.close()` with the new API in Skills-in-Sandboxes, AI Code Execution, Data Analysis, and CI/CD patterns
+- **integrations.md** — updated LangChain, OpenAI function-calling, and multi-agent examples to use `Sandbox.create()` / `sandbox.terminate()`
+- **SKILL.md** / **AGENTS.md** — bumped version to 2.5.0. Updated CLI quick-reference (`tl sbx create`, `tl sbx checkpoint`). Annotated the LLM code-execution pattern with the 0.5.0 import change.
+- **sources.yaml** — bumped every `sdk_version` to `0.5.0` and `last_verified` to `2026-04-24`. Added `sandboxes/lifecycle.md` to the `sandbox_sdk.md` source list (now explicitly referenced for the static-method API surface).
+- All reference files — bumped `SDK version:` / `Last verified:` headers together, per the paired-bump rule.
+
 ## [2.4.1] — 2026-04-22
 
 ### Added
