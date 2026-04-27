@@ -3,28 +3,17 @@
   "evals": [
     {
       "id": 1,
-      "name": "orchestration-map-reduce-pipeline",
-      "prompt": "Write a Tensorlake application that takes a list of URLs, processes each one in parallel, then reduces the per-URL results into a single summary dict. Use the Orchestration SDK. I want it to run end-to-end locally on my laptop.",
-      "expected_output": "A single Python file using @application and @function decorators with a correct .map() fan-out, a .reduce() fan-in with the (accumulated, next_item) signature, and invocation via run_local_application. Imports come from tensorlake.applications.",
-      "files": [],
-      "expectations": [
-        "Entry point stacks both @application() and @function() decorators on the same function",
-        "Parallel fan-out uses .map() on a function rather than a Python list comprehension of direct calls",
-        "Reduce function takes exactly two positional arguments in the (accumulated, next_item) order",
-        "Pipeline is invoked via run_local_application(fn, *args), not asyncio.run or a plain function call",
-        "All Orchestration SDK imports come from tensorlake.applications (e.g. application, function, run_local_application, Image)",
-        "No hardcoded TENSORLAKE_API_KEY literal in the code; env-var auth is left to the environment"
-      ]
-    },
-    {
-      "id": 2,
       "name": "named-sandbox-suspend-resume",
+      "references": [
+        "sandbox_persistence.md#suspend-and-resume",
+        "sandbox_persistence.md#ephemeral-vs-named"
+      ],
       "prompt": "I'm building a long-running coding agent and want its sandbox to survive across tasks. Pause it when the agent is idle, and resume it exactly where it left off on the next request, same sandbox ID and URL. Show me how to create the sandbox and the suspend/resume calls. Does this work if I make the sandbox ephemeral?",
-      "expected_output": "Guidance that persistence requires a NAMED sandbox (name=...), with correct client.suspend() / client.resume() calls, and an explicit note that ephemeral sandboxes cannot be suspended or resumed.",
+      "expected_output": "Guidance that persistence requires a NAMED sandbox (name=...), with correct `sandbox.suspend()` / `sandbox.resume()` instance-method calls on the `Sandbox` handle (0.5.1 canonical form), and an explicit note that ephemeral sandboxes cannot be suspended or resumed.",
       "files": [],
       "expectations": [
-        "Sandbox is created with a name= argument (e.g. client.create(name=\"...\") or create_and_connect(name=\"...\"))",
-        "Code uses client.suspend(...) and client.resume(...) — not invented methods like pause()/unpause()/stop()",
+        "Sandbox is created with a `name=` argument via `Sandbox.create(name=\"...\")` (the 0.5.1 canonical static method) — does NOT use the deprecated `SandboxClient().create_and_connect(...)` form",
+        "Code uses `sandbox.suspend()` and `sandbox.resume()` as INSTANCE methods on the `Sandbox` handle — not `client.suspend(...)`, `client.resume(...)`, or invented methods like pause()/unpause()/stop()",
         "Answer states explicitly that ephemeral sandboxes cannot be suspended or resumed",
         "Answer notes that suspend/resume preserves the same sandbox_id and name, unlike snapshot restore which creates a new sandbox",
         "Does not claim that snapshot + restore alone gives you the same sandbox identity back",
@@ -32,102 +21,114 @@
       ]
     },
     {
-      "id": 3,
-      "name": "webhook-handler-csrf-and-signature",
-      "prompt": "I'm adding a Tensorlake webhook endpoint to my Django app so I get notified when a document-ingestion job finishes. My app enables CSRF protection globally and I want to keep it that way. Write the handler.",
-      "expected_output": "A Django view that exempts only the webhook route from CSRF, verifies the Svix signature before trusting the payload, handles the tensorlake.document_ingestion.job.completed event, and returns a 2xx on success / 4xx on signature mismatch.",
-      "files": [],
-      "expectations": [
-        "CSRF exemption is applied only to the webhook view (e.g. @csrf_exempt on the view) — not to the whole app or middleware globally",
-        "Does NOT suggest disabling CSRF middleware, setting CSRF_TRUSTED_ORIGINS='*', or otherwise weakening CSRF across the app",
-        "Signature verification runs before any side effects — either via the svix library Webhook.verify(...) or a manual HMAC computed from the svix-signature header",
-        "Signing secret is read from an environment variable or Django settings, never hardcoded",
-        "The event name referenced matches a real Tensorlake event (e.g. tensorlake.document_ingestion.job.completed / .failed / .created) — not invented names like tensorlake.parse.done",
-        "Handler returns 2xx on successful handling and a 4xx (e.g. 400 or 401) when signature verification fails"
-      ]
-    },
-    {
-      "id": 4,
+      "id": 2,
       "name": "sandbox-custom-image-with-registered-name",
+      "references": [
+        "sandbox_sdk.md#sandbox-images"
+      ],
       "prompt": "I'm using the Python SDK. Build a custom sandbox image for a data pipeline that needs Python 3.11, pandas, pyarrow, and duckdb pre-installed on top of Ubuntu. Register it as 'etl-tools' in my project, then spin up a sandbox from it with 4 CPUs and 8 GB of memory and run a quick import smoke check inside it. Walk me through the whole flow.",
-      "expected_output": "Image is defined via the Python Image DSL with tensorlake/ubuntu-* as base_image; apt and pip install steps are ordered correctly; registration uses the `tl sbx image create` CLI (since Python has no createSandboxImage equivalent); the sandbox is launched with image=\"etl-tools\" and the requested resources; a smoke check is run via sandbox.run and its exit code / stdout is inspected.",
+      "expected_output": "Image is defined via the Python Image DSL with tensorlake/ubuntu-* as base_image; apt and pip install steps are ordered correctly; registration uses `image.build()` (Python SDK) or the `tl sbx image create` CLI; the sandbox is launched via `Sandbox.create(image=\"etl-tools\", ...)` with the requested resources; a smoke check is run via sandbox.run and its exit code / stdout is inspected.",
       "files": [],
       "expectations": [
         "Image is built via `Image(name=..., base_image=\"tensorlake/ubuntu-minimal\")` or `tensorlake/ubuntu-systemd` — uses the `tensorlake/` prefix for the base image",
         "apt-get install runs BEFORE pip install (system Python must exist before pip can use it), and both are chained via `.run(...)` on the Image object",
         "pip install uses `--break-system-packages` (or an explicit venv) since the base Ubuntu images ship a PEP 668-managed system Python",
-        "Registration step uses the `tl sbx image create <Dockerfile> --registered-name etl-tools` CLI — does NOT claim a Python `createSandboxImage(image, ...)` function exists (that's TypeScript-only)",
-        "Sandbox is launched via `client.create_and_connect(image=\"etl-tools\", cpus=4.0, memory_mb=8192, ...)` — uses the registered name, memory in MiB, and the correct parameter names",
+        "Registration step uses `image.build()` from the Python SDK OR the `tl sbx image create <Dockerfile> --registered-name etl-tools` CLI — does NOT hallucinate `client.create_image(...)`, `image.register()`, or a `createSandboxImage(...)` function in Python",
+        "Sandbox is launched via `Sandbox.create(image=\"etl-tools\", cpus=4.0, memory_mb=8192, ...)` (the 0.5.1 canonical static method) — uses the registered name, memory in MiB, and the correct parameter names; does NOT use the deprecated `SandboxClient().create_and_connect(...)`",
         "Smoke check is executed via `sandbox.run(...)` and the response's `exit_code` / `stdout` are inspected — does not assume the sandbox is auto-terminated before the check runs"
       ]
     },
     {
-      "id": 5,
+      "id": 3,
       "name": "sandbox-fork-for-parallel-workers",
+      "references": [
+        "sandbox_persistence.md#snapshots",
+        "sandbox_persistence.md#forking-from-a-snapshot",
+        "sandbox_sdk.md#sandbox-images"
+      ],
       "prompt": "I need to run 10 evaluation jobs in parallel, each in its own sandbox. Every sandbox needs the same heavyweight dependencies (PyTorch, transformers, a downloaded HF model) — installing them from scratch on each of 10 sandboxes takes ~2 minutes each and is killing me. What's the right Tensorlake pattern, and show me the code. I don't need the sandboxes to share state after they start.",
-      "expected_output": "Recommend a 'pre-install once, fork many' pattern using EITHER Snapshots (`snapshot_and_wait` + `create_and_connect(snapshot_id=...)`) OR Custom Images (`Image(...)` + `tl sbx image create ... --registered-name` + `create_and_connect(image=...)`). Both are valid per Tensorlake's docs — the agent should not recommend reinstalling deps per worker or using suspend/resume. Code shows parallel fan-out (ThreadPoolExecutor, asyncio.gather, or equivalent).",
+      "expected_output": "Recommend a 'pre-install once, fork many' pattern using EITHER Snapshots (`sandbox.checkpoint()` + `Sandbox.create(snapshot_id=...)`) OR Custom Images (`Image(...)` + `image.build()` (or `tl sbx image create ... --registered-name`) + `Sandbox.create(image=...)`). Both are valid per Tensorlake's docs — the agent should not recommend reinstalling deps per worker or using suspend/resume. Code shows parallel fan-out (ThreadPoolExecutor, asyncio.gather, or equivalent).",
       "files": [],
       "expectations": [
-        "Recommends a 'pre-install once, fork many' pattern — either Snapshots (snapshot_and_wait + restore) or Custom Images (Image DSL + registered name + launch many). Does NOT suggest reinstalling deps in every worker. Does NOT suggest suspend/resume (which is 1:1, not fork-N)",
-        "Uses a real documented primitive for the pre-build step: either `client.snapshot_and_wait(sandbox_id, ...)` for the snapshot path, OR an `Image(name=..., base_image=\"tensorlake/...\")` DSL plus `tl sbx image create ... --registered-name` CLI for the image path. Does NOT hallucinate `sandbox.commit()`, `builder.snapshot(name=...)`, `client.sandboxes.create_from_snapshot()`, or a Python `createSandboxImage()` function (the last is TypeScript-only)",
-        "Uses a real documented primitive for spawning each worker: either `client.create_and_connect(snapshot_id=...)` for snapshots OR `client.create_and_connect(image=\"<name>\", cpus=..., memory_mb=...)` for images. Parameter names match the Python SDK",
+        "Recommends a 'pre-install once, fork many' pattern — either Snapshots (checkpoint + restore) or Custom Images (Image DSL + registered name + launch many). Does NOT suggest reinstalling deps in every worker. Does NOT suggest suspend/resume (which is 1:1, not fork-N)",
+        "Uses a real documented primitive for the pre-build step: either `sandbox.checkpoint()` (instance method on the Sandbox handle, returns a `SnapshotInfo`) for the snapshot path, OR an `Image(name=..., base_image=\"tensorlake/...\")` DSL plus `image.build()` (Python SDK) or `tl sbx image create ... --registered-name` CLI for the image path. Does NOT hallucinate `sandbox.commit()`, `client.snapshot_and_wait(...)`, `builder.snapshot(name=...)`, `client.sandboxes.create_from_snapshot()`, or a Python `createSandboxImage()` function",
+        "Uses a real documented primitive for spawning each worker: either `Sandbox.create(snapshot_id=...)` for snapshots OR `Sandbox.create(image=\"<name>\", cpus=..., memory_mb=...)` for images (the 0.5.1 canonical static method). Parameter names match the Python SDK; does NOT use the deprecated `SandboxClient().create_and_connect(...)`",
         "Each worker is a new, isolated sandbox with its own sandbox_id — no shared state after launch. Does not confuse this with resume (which reuses the same sandbox) or with a shared-filesystem mount",
         "Demonstrates parallel fan-out (ThreadPoolExecutor + as_completed, asyncio.gather, Promise.all, or equivalent) — not a sequential loop over the 10 jobs",
-        "Cleanup is addressed: per-worker sandbox teardown (context manager `with ... as sandbox:`, `sandbox.close()`, or `sandbox.terminate()` in finally) AND/OR mentions that the persistent artifact (snapshot or registered image) remains in the project until deleted (`client.delete_snapshot(...)` / `tl sbx snapshot rm` / `tl sbx image rm`)"
+        "Cleanup is addressed: per-worker sandbox teardown via `sandbox.terminate()` (instance method) — typically in a `finally` block AND/OR mentions that the persistent artifact (snapshot or registered image) remains in the project until deleted (`Sandbox.delete_snapshot(...)` / `tl sbx checkpoint rm` / `tl sbx image rm`)"
       ]
     },
     {
-      "id": 6,
+      "id": 4,
       "name": "sandbox-as-untrusted-llm-code-execution-tool",
+      "references": [
+        "sandbox_advanced.md#ai-code-execution",
+        "sandbox_sdk.md#execute-commands",
+        "sandbox_sdk.md#outbound-internet-control"
+      ],
       "prompt": "I'm building a coding agent that lets an LLM (Claude) write Python and execute it, with results fed back as tool_result. Set up the sandbox side of this: I need it to be safe for untrusted code, reuse the same environment across multiple tool calls in a session, and capture stdout, stderr, and exit code. Also — between tool calls, should Python variables from a previous call still be defined when the next one runs? Explain and show the code.",
-      "expected_output": "One sandbox per session (reused across tool calls, not created per call), created with allow_internet_access=False, a sensible timeout_secs, and code that runs the LLM-supplied Python via sandbox.run(\"python\", [\"-c\", code]) and returns stdout/stderr/exit_code. Answer explains that files and installed packages persist, but each python -c invocation is a fresh process so in-memory Python state (variables, imports) does NOT carry over.",
+      "expected_output": "One sandbox per session (reused across tool calls, not created per call), created via `Sandbox.create(allow_internet_access=False, ...)` with a sensible timeout_secs, and code that runs the LLM-supplied Python via sandbox.run(\"python\", [\"-c\", code]) and returns stdout/stderr/exit_code. Answer explains that files and installed packages persist, but each python -c invocation is a fresh process so in-memory Python state (variables, imports) does NOT carry over.",
       "files": [],
       "expectations": [
-        "Single sandbox is created at session start and reused across multiple LLM tool calls — NOT one sandbox per tool call (which would add cold-start latency and lose state)",
+        "Single sandbox is created at session start (via `Sandbox.create(...)`, the 0.5.1 canonical static method — not the deprecated `SandboxClient().create_and_connect(...)`) and reused across multiple LLM tool calls — NOT one sandbox per tool call (which would add cold-start latency and lose state)",
         "Sandbox is created with `allow_internet_access=False` (or equivalent kwarg) because the code is untrusted LLM output",
         "Each execution uses `sandbox.run(\"python\", [\"-c\", code])` (or equivalent) and returns `result.stdout`, `result.stderr`, and `result.exit_code` to the caller",
         "Answer explicitly explains that each `python -c` invocation is a FRESH process, so variables/imports defined in a previous tool call are NOT available in the next — the user must re-import or persist state via files",
         "Answer confirms that files written to disk and packages installed with pip DO persist across calls within the same sandbox",
-        "Teardown happens at session end via `sandbox.close()` / `sandbox.terminate()` — not inside the per-tool-call path"
+        "Teardown happens at session end via `sandbox.terminate()` (instance method on the Sandbox handle) — not inside the per-tool-call path. Does NOT invent `sandbox.close()` for the sandbox handle (note: `close_stdin(pid)` exists for processes but is unrelated)"
       ]
     },
     {
-      "id": 7,
+      "id": 5,
       "name": "sandbox-expose-http-service",
+      "references": [
+        "sandbox_sdk.md#port-exposure",
+        "sandbox_sdk.md#process-management",
+        "sandbox_sdk.md#public-urls"
+      ],
       "prompt": "I want to run a FastAPI app inside a Tensorlake sandbox on port 8000 and hit it from my laptop's browser. Start the server as a background process (so my script doesn't block), expose the port with authentication required, and print the URL I should open. The sandbox should stay up for the session and be torn down when I'm done. Python SDK.",
-      "expected_output": "A Python snippet that launches uvicorn/FastAPI via `sandbox.start_process(...)` (NOT `sandbox.run`, which blocks), then calls `client.expose_ports(sandbox_id, ports=[8000], allow_unauthenticated_access=False)`, constructs the URL as `https://8000-<sandbox-id>.sandbox.tensorlake.ai`, and tears down with `sandbox.close()` / `sandbox.terminate()` (optionally `client.unexpose_ports` first).",
+      "expected_output": "A Python snippet that launches uvicorn/FastAPI via `sandbox.start_process(...)` (NOT `sandbox.run`, which blocks), then exposes the port via `sandbox.update(exposed_ports=[8000], allow_unauthenticated_access=False)` (the 0.5.1 instance method — `SandboxClient().expose_ports(...)` legacy form is also acceptable), constructs the URL as `https://8000-<sandbox-id>.sandbox.tensorlake.ai`, and tears down with `sandbox.terminate()` (optionally clearing exposed ports first via `sandbox.update(exposed_ports=[])` or `client.unexpose_ports(...)`).",
       "files": [],
       "expectations": [
         "Server is launched via `sandbox.start_process(...)` — NOT `sandbox.run(...)`, since run() blocks until the command exits and would prevent the rest of the script from proceeding",
-        "Port is exposed via `client.expose_ports(sandbox_id, ports=[8000], allow_unauthenticated_access=False)` — uses the real kwarg name `allow_unauthenticated_access` and explicitly keeps authentication on (False, not True)",
-        "URL is constructed in the documented `https://<port>-<sandbox-id>.sandbox.tensorlake.ai` form — not a made-up pattern like `https://sandbox.tensorlake.ai/sb/<id>:8000` or a per-sandbox random hostname",
-        "Does NOT invent methods like `sandbox.expose(8000)`, `sandbox.port_forward(...)`, `sandbox.public_url(...)`, or `sandbox.serve(...)` — the real API lives on the client (`client.expose_ports` / `client.unexpose_ports`), not on the sandbox object",
-        "Teardown tears down the sandbox at session end via `sandbox.close()` or `sandbox.terminate()`; if `client.unexpose_ports(...)` is mentioned, it uses that exact name (not `close_port` / `remove_port`)",
+        "Port is exposed via `sandbox.update(exposed_ports=[8000], allow_unauthenticated_access=False)` (the 0.5.1 canonical instance method) — the legacy `SandboxClient().expose_ports(\"<id-or-name>\", [8000], allow_unauthenticated_access=False)` form is also acceptable. Uses the real kwarg name `allow_unauthenticated_access` and explicitly keeps authentication on (False, not True)",
+        "URL is constructed in the documented `https://<port>-<sandbox-id>.sandbox.tensorlake.ai` form (sandbox name also works) — not a made-up pattern like `https://sandbox.tensorlake.ai/sb/<id>:8000` or a per-sandbox random hostname",
+        "Does NOT invent methods like `sandbox.expose(8000)`, `sandbox.port_forward(...)`, `sandbox.public_url(...)`, or `sandbox.serve(...)` — the real API is `sandbox.update(exposed_ports=...)` on the instance or the legacy `SandboxClient().expose_ports/unexpose_ports`",
+        "Teardown tears down the sandbox at session end via `sandbox.terminate()`; if port removal is mentioned, it uses `sandbox.update(exposed_ports=[])` or `SandboxClient().unexpose_ports(...)` — not invented names like `close_port` / `remove_port`",
         "Does not claim the public URL is reachable without auth by default, and does not claim suspend/resume changes the URL (the `sandbox_id` is preserved across resume, so the URL is stable for named sandboxes)"
       ]
     },
     {
-      "id": 8,
+      "id": 6,
       "name": "sandbox-long-running-process-stream-signal-snapshot",
-      "prompt": "I'm running a ~30-minute training job inside a Tensorlake sandbox. I need to: (1) start it as a background process, (2) stream its stdout live to my terminal as it runs, (3) be able to interrupt it gracefully from my laptop (SIGTERM) if it's going off the rails, and (4) if I do interrupt it, snapshot the sandbox first so I can later restore the partial state into a fresh sandbox for offline debugging. After snapshotting, terminate the running sandbox. Python SDK.",
-      "expected_output": "A Python snippet that uses `sandbox.start_process(\"python\", [\"train.py\"], stdout_mode=\"capture\")` to launch the job, iterates `sandbox.follow_output(proc.pid)` for live streaming, uses `sandbox.send_signal(proc.pid, signal.SIGTERM)` for graceful interrupt, then `client.snapshot_and_wait(sandbox.sandbox_id)` before `sandbox.terminate()`. Answer explains that restoring the snapshot produces a NEW sandbox with a new sandbox_id — this is snapshot/restore semantics, not suspend/resume.",
+      "source_eval_id": 8,
+      "references": [
+        "sandbox_sdk.md#process-management",
+        "sandbox_persistence.md#snapshots"
+      ],
+      "prompt": "I'm running a training job inside a Tensorlake sandbox — about half an hour. I want to watch its output live from my laptop as it runs, and still be able to kill it gracefully if the loss starts looking wrong. If I do have to kill it, I'd like to grab the partial state first so I can dig into it later in a fresh environment, without rerunning the training. Python SDK. How should this look?",
+      "expected_output": "Launch the training command as a non-blocking background process via `sandbox.start_process(...)`, stream its stdout live from the laptop via `sandbox.follow_output(pid)` (SSE iterator), send SIGTERM via `sandbox.send_signal(pid, signal.SIGTERM)` for graceful shutdown, then `sandbox.checkpoint()` BEFORE `sandbox.terminate()`, and explain that `Sandbox.create(snapshot_id=...)` produces a NEW sandbox with a new sandbox_id — this is snapshot/restore semantics, not suspend/resume.",
+      "files": [],
       "expectations": [
-        "Launches the training job as a background process via `sandbox.start_process(...)` (with `stdout_mode=\"capture\"` or equivalent) — NOT `sandbox.run(...)` (which would block until the 30-minute job finishes)",
-        "Streams stdout via `sandbox.follow_output(proc.pid)` iterating SSE events — does NOT invent methods like `proc.stream()`, `sandbox.tail(pid)`, `proc.logs()`, or `sandbox.stream_stdout(pid)`",
-        "Graceful interrupt uses `sandbox.send_signal(proc.pid, signal.SIGTERM)` (signal.SIGTERM or numeric 15) — does NOT invent `proc.stop()`, `proc.kill()`, `proc.terminate()`, or a Python `sandbox.kill_process(pid)` (the convenience killProcess exists in TypeScript only)",
-        "Snapshots BEFORE terminating, via `client.snapshot_and_wait(sandbox.sandbox_id)` — does NOT call `sandbox.suspend()` instead (suspend requires a named sandbox and returns the same sandbox, which is not what 'restore into a fresh sandbox' means)",
-        "Explains that restoring from the snapshot (`client.create_and_connect(snapshot_id=...)`) produces a NEW sandbox with a NEW sandbox_id — snapshot/restore is not suspend/resume and does not preserve sandbox identity",
-        "Tears down via `sandbox.terminate()` (or `sandbox.close()`) AFTER the snapshot completes, and the flow order in the code is: start_process → follow_output → send_signal → snapshot_and_wait → terminate"
+        "The training command is launched as a non-blocking background process via `sandbox.start_process(\"python\", args=[...])` so the local script can still stream, signal, and snapshot — does NOT use a call that blocks until the 30-minute job finishes (e.g. a plain `sandbox.run` for the training command)",
+        "Live stdout streaming is done via `sandbox.follow_output(proc.pid)` (the documented SSE iterator yielding events with a `.line` attribute) — does NOT invent methods like proc.stream(), proc.logs(), sandbox.tail(pid), or sandbox.stream_stdout(pid)",
+        "Graceful interrupt is delivered as a SIGTERM via `sandbox.send_signal(proc.pid, signal.SIGTERM)` (or numeric `15`) — not via an invented proc.stop() / proc.kill() / sandbox.kill_process() (note: TS has `sandbox.killProcess(pid)`, but Python uses `send_signal` with `SIGKILL` for force-kill)",
+        "Snapshot creation uses `sandbox.checkpoint()` (the 0.5.1 instance method returning `SnapshotInfo`) — NOT the deprecated `client.snapshot_and_wait(...)` or invented `sandbox.snapshot()`. The snapshot happens BEFORE the sandbox is torn down, and the code's order is: start_process → follow_output → send_signal → checkpoint → terminate",
+        "The response DISTINGUISHES snapshot/restore (creates a new Tensorlake sandbox with a new sandbox_id) from suspend/resume (same sandbox, same id) — and does not suggest suspend/resume for this use case, since the user asked to restore into a fresh environment",
+        "The restore step uses `Sandbox.create(snapshot_id=snapshot.snapshot_id)` (the 0.5.1 canonical create-from-snapshot path) — does not hallucinate sandbox.restore(), client.sandboxes.create_from_snapshot(), `SandboxClient().create_and_connect(snapshot_id=...)`, or a `snapshot.restore()` method"
       ]
     },
     {
-      "id": 9,
+      "id": 7,
       "name": "sandbox-egress-allowlist",
+      "references": [
+        "sandbox_sdk.md#outbound-internet-control"
+      ],
       "prompt": "I'm running untrusted LLM-generated Python inside a Tensorlake sandbox. I want to let it reach `pypi.org`, `files.pythonhosted.org`, and `huggingface.co` so it can pip install and pull models — but I want every other outbound destination blocked. What's the right way to configure the sandbox? Show the create call and explain what each knob does. Python SDK.",
-      "expected_output": "A `client.create_and_connect(...)` call that sets `allow_internet_access=False` and `allow_out=[\"pypi.org\", \"files.pythonhosted.org\", \"huggingface.co\"]`, with an explanation that `allow_out` is the allowlist consulted when internet is otherwise disabled. Answer does NOT invent a `network_policy`, `firewall_rules`, or `egress=` parameter, and does not claim the feature is unsupported.",
+      "expected_output": "A `Sandbox.create(...)` call that sets `allow_internet_access=False` and `allow_out=[\"pypi.org\", \"files.pythonhosted.org\", \"huggingface.co\"]`, with an explanation that `allow_out` is the allowlist consulted when internet is otherwise disabled. Answer does NOT invent a `network_policy`, `firewall_rules`, or `egress=` parameter, and does not claim the feature is unsupported.",
       "files": [],
       "expectations": [
-        "Uses `allow_internet_access=False` combined with `allow_out=[...]` to express an egress allowlist — these are the real documented kwargs on the Python SDK's create call",
+        "Uses `Sandbox.create(...)` (the 0.5.1 canonical static method) with `allow_internet_access=False` combined with `allow_out=[...]` to express an egress allowlist — these are the real documented kwargs on the Python SDK's create call. Does NOT use the deprecated `SandboxClient().create_and_connect(...)`",
         "The allowlist is passed as a Python list of domain strings (e.g. `[\"pypi.org\", \"files.pythonhosted.org\", \"huggingface.co\"]`) — not a single comma-separated string, not a regex, not a dict of rules",
         "Does NOT hallucinate alternate parameter names like `network_policy=`, `firewall_rules=`, `egress=`, `outbound_allow=`, `allowed_domains=`, `allowed_hosts=`, or `proxy=`",
         "Does NOT claim that per-domain egress controls are unsupported and require an external proxy — the Python SDK exposes both `allow_out` and `deny_out` as first-class kwargs on create",
@@ -136,18 +137,169 @@
       ]
     },
     {
-      "id": 10,
+      "id": 8,
       "name": "sandbox-desktop-automation-screenshot",
+      "references": [
+        "sandbox_sdk.md#computer-use"
+      ],
       "prompt": "I want to automate a desktop task inside a Tensorlake sandbox from Python: spin up a desktop-enabled sandbox, open a terminal via the keyboard shortcut Ctrl+Alt+T, type `echo hello > /tmp/out.txt` and press Enter, then take a screenshot of the desktop and save it to my laptop as `desktop.png`. Show me the end-to-end Python flow and explain what image to use and how authentication to the desktop works.",
-      "expected_output": "A Python snippet that creates a sandbox with `image=\"ubuntu-vnc\"`, opens a desktop connection via `sandbox.connect_desktop(password=\"tensorlake\")`, uses `desktop.press([\"ctrl\", \"alt\", \"t\"])` (list of strings for a key combo) to open the terminal, uses `desktop.type_text(...)` + `desktop.press(\"enter\")`, captures a screenshot via `desktop.screenshot()` (returns PNG bytes) and writes the bytes locally via `Path(\"desktop.png\").write_bytes(...)`. Answer notes that the desktop connection is proxied through Tensorlake's authenticated endpoint — no public port exposure of 5901 is needed.",
+      "expected_output": "A Python snippet that creates a sandbox via `Sandbox.create(image=\"ubuntu-vnc\")`, opens a desktop connection via `sandbox.connect_desktop(password=\"tensorlake\")`, uses `desktop.press([\"ctrl\", \"alt\", \"t\"])` (list of strings for a key combo) to open the terminal, uses `desktop.type_text(...)` + `desktop.press(\"enter\")`, captures a screenshot via `desktop.screenshot()` (returns PNG bytes) and writes the bytes locally via `Path(\"desktop.png\").write_bytes(...)`. Answer notes that the desktop connection is proxied through Tensorlake's authenticated endpoint — no public port exposure of 5901 is needed.",
       "files": [],
       "expectations": [
-        "Sandbox is created with `image=\"ubuntu-vnc\"` — the documented desktop-enabled image name (not `desktop`, `ubuntu-desktop`, or an invented variant)",
+        "Sandbox is created via `Sandbox.create(image=\"ubuntu-vnc\")` (the 0.5.1 canonical static method) — the documented desktop-enabled image name (not `desktop`, `ubuntu-desktop`, or an invented variant). Does NOT use the deprecated `SandboxClient().create_and_connect(...)`",
         "Desktop session is obtained via `sandbox.connect_desktop(password=\"tensorlake\")` — correct method on the sandbox object, with the documented default password string `\"tensorlake\"` (not an invented default or a missing password argument)",
         "Key combos use `desktop.press([\"ctrl\", \"alt\", \"t\"])` — a LIST of lowercase modifier/key strings — not a single compound string like `\"ctrl+alt+t\"`, not separate positional args, and not an invented `desktop.key_combo(...)`",
         "Screenshot is captured via `desktop.screenshot()` which returns raw PNG bytes, and those bytes are written to the local laptop via `Path(\"desktop.png\").write_bytes(...)` or equivalent file write — answer does NOT claim `screenshot()` returns a URL, a PIL Image, or a path inside the sandbox that needs a separate download",
         "Does NOT hallucinate shortcut methods like `sandbox.screenshot()`, `sandbox.desktop()`, `sandbox.computer_use(...)`, `desktop.open_browser(...)`, `desktop.navigate(url)`, `desktop.goto(url)`, or `desktop.open_terminal()` — the real desktop API is low-level (screenshot / press / type_text / click / move_mouse / scroll / key_down / key_up)",
         "Answer states (or the code reflects) that the desktop connection is proxied through Tensorlake's authenticated endpoint and does NOT require publicly exposing port 5901 via `client.expose_ports(...)` — and does not claim the user must open a VNC client or configure noVNC for this programmatic flow"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "sandbox-file-transfer-laptop-to-sandbox",
+      "references": [
+        "sandbox_sdk.md#file-operations",
+        "sandbox_sdk.md#cli-quick-reference"
+      ],
+      "prompt": "I have a 200MB CSV on my laptop. I want to push it into a Tensorlake sandbox at /workspace/input.csv, run a pandas aggregation inside the sandbox that writes /workspace/output.parquet, then pull that parquet file back down to my laptop. Show me the Python flow end-to-end and tell me if there's a CLI shortcut for the upload/download steps.",
+      "expected_output": "Local file is read with `Path(...).read_bytes()` (or open(..., 'rb')) and pushed into the sandbox via `sandbox.write_file(\"/workspace/input.csv\", data)`. Aggregation runs via `sandbox.run(\"python\", [\"-c\", code])` (or by writing a script file and running it). The resulting parquet is pulled with `sandbox.read_file(\"/workspace/output.parquet\")`, unwrapping `.value` in Python to get bytes, then `Path(...).write_bytes(...)` locally. Answer mentions the `tl sbx cp` CLI as a shortcut (`tl sbx cp file.txt <id>:/path` to upload, `tl sbx cp <id>:/path ./local` to download) and notes it's file-only (no directories).",
+      "files": [],
+      "expectations": [
+        "Upload uses `sandbox.write_file(path, bytes)` with the local file's raw bytes — does NOT invent `sandbox.upload(...)`, `sandbox.upload_file(...)`, `sandbox.put_file(...)`, `sandbox.copy_to(...)`, or `sandbox.scp(...)`",
+        "Download uses `sandbox.read_file(path)` and the response is treated as bytes — for the Python SDK 0.5.x, the answer either shows `.value` to unwrap the Traced wrapper or otherwise correctly extracts bytes; does NOT claim `read_file` returns a string or a file-like object that needs `.read()`",
+        "Local file I/O uses `Path(...).read_bytes()` / `Path(...).write_bytes(...)` (or open in binary mode) — does NOT pass a local file path to `write_file` expecting it to read it (the API takes bytes, not a path)",
+        "Mentions `tl sbx cp` as the CLI shortcut with the correct `<id>:/path` syntax for both upload and download directions, and notes the file-only limitation (no recursive directory copy)",
+        "Does NOT recommend wrapping the upload in `sandbox.run(\"bash\", [\"-c\", \"cat > /workspace/input.csv\"])` with stdin — that's a workaround, not the documented API",
+        "Pandas step runs via `sandbox.run(...)` (or `start_process` if backgrounded) with results inspected via `result.stdout` / `result.exit_code` — the answer doesn't invent intermediate file-staging APIs"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "sandbox-list-and-cleanup-stale-typescript",
+      "references": [
+        "sandbox_sdk.md#list-update",
+        "sandbox_sdk.md#lifecycle"
+      ],
+      "prompt": "TypeScript SDK. My project has accumulated a bunch of sandboxes from past experiments and I have no idea which are still alive. List every sandbox in my project, print id/name/status/created_at, and terminate any that are in the Suspended state (I don't need them anymore). Don't touch Running ones. Show me the code.",
+      "expected_output": "TypeScript snippet that lists sandboxes via `await client.list()` (the documented client list method — listing has no `Sandbox`-static equivalent in 0.5.1), iterates over `SandboxInfo` objects reading `sandboxId`, `name`, `status`, `createdAt`, filters where `status === \"Suspended\"`, then for each match calls `await Sandbox.connect(sandboxId)` and `await sandbox.terminate()`. Answer notes that terminate is an INSTANCE method (must connect first) and that Running sandboxes are skipped by the filter — does not bulk-terminate everything.",
+      "expectations": [
+        "Uses `await client.list()` to enumerate sandboxes (listing has no `Sandbox`-static equivalent in 0.5.1 — it's the one operation that still requires the SandboxClient); does NOT invent `Sandbox.listAll()`, `Sandbox.findAll()`, `Sandbox.list()`, `client.getSandboxes()`, or a `listSandboxes(projectId)` shape",
+        "Reads camelCase TypeScript field names off `SandboxInfo` (`sandboxId`, `name`, `status`, `createdAt`) — does NOT use Python snake_case like `sandbox_id` or `created_at` in the TS code",
+        "Filters on `status === \"Suspended\"` (the documented status string) before terminating — does NOT bulk-terminate every returned sandbox, and does NOT confuse `Suspended` with `Terminated` (which is already a final state)",
+        "Termination goes through `await Sandbox.connect(sandboxId)` followed by `await sandbox.terminate()` — answer reflects that `terminate()` is an INSTANCE method on a connected handle, NOT a static like `Sandbox.terminate(id)` or a client method",
+        "Does NOT call `sandbox.suspend()` or `sandbox.resume()` on already-Suspended sandboxes as a precondition for terminate — terminate works directly from the Suspended state",
+        "Code uses `await` on every async call (TS SDK is promise-based) and does NOT mix in Python idioms like `with sandbox:` context managers"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "sandbox-secrets-and-per-run-env-typescript",
+      "references": [
+        "sandbox_sdk.md#environment-variables",
+        "sandbox_sdk.md#create-a-sandbox"
+      ],
+      "prompt": "TypeScript SDK. I want a sandbox that can call the OpenAI API on its own — so OPENAI_API_KEY needs to be available inside it — but I do NOT want to bake the key into a custom image or pass it on the CLI every time. I'd also like to pass per-run config like MODE=prod into individual `sandbox.run` calls without rebuilding anything. Show me the create call and a couple of run calls, and explain the difference in lifetime between the two mechanisms.",
+      "expected_output": "Create call uses `secretNames: [\"OPENAI_API_KEY\"]` on `Sandbox.create({...})` — the secret is resolved server-side from the project's secret store and injected as an env var for the lifetime of the sandbox. Per-call config uses the `env` option on `sandbox.run(command, { args, env: { MODE: \"prod\" } })`, which only applies to that single command invocation. Answer explains the lifetime distinction (secret = sandbox lifetime, run env = single command) and does not suggest stuffing the key into the Image DSL via `.env(\"OPENAI_API_KEY\", ...)` (which would bake it in) or shelling out with `bash -c \"OPENAI_API_KEY=... python script.py\"`.",
+      "expectations": [
+        "Secret injection uses `secretNames: [\"OPENAI_API_KEY\"]` (camelCase, array of strings naming entries in the project's secret store) on `Sandbox.create({...})` — does NOT invent kwargs like `secrets:`, `secretEnv:`, `env: { OPENAI_API_KEY: process.env.OPENAI_API_KEY }`, or pass the literal key value",
+        "Per-call env uses the `env` option of `sandbox.run(command, { args, env: {...} })` — TypeScript uses an options object as the second argument, not a positional dict; does NOT use Python-style `sandbox.run(\"python\", args=[...], env={...})`",
+        "Answer explicitly distinguishes lifetime: `secretNames` is sandbox-scoped (available to every command/process in the sandbox until terminate), `env` on `run` is scoped to that single command — does not conflate the two or claim per-call env persists across calls",
+        "Does NOT recommend baking the secret into a custom `Image` via `.env(\"OPENAI_API_KEY\", value)` — answer flags that this would persist the key in the registered image and is the wrong layer",
+        "Does NOT recommend shell-level workarounds like `sandbox.run(\"bash\", { args: [\"-lc\", \"OPENAI_API_KEY=$KEY python script.py\"] })` to inject the secret — the SDK's secretNames mechanism is the documented path",
+        "Mentions that `secretNames` entries must already exist in the project's secret store (the SDK references them by name, it doesn't upload values) — does not claim the SDK creates the secret on the fly from a local value"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "sandbox-image-with-bundled-skills",
+      "references": [
+        "sandbox_advanced.md#skills-in-sandboxes",
+        "sandbox_sdk.md#sandbox-images"
+      ],
+      "prompt": "I'm building a coding-agent setup where Claude Code runs *inside* the Tensorlake sandbox and uses the tensorlake skill (so it can look up SDK references at startup). Build me a custom image that has Node, the `skills` CLI, the tensorlake-skills bundle preinstalled at the right discovery path for Claude Code, and the `tensorlake` Python package. Register it as `agent-with-tl-skills`. Python SDK. And — important — I do NOT want this touching my laptop's `~/.claude/skills/` directory; the skill should only live inside the image.",
+      "expected_output": "An `Image(name=\"agent-with-tl-skills\", base_image=\"tensorlake/ubuntu-systemd\")` (or ubuntu-minimal) build that installs nodejs/npm and python3/pip via apt, then `npm install -g skills`, then `skills add tensorlakeai/tensorlake-skills --all -y --copy`, then `python3 -m pip install --break-system-packages tensorlake`. The `skills add` command runs INSIDE the build (a `.run(...)` step on the Image), not on the user's laptop. Image is registered via `image.build()`. Answer explicitly notes that nothing in the flow writes to the host's `~/.claude/skills/` — the skill only lands at the in-sandbox discovery path that the build step targets.",
+      "expectations": [
+        "Image is built via the Python `Image` DSL with `base_image=\"tensorlake/ubuntu-systemd\"` (preferred for the multi-tool install) or `tensorlake/ubuntu-minimal` — uses the `tensorlake/` prefix for the base",
+        "Build chain installs Node/npm and Python/pip via apt FIRST (`apt-get update && apt-get install -y nodejs npm python3 python3-pip`), THEN `npm install -g skills`, THEN `skills add tensorlakeai/tensorlake-skills --all -y --copy`, THEN `python3 -m pip install --break-system-packages tensorlake` — order reflects the dependency chain",
+        "The `skills add` invocation uses the documented flags: `--all` (deploy to all detected agents), `-y` (non-interactive), `--copy` (avoid symlink issues in containers) — does NOT invent flags like `--target=claude` or `--path=~/.claude/skills`",
+        "Registration uses `image.build()` from the SDK (not the `tl sbx image create <Dockerfile>` CLI, since the user asked for the Python SDK path) — and does NOT hallucinate a `client.create_image(...)` or `image.register()` method",
+        "Answer explicitly confirms that the install runs INSIDE the image build (a `.run(...)` step on the Image object) and does NOT modify the user's host `~/.claude/skills/` directory — does not suggest running `skills add` locally on the laptop as a setup step",
+        "pip install uses `--break-system-packages` (or an explicit venv) since the base Ubuntu image ships a PEP 668-managed system Python — does NOT omit the flag and assume bare `pip install tensorlake` works"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "sandbox-pty-interactive-session",
+      "references": [
+        "sandbox_sdk.md#interactive-pty-session"
+      ],
+      "prompt": "I want my agent to drive an interactive bash shell inside a Tensorlake sandbox: send a command, watch the output stream back as it arrives, decide what to send next based on what it saw, and resize the terminal when the user resizes their window. Set this up end-to-end in Python — open the PTY, subscribe to live output, send a couple of input lines, resize once, then clean up. Also: if my script crashes mid-session, can I reattach to the same PTY in a new script?",
+      "expected_output": "A Python snippet that opens a PTY via `sandbox.create_pty(command=\"/bin/bash\", args=[\"-l\"], cols=80, rows=24)`, subscribes to live output via `pty.on_data(callback)` and `pty.on_exit(callback)`, sends input via `pty.send_input(\"...\\n\")`, resizes via `pty.resize(cols, rows)`, and tears down via `pty.kill()` (ends the PTY process) or `pty.disconnect()` (just drops streaming). Mentions `sandbox.connect_pty(session_id, token)` for reconnecting from a fresh script. Does not invent shortcuts like `sandbox.shell()` or `pty.read()`.",
+      "files": [],
+      "expectations": [
+        "Opens the PTY via `sandbox.create_pty(command=\"/bin/bash\", args=[...], cols=..., rows=...)` — does NOT invent `sandbox.shell(...)`, `sandbox.open_terminal(...)`, `sandbox.exec_interactive(...)`, or `sandbox.pty(...)`",
+        "Streams output by subscribing with `pty.on_data(callback)` (and optionally `pty.on_exit(callback)`) — does NOT poll via fabricated methods like `pty.read()`, `pty.stream()`, `pty.tail()`, or treat `pty.send_input` as if it returned the response synchronously",
+        "Sends input via `pty.send_input(text)` passing a single string (the caller is responsible for the trailing newline) — does NOT invent `pty.write(...)`, `pty.send(...)`, `pty.input(...)`, or split into separate stdin/stdout APIs",
+        "Resizes the terminal via `pty.resize(cols, rows)` — does NOT invent `pty.set_size(...)`, `pty.window_resize(...)`, or `pty.update(cols=, rows=)`",
+        "Cleanup distinguishes `pty.kill()` (terminates the PTY process) from `pty.disconnect()` (drops the streaming connection but the PTY keeps running server-side) — does not conflate the two; sandbox-level teardown uses `sandbox.terminate()`",
+        "Reattach path uses `sandbox.connect_pty(session_id, token)` on a fresh `Sandbox.connect(...)` handle — does NOT fabricate `pty.reattach()`, `Sandbox.connect_pty(...)` as a static, or claim PTY sessions are unrecoverable after a script crash"
+      ]
+    },
+    {
+      "id": 14,
+      "name": "sandbox-update-promote-and-expose",
+      "references": [
+        "sandbox_sdk.md#list-update",
+        "sandbox_sdk.md#port-exposure"
+      ],
+      "prompt": "I created an ephemeral Tensorlake sandbox to do a quick experiment and now I want to keep it around: give it the name 'data-explorer' so I can suspend/resume it later, and expose port 8888 with auth required so I can hit a Jupyter server I'm about to start. I do NOT want to terminate and recreate the sandbox — I'd lose the work I already did. What's the right call? Python SDK.",
+      "expected_output": "Use `sandbox.update(name=\"data-explorer\")` to promote ephemeral → named in place, and `sandbox.update(exposed_ports=[8888], allow_unauthenticated_access=False)` to add the port. Both are INSTANCE methods on the existing handle — no recreation needed, no work lost. After promotion, `sandbox.suspend()` / `sandbox.resume()` become valid (ephemeral cannot be suspended directly, but `update(name=...)` is the documented conversion path). The legacy `SandboxClient().update_sandbox(id, name)` form also works.",
+      "files": [],
+      "expectations": [
+        "Uses `sandbox.update(name=\"data-explorer\")` to rename / promote — recognizes this as an INSTANCE method on the existing sandbox handle, NOT a recreate or a terminate-and-create-with-name dance",
+        "Uses `sandbox.update(exposed_ports=[8888], allow_unauthenticated_access=False)` to expose the port — same instance method handles both knobs; explicitly keeps `allow_unauthenticated_access=False`",
+        "Does NOT claim the user must terminate and recreate the sandbox to add a name or expose ports — that would lose the in-progress work the user explicitly mentioned",
+        "Confirms that AFTER promoting to named via `update(name=...)`, suspend/resume becomes valid — does NOT claim ephemeral sandboxes can be suspended directly, and does NOT claim suspend/resume needs a fresh sandbox",
+        "Does NOT invent methods like `sandbox.rename(...)`, `sandbox.set_name(...)`, `sandbox.expose_port(...)`, `sandbox.add_port(...)`, `sandbox.promote()`, or `client.rename_sandbox(...)` — `update()` is the single documented entry point",
+        "If `SandboxClient().expose_ports(...)` or `client.update_sandbox(id, name)` is mentioned as an alternative, the names and signatures match the docs (not invented variants like `client.set_name()` or `client.add_exposed_port()`)"
+      ]
+    },
+    {
+      "id": 15,
+      "name": "sandbox-connect-by-name-and-resume",
+      "references": [
+        "sandbox_sdk.md#connect-to-an-existing-sandbox",
+        "sandbox_persistence.md#suspend-and-resume"
+      ],
+      "prompt": "Yesterday I created a named sandbox 'agent-env' and suspended it at the end of the session. Today, from a fresh Python script, I want to: get a handle to that same sandbox by name (I don't have the sandbox_id memorized), resume it, run a single command in it, then suspend it again so it's ready for tomorrow. I do NOT want to terminate it — it needs to stick around. Python SDK.",
+      "expected_output": "`Sandbox.connect(\"agent-env\")` returns a handle (connect accepts either a name or a sandbox_id). Then `sandbox.resume()` to bring it back to Running, `sandbox.run(\"...\", [...])`, and `sandbox.suspend()` at the end. The script must NOT call `sandbox.terminate()` — terminate is final and would destroy the work. `Sandbox.connect()` does not auto-terminate on garbage collection. The same sandbox_id and name are preserved across suspend/resume.",
+      "files": [],
+      "expectations": [
+        "Uses `Sandbox.connect(\"agent-env\")` to get a handle — recognizes that connect accepts either a sandbox_id (UUID) or a name string; does NOT invent `Sandbox.find_by_name(...)`, `Sandbox.get(name=...)`, `client.get_sandbox_by_name(...)`, or require listing all sandboxes and filtering by name",
+        "Calls `sandbox.resume()` BEFORE running commands (since the sandbox is in Suspended state) and `sandbox.suspend()` AFTER — both are INSTANCE methods on the connected handle, not statics or client methods",
+        "Does NOT call `sandbox.terminate()` at the end of the script — answer recognizes that the user explicitly wants to keep the sandbox around for future sessions, and that `Sandbox.connect()` does NOT auto-terminate when the handle goes out of scope",
+        "Does NOT recommend calling `Sandbox.create(name=\"agent-env\")` to 'find' the existing sandbox — that would either create a new sandbox or error on name collision, not return the existing one",
+        "Distinguishes connect-by-name (returns the SAME sandbox with the SAME sandbox_id) from snapshot/restore (creates a NEW sandbox with a new id) — does not confuse the two workflows",
+        "If the answer reads identifying fields off the connected handle, it uses the documented attribute names `sandbox.sandbox_id` and `sandbox.name` (Python snake_case) — not `sandbox.id`, `sandbox.uuid`, or TypeScript-style `sandboxId`"
+      ]
+    },
+    {
+      "id": 16,
+      "name": "sandbox-snapshot-lifecycle-management",
+      "references": [
+        "sandbox_persistence.md#snapshots",
+        "sandbox_persistence.md#manage-snapshots"
+      ],
+      "prompt": "I've been creating snapshots from various sandboxes for weeks and storage is creeping up. From a running sandbox, list every snapshot that was created from it, look up a specific snapshot's metadata by id (status, size_bytes), and delete the ones I don't want anymore. Python SDK. Also — if I delete a snapshot, does that affect any sandboxes I previously restored from it? And is there a CLI shortcut for the same operations?",
+      "expected_output": "`sandbox.list_snapshots()` is an INSTANCE method that returns snapshots from THAT sandbox. `Sandbox.get_snapshot(snapshot_id)` and `Sandbox.delete_snapshot(snapshot_id)` are STATIC methods on the Sandbox class. Each `SnapshotInfo` exposes `.snapshot_id`, `.status`, `.size_bytes`. Deleting a snapshot does NOT affect previously restored sandboxes — those are independent copies of state at restore time and keep running; only future restores from that snapshot id will fail. CLI shortcuts: `tl sbx checkpoint ls` and `tl sbx checkpoint rm <snapshot-id>`.",
+      "files": [],
+      "expectations": [
+        "Uses `sandbox.list_snapshots()` as an INSTANCE method on the running sandbox handle (returns snapshots created from THIS sandbox) — does NOT invent `Sandbox.list_snapshots()` as a static, `client.list_snapshots()`, or a project-wide list method (no such SDK method is documented)",
+        "Uses `Sandbox.get_snapshot(snapshot_id)` and `Sandbox.delete_snapshot(snapshot_id)` as STATIC methods on the `Sandbox` class — does NOT call them as instance methods like `sandbox.delete_snapshot(...)` or invent client-scoped variants",
+        "Inspects the documented snake_case fields on `SnapshotInfo`: `snapshot_id`, `status`, `size_bytes` — does NOT use camelCase (`snapshotId`) in Python or invent fields like `bytes`, `size`, `created_iso`",
+        "Explicitly explains that deleting a snapshot does NOT affect sandboxes that were previously restored from it — restored sandboxes are independent copies and keep running; only NEW restores from that snapshot id will fail after deletion",
+        "Mentions the CLI shortcut using the documented `checkpoint` subcommand: `tl sbx checkpoint ls` and `tl sbx checkpoint rm <snapshot-id>` — does NOT invent `tl sbx snapshot ls`, `tl snapshot delete`, or `tl sbx delete-snapshot`",
+        "Does NOT claim snapshots are auto-deleted when the source sandbox terminates — snapshots persist independently of sandbox lifecycle until explicitly deleted"
       ]
     }
   ]

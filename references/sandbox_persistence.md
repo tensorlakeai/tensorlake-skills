@@ -3,7 +3,7 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/lifecycle.md
   - https://docs.tensorlake.ai/sandboxes/snapshots.md
 SDK version: tensorlake 0.5.0
-Last verified: 2026-04-24
+Last verified: 2026-04-26
 -->
 
 # TensorLake Sandbox Persistence
@@ -129,6 +129,35 @@ tl sbx checkpoint <sandbox-id> --timeout 600
 curl -X POST https://api.tensorlake.ai/sandboxes/<sandbox-id>/snapshot \
   -H "Authorization: Bearer $TENSORLAKE_API_KEY"
 ```
+
+### Graceful Stop + Snapshot (long-running process)
+
+When you want to interrupt a running background process and preserve its post-shutdown state for later inspection, the canonical sequence is **SIGTERM → wait for the process to exit → `checkpoint()` → `terminate()`**. SIGTERM gives the program a chance to flush buffers and write its own final partial output; the snapshot then captures that flushed state. Snapshotting *before* the signal captures in-flight memory but misses anything the process would have written on graceful shutdown.
+
+```python
+import signal
+from tensorlake.sandbox import Sandbox
+
+sandbox = Sandbox.create(name="training-run", cpus=4.0, memory_mb=8192)
+
+proc = sandbox.start_process("python", args=["/workspace/train.py"])
+
+try:
+    for event in sandbox.follow_output(proc.pid):
+        print(event.line, end="", flush=True)
+        # ... decide to interrupt based on what you see ...
+except KeyboardInterrupt:
+    sandbox.send_signal(proc.pid, signal.SIGTERM)   # 1. graceful — let the process flush
+    # (optional) wait briefly for the process to exit, then:
+    snapshot = sandbox.checkpoint()                  # 2. capture post-shutdown state
+    print(f"Snapshot: {snapshot.snapshot_id}")
+    sandbox.terminate()                              # 3. tear down the sandbox
+
+# Later, in a fresh script — restore creates a NEW sandbox with a new sandbox_id
+restored = Sandbox.create(snapshot_id=snapshot.snapshot_id)
+```
+
+This is **snapshot/restore semantics** (new sandbox, new id), not **suspend/resume** (same sandbox, same id). Use suspend/resume when you want *this* sandbox back later; use checkpoint/restore when you want a starting point you can fork into a fresh environment.
 
 ### Restore from a Snapshot
 

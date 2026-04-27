@@ -11,6 +11,7 @@ import os
 import re
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -105,6 +106,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--iteration", type=int, help="iteration to grade; default latest")
     ap.add_argument("--timeout", type=int, default=600, help="per-eval judge timeout in seconds")
+    ap.add_argument("--workers", type=int, default=1, help="parallel judge workers; default 1")
     args = ap.parse_args()
 
     iteration = args.iteration or latest_iteration()
@@ -114,7 +116,7 @@ def main() -> None:
     evals_data = json.loads(EVALS_JSON.read_text())
     by_id = {e["id"]: e for e in evals_data["evals"]}
 
-    runs = []
+    jobs = []
     for slug_dir in sorted(iter_dir.iterdir(), key=lambda p: int(p.name.split("-")[1]) if p.name.startswith("eval-") else 0):
         if not slug_dir.is_dir() or not slug_dir.name.startswith("eval-"):
             continue
@@ -126,32 +128,47 @@ def main() -> None:
         if not out_path.exists():
             print(f"  • eval {eval_id}: no output.md, skipping", file=sys.stderr)
             continue
-        print(f"  • grading eval {eval_id} ({eval_obj['name']})", flush=True)
+        jobs.append((eval_id, eval_obj, out_path))
+
+    def grade_job(job):
+        eval_id, eval_obj, out_path = job
         try:
             results = grade_one(eval_obj, out_path.read_text(), args.timeout)
         except Exception as exc:
-            print(f"    ✗ judge failed: {exc}", file=sys.stderr)
-            continue
-        passed = sum(1 for r in results if r.get("passed"))
-        total = len(results)
-        runs.append({
-            "eval_id": eval_id,
-            "eval_name": eval_obj["name"],
-            "configuration": "with_skill",
-            "result": {
-                "pass_rate": round(passed / total, 2) if total else 0,
-                "passed": passed,
-                "total": total,
-            },
-            "expectations": [
-                {
-                    "text": eval_obj["expectations"][i],
-                    "passed": bool(r.get("passed")),
-                    "evidence": r.get("evidence", ""),
-                }
-                for i, r in enumerate(results)
-            ],
-        })
+            return eval_id, eval_obj, None, str(exc)
+        return eval_id, eval_obj, results, None
+
+    runs = []
+    workers = max(1, args.workers)
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(grade_job, j) for j in jobs]
+        for fut in as_completed(futures):
+            eval_id, eval_obj, results, err = fut.result()
+            if err is not None:
+                print(f"  ✗ eval {eval_id} ({eval_obj['name']}): judge failed: {err}", file=sys.stderr)
+                continue
+            passed = sum(1 for r in results if r.get("passed"))
+            total = len(results)
+            print(f"  ✓ eval {eval_id} ({eval_obj['name']}): {passed}/{total}", flush=True)
+            runs.append({
+                "eval_id": eval_id,
+                "eval_name": eval_obj["name"],
+                "configuration": "with_skill",
+                "result": {
+                    "pass_rate": round(passed / total, 2) if total else 0,
+                    "passed": passed,
+                    "total": total,
+                },
+                "expectations": [
+                    {
+                        "text": eval_obj["expectations"][i],
+                        "passed": bool(r.get("passed")),
+                        "evidence": r.get("evidence", ""),
+                    }
+                    for i, r in enumerate(results)
+                ],
+            })
+    runs.sort(key=lambda r: r["eval_id"])
 
     total_passed = sum(r["result"]["passed"] for r in runs)
     total = sum(r["result"]["total"] for r in runs)
