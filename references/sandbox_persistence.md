@@ -3,7 +3,7 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/lifecycle.md
   - https://docs.tensorlake.ai/sandboxes/snapshots.md
 SDK version: tensorlake 0.5.0
-Last verified: 2026-04-26
+Last verified: 2026-04-27
 -->
 
 # TensorLake Sandbox Persistence
@@ -158,6 +158,8 @@ restored = Sandbox.create(snapshot_id=snapshot.snapshot_id)
 ```
 
 This is **snapshot/restore semantics** (new sandbox, new id), not **suspend/resume** (same sandbox, same id). Use suspend/resume when you want *this* sandbox back later; use checkpoint/restore when you want a starting point you can fork into a fresh environment.
+
+> **When answering, surface this distinction explicitly.** If the user's prompt mentions "fresh environment", "clean environment", "new sandbox", "later/separately", "fork", or "inspect/debug after the fact" — call out in prose that `Sandbox.create(snapshot_id=...)` produces a *new* sandbox with a *new* `sandbox_id`, and that this is why it's the right tool over suspend/resume here. Don't conflate "checkpoints" with "suspend semantics" in summary lines — they're different lifecycle concepts and users get confused when they're bundled.
 
 ### Restore from a Snapshot
 
