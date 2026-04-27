@@ -63,7 +63,9 @@ def main() -> None:
 
     iteration = args.iteration or next_iteration()
     iter_dir = WORKSPACE / f"iteration-{iteration}"
+    iter_dir.mkdir(parents=True, exist_ok=True)
     model_label = args.model or "harness default"
+    (iter_dir / "run_meta.json").write_text(json.dumps({"executor_model": model_label}))
     print(f"→ iteration {iteration}: {len(evals)} evals, with_skill, model={model_label}, workers={args.workers}", flush=True)
 
     def submit(e):

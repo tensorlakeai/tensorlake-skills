@@ -15,7 +15,7 @@
         "Sandbox is created with a `name=` argument via `Sandbox.create(name=\"...\")` (the 0.5.1 canonical static method) — does NOT use the deprecated `SandboxClient().create_and_connect(...)` form",
         "Code uses `sandbox.suspend()` and `sandbox.resume()` as INSTANCE methods on the `Sandbox` handle — not `client.suspend(...)`, `client.resume(...)`, or invented methods like pause()/unpause()/stop()",
         "Answer states explicitly that ephemeral sandboxes cannot be suspended or resumed",
-        "Answer notes that suspend/resume preserves the same sandbox_id and name, unlike snapshot restore which creates a new sandbox",
+        "Answer notes that suspend/resume preserves the same sandbox_id and name",
         "Does not claim that snapshot + restore alone gives you the same sandbox identity back",
         "Does not hallucinate SDK methods or arguments not present in references/sandbox_persistence.md"
       ]

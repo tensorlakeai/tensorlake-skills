@@ -68,7 +68,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          args=(--workers 4)
+          args=(--workers 4 --model claude-sonnet-4-6)
           if [ -n "${{ steps.filter.outputs.ids }}" ]; then
             args+=(--evals "${{ steps.filter.outputs.ids }}")
           fi
@@ -78,7 +78,7 @@ jobs:
         if: steps.filter.outputs.skip == 'false'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python evals/grade.py --workers 4
+        run: python evals/grade.py --workers 4 --model claude-haiku-4-5-20251001
 
       - name: Upload eval workspace
         if: always() && steps.filter.outputs.skip == 'false'

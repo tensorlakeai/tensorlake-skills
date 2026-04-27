@@ -2,6 +2,21 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [2.5.2] — 2026-04-27
+
+### Added (Eval CI)
+- **`.github/workflows/evals.yml`** — CI workflow that runs the eval suite on PRs touching `references/**.md`. Triggers narrowly: version bumps, `SKILL.md`/`AGENTS.md` edits, and `evals/**` script changes do NOT auto-run evals. Full runs are available via `workflow_dispatch` (with optional comma-separated eval IDs).
+- **`evals/filter.py`** — maps changed files to eval IDs via each eval's `references[]` field, deduplicating across overlapping reference files. Empty result skips the CI job.
+- **`evals/ci_summary.py`** — renders a markdown summary table for `$GITHUB_STEP_SUMMARY`. Report-only (always exits 0); failures show in the table and uploaded `eval-workspace` artifact, never block the PR.
+
+### Changed (Eval harness)
+- **`evals/grade.py`** — `JUDGE_MODEL` constant replaced by a `--model` CLI flag (`DEFAULT_JUDGE_MODEL` = `claude-opus-4-7`). Judge model now propagates into `benchmark.json` → `metadata.analyzer_model`.
+- **`evals/run.py`** — writes `evals/workspace/iteration-N/run_meta.json` recording the executor model. `grade.py` reads it so `benchmark.json` → `metadata.executor_model` reflects the real model used (was previously hardcoded as `"default (claude -p)"`).
+- CI is pinned to **agent: `claude-sonnet-4-6`**, **judge: `claude-haiku-4-5-20251001`**.
+
+### Fixed
+- **`evals/evals.json`** eval 1 (`named-sandbox-suspend-resume`) — expectation #4 no longer requires an unsolicited contrast against snapshot/restore. The original prompt asks only about suspend/resume + ephemeral, and `expected_output` doesn't request the comparison either; the negative-direction expectation #5 still tests the underlying misconception.
+
 ## [2.5.1] — SDK 0.5.1 — 2026-04-25
 
 ### Changed (Sandbox SDK 0.5.1)

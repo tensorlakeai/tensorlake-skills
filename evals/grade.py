@@ -18,7 +18,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 EVALS_JSON = REPO / "evals" / "evals.json"
 WORKSPACE = REPO / "evals" / "workspace"
-JUDGE_MODEL = "claude-opus-4-7"
+DEFAULT_JUDGE_MODEL = "claude-opus-4-7"
 
 JUDGE_PROMPT = """You are grading a model's response to a Tensorlake skill eval.
 
@@ -72,7 +72,7 @@ def extract_json(text: str) -> dict:
     return json.loads(m.group(0))
 
 
-def grade_one(eval_obj: dict, output_md: str, timeout: int) -> list[dict]:
+def grade_one(eval_obj: dict, output_md: str, timeout: int, judge_model: str) -> list[dict]:
     expectations = eval_obj["expectations"]
     numbered = "\n".join(f"{i + 1}. {e}" for i, e in enumerate(expectations))
     prompt = JUDGE_PROMPT.format(
@@ -83,7 +83,7 @@ def grade_one(eval_obj: dict, output_md: str, timeout: int) -> list[dict]:
         output=output_md,
     )
     result = subprocess.run(
-        ["claude", "-p", prompt, "--output-format", "text", "--model", JUDGE_MODEL],
+        ["claude", "-p", prompt, "--output-format", "text", "--model", judge_model],
         cwd=REPO,
         capture_output=True,
         text=True,
@@ -107,6 +107,7 @@ def main() -> None:
     ap.add_argument("--iteration", type=int, help="iteration to grade; default latest")
     ap.add_argument("--timeout", type=int, default=600, help="per-eval judge timeout in seconds")
     ap.add_argument("--workers", type=int, default=1, help="parallel judge workers; default 1")
+    ap.add_argument("--model", default=DEFAULT_JUDGE_MODEL, help=f"judge model id; default {DEFAULT_JUDGE_MODEL}")
     args = ap.parse_args()
 
     iteration = args.iteration or latest_iteration()
@@ -133,7 +134,7 @@ def main() -> None:
     def grade_job(job):
         eval_id, eval_obj, out_path = job
         try:
-            results = grade_one(eval_obj, out_path.read_text(), args.timeout)
+            results = grade_one(eval_obj, out_path.read_text(), args.timeout, args.model)
         except Exception as exc:
             return eval_id, eval_obj, None, str(exc)
         return eval_id, eval_obj, results, None
@@ -178,12 +179,20 @@ def main() -> None:
         "pass_rate": round(total_passed / total, 2) if total else 0,
     }
 
+    meta_path = iter_dir / "run_meta.json"
+    executor_model = "default (claude -p)"
+    if meta_path.exists():
+        try:
+            executor_model = json.loads(meta_path.read_text()).get("executor_model", executor_model)
+        except json.JSONDecodeError:
+            pass
+
     benchmark = {
         "metadata": {
             "skill_name": evals_data["skill_name"],
             "skill_path": str(REPO),
-            "executor_model": "default (claude -p)",
-            "analyzer_model": JUDGE_MODEL,
+            "executor_model": executor_model,
+            "analyzer_model": args.model,
             "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "iteration": iteration,
             "evals_run": [r["eval_id"] for r in runs],
