@@ -42,6 +42,13 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             ids="${{ github.event.inputs.evals }}"
+            if [ -z "$ids" ]; then
+              echo "manual run with no ids: running all evals"
+            else
+              echo "manual run with ids: $ids"
+            fi
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "ids=$ids" >> "$GITHUB_OUTPUT"
           else
             base="${{ github.event.pull_request.base.sha }}"
             head="${{ github.event.pull_request.head.sha }}"
@@ -49,14 +56,14 @@ jobs:
             printf 'changed files:\n'
             printf '  %s\n' "${changed[@]}"
             ids=$(python evals/filter.py "${changed[@]}")
-          fi
-          if [ -z "$ids" ]; then
-            echo "no evals to run for this change"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "running eval ids: $ids"
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "ids=$ids" >> "$GITHUB_OUTPUT"
+            if [ -z "$ids" ]; then
+              echo "no evals to run for this change"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "running eval ids: $ids"
+              echo "skip=false" >> "$GITHUB_OUTPUT"
+              echo "ids=$ids" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
       - name: Install Claude Code
