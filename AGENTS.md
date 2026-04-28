@@ -8,7 +8,7 @@ Two APIs:
 - **Sandbox** — Stateful execution environments for agents and isolated tool calls, with suspend/resume, snapshots, and clone for persistence between tasks
 - **Orchestration** — Sandbox-native durable workflow orchestration for agents (imported as `tensorlake.applications`)
 
-Available in **Python** (`pip install tensorlake`), **TypeScript** (`npm install tensorlake`), and **CLI** (`curl -fsSL https://tensorlake.ai/install | sh`). Use standalone or as infrastructure alongside any LLM provider, agent framework, database, or API.
+Available in **Python**, **TypeScript**, and **CLI**. Use standalone or as infrastructure alongside any LLM provider, agent framework, database, or API.
 
 **For documentation questions**: Read the relevant reference file below to answer. If the bundled references don't cover it, go to https://docs.tensorlake.ai/llms.txt
 **For building**: Use the Quick Start and Core Patterns below, plus reference files for API details.
