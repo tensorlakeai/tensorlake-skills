@@ -2,7 +2,7 @@
 Source:
   - https://docs.tensorlake.ai/sandboxes/introduction.md
   - https://docs.tensorlake.ai/sandboxes/quickstart.md
-  - https://docs.tensorlake.ai/sandboxes/concepts.md
+  - https://docs.tensorlake.ai/sandboxes/sdk-reference.md
   - https://docs.tensorlake.ai/sandboxes/lifecycle.md
   - https://docs.tensorlake.ai/sandboxes/commands.md
   - https://docs.tensorlake.ai/sandboxes/file-operations.md

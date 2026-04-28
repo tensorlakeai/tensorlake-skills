@@ -2,6 +2,16 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [2.5.5] — 2026-04-28
+
+### Changed (Eval harness — skill-trigger detection)
+- **`evals/run.py`** — switched `claude -p` to `--output-format stream-json --verbose` and added `detect_skill_trigger()` / `extract_final_text()`. Each run now writes `stream.jsonl`, `output.md`, and `trigger.json` (`{"skill_triggered": bool, "skill_invocations": [...]}`).
+- **`evals/grade.py`** — reads `trigger.json` first; if the skill didn't trigger, the judge LLM call is skipped and all expectations are recorded as failed with reason `"skill not triggered; grading skipped"`. Adds `skill_triggered`, `skill_invocations`, and aggregate `skill_trigger_rate` to `benchmark.json`.
+- **`evals/ci_summary.py`** — added a `Skill triggered` column to the per-eval table (with `_(skipped)_` annotation when the judge was bypassed) and a new `## Skill trigger rate` section with the overall rate and per-eval invocation list.
+
+### Why
+Eval pass-rate alone conflates "skill didn't fire" with "skill fired but answered wrong" — two very different failure modes. Surfacing trigger detection as a first-class signal makes regressions in the description/trigger criteria visible immediately, and short-circuiting the judge on no-trigger runs saves the cost of grading a response that was never going to consult the skill.
+
 ## [2.5.4] — 2026-04-28
 
 ### Changed (Snapshot restore — surfacing the filesystem/full distinction earlier)
@@ -75,12 +85,12 @@ Eval 15 (`filesystem-snapshot-restore-with-resource-overrides`) regressed to 0/6
 ### Added
 - **sandbox_sdk.md** — new **Browser Access with noVNC** subsection under Computer Use: backend-tunnel + WebSocket bridge architecture for live human-facing desktop streams on VNC port `5901` (password `tensorlake`), with a `@novnc/novnc` browser client snippet and the hybrid pattern of `noVNC` for the live view + `sandbox.connect_desktop()` for programmatic actions. Sourced from the new upstream section in `sandboxes/computer-use.md`
 - **sandbox_sdk.md** — new **Running Docker Inside a Sandbox** subsection under Sandbox Images, cross-referencing the new upstream `sandboxes/docker.md` page (full install script lives there; `ubuntu-systemd` base image was already in the Base Images table)
-- **sandbox_sdk.md** — `sandboxes/concepts.md` (new upstream Sandbox SDK Reference page) and `sandboxes/docker.md` added to the source URL header
-- **sources.yaml** — four sources added to `sandbox_sdk.md`: `sandboxes/concepts.md`, `sandboxes/docker.md`, `sandboxes/environment-variables.md`, `sandboxes/quickstart.md`. The last two were already in the reference file's source header (added in v2.3.1) but had never been registered in `sources.yaml` — a drift-check bug from that release
+- **sandbox_sdk.md** — `sandboxes/sdk-reference.md` (new upstream Sandbox SDK Reference page) and `sandboxes/docker.md` added to the source URL header
+- **sources.yaml** — four sources added to `sandbox_sdk.md`: `sandboxes/sdk-reference.md`, `sandboxes/docker.md`, `sandboxes/environment-variables.md`, `sandboxes/quickstart.md`. The last two were already in the reference file's source header (added in v2.3.1) but had never been registered in `sources.yaml` — a drift-check bug from that release
 - **CLAUDE.md** — new rule: `SDK version:` and `Last verified:` must always bump together. Bumping the SDK version without also bumping the date creates a false record claiming verification against a newer SDK on an older date. Applies to PyPI releases, content edits, and `Source:` / `sources.yaml` URL changes
 
 ### Changed
-- **SKILL.md** / **AGENTS.md** / **README.md** — renamed the product from "Orchestrate" to "Orchestration" to match the upstream docs terminology shift in `agent-skills.md` and the new `sandboxes/concepts.md`. Affects the "Two APIs" opening paragraph, Quick Start heading, Core Patterns bullet, reference-list title (`Orchestration SDK`), and the README description/tree comment. Lowercase verb uses of "orchestrate" ("orchestrate multi-step LLM pipelines") were left alone
+- **SKILL.md** / **AGENTS.md** / **README.md** — renamed the product from "Orchestrate" to "Orchestration" to match the upstream docs terminology shift in `agent-skills.md` and the new `sandboxes/sdk-reference.md`. Affects the "Two APIs" opening paragraph, Quick Start heading, Core Patterns bullet, reference-list title (`Orchestration SDK`), and the README description/tree comment. Lowercase verb uses of "orchestrate" ("orchestrate multi-step LLM pipelines") were left alone
 - All reference files + `sources.yaml` + README example — bumped `SDK version:` / `sdk_version:` to `tensorlake 0.4.49` (latest on PyPI) and `Last verified:` / `last_verified:` to `2026-04-22`
 
 ### Fixed
