@@ -39,7 +39,7 @@ MODEL RESPONSE:
 For each expectation in order, decide pass/fail strictly from the response.
 Reply with ONLY a JSON object of this shape (no prose, no markdown fences):
 
-{{"results": [{{"passed": true|false, "evidence": "<short citation or 'not present'>"}}]}}
+{{"results": [{{"passed": true|false, "evidence": "<short citation or 'not present'>", "reason": "<one sentence explaining why this passed or failed>"}}]}}
 
 The "results" array MUST have exactly {n} entries, one per numbered expectation, in order.
 """
@@ -165,6 +165,7 @@ def main() -> None:
                         "text": eval_obj["expectations"][i],
                         "passed": bool(r.get("passed")),
                         "evidence": r.get("evidence", ""),
+                        "reason": r.get("reason", ""),
                     }
                     for i, r in enumerate(results)
                 ],
