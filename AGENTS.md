@@ -78,13 +78,14 @@ if __name__ == "__main__":
 - **Document extraction**: Use DocumentAI with Pydantic schemas to extract structured data from PDFs/images
 - **LLM integration**: Use any LLM provider inside `@function()` — install deps via `Image`, pass keys via `secrets`
 - **Framework integration**: Use Sandbox as a code execution tool for LangChain agents or OpenAI function calling, or DocumentAI as a document loader for any RAG pipeline
+- **Computer use / desktop automation**: Use `Sandbox.create(image="ubuntu-vnc")` with `sandbox.connect_desktop(password="tensorlake")` for screenshot + keyboard/mouse control (`desktop.screenshot()`, `desktop.press()`, `desktop.type_text()`). Connection is proxied through an authenticated endpoint — no port exposure needed. See `references/sandbox_sdk.md#computer-use-desktop-automation`.
 
 ## Reference Documentation
 
 Detailed API docs are in the `references/` directory:
 
 - `references/applications_sdk.md` — Orchestration SDK: decorators, futures, map/reduce, images, context
-- `references/sandbox_sdk.md` — Create sandboxes, connect, run commands, file ops, processes, networking, images
+- `references/sandbox_sdk.md` — Create sandboxes, connect, run commands, file ops, processes, networking, images, desktop / computer-use
 - `references/sandbox_persistence.md` — Sandbox state: snapshots, suspend/resume, clone, ephemeral vs named, state machine
 - `references/documentai_sdk.md` — Parse, extract, classify, options
 - `references/integrations.md` — LangChain, OpenAI, ChromaDB, Qdrant, Databricks, MotherDuck patterns
