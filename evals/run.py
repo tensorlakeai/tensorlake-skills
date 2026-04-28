@@ -28,14 +28,13 @@ def next_iteration() -> int:
 
 
 SKILL_NAME = "tensorlake"
+FILE_WRITE_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
+FILES_MAX_BYTES = 200_000
+FILES_TOTAL_MAX_BYTES = 1_000_000
 
 
-def detect_skill_trigger(stream_lines: list[str]) -> dict:
-    """Scan stream-json output for a Skill tool_use that loads the tensorlake skill.
-
-    Returns {"skill_triggered": bool, "skill_invocations": [...]}.
-    """
-    invocations = []
+def iter_assistant_tool_uses(stream_lines):
+    """Yield (name, input) for every assistant tool_use block in the stream."""
     for line in stream_lines:
         line = line.strip()
         if not line:
@@ -47,10 +46,21 @@ def detect_skill_trigger(stream_lines: list[str]) -> dict:
         if obj.get("type") != "assistant":
             continue
         for block in obj.get("message", {}).get("content", []) or []:
-            if block.get("type") != "tool_use" or block.get("name") != "Skill":
+            if block.get("type") != "tool_use":
                 continue
-            skill_arg = (block.get("input") or {}).get("skill", "")
-            invocations.append(skill_arg)
+            yield block.get("name"), block.get("input") or {}
+
+
+def detect_skill_trigger(stream_lines: list[str]) -> dict:
+    """Scan stream-json output for a Skill tool_use that loads the tensorlake skill.
+
+    Returns {"skill_triggered": bool, "skill_invocations": [...]}.
+    """
+    invocations = [
+        inp.get("skill", "")
+        for name, inp in iter_assistant_tool_uses(stream_lines)
+        if name == "Skill"
+    ]
     triggered = any(SKILL_NAME in s.lower() for s in invocations)
     return {"skill_triggered": triggered, "skill_invocations": invocations}
 
@@ -68,6 +78,49 @@ def extract_final_text(stream_lines: list[str]) -> str:
         if obj.get("type") == "result" and obj.get("subtype") == "success":
             return obj.get("result", "") or ""
     return ""
+
+
+def collect_written_files(stream_lines: list[str]) -> dict[str, str]:
+    """Snapshot files the assistant wrote/edited during the run.
+
+    Scans the stream for Write/Edit-family tool_uses, collects the unique paths,
+    then reads the final on-disk state of each. Used by the grader so the judge
+    can score artifacts the model put in a file rather than in output.md.
+    """
+    paths: list[str] = []
+    seen: set[str] = set()
+    for name, inp in iter_assistant_tool_uses(stream_lines):
+        if name not in FILE_WRITE_TOOLS:
+            continue
+        fp = inp.get("file_path") or inp.get("notebook_path")
+        if not fp or fp in seen:
+            continue
+        seen.add(fp)
+        paths.append(fp)
+
+    out: dict[str, str] = {}
+    total = 0
+    for p in paths:
+        path = Path(p)
+        try:
+            size = path.stat().st_size
+        except OSError as exc:
+            out[p] = f"<unreadable: {exc.__class__.__name__}>"
+            continue
+        try:
+            if size > FILES_MAX_BYTES:
+                content = path.read_text()[:FILES_MAX_BYTES] + "\n... [truncated]"
+            else:
+                content = path.read_text()
+        except (OSError, UnicodeDecodeError) as exc:
+            out[p] = f"<unreadable: {exc.__class__.__name__}>"
+            continue
+        total += len(content)
+        if total > FILES_TOTAL_MAX_BYTES:
+            out[p] = "<omitted: total snapshot size exceeded>"
+            break
+        out[p] = content
+    return out
 
 
 def run_eval(eval_obj: dict, out_dir: Path, timeout: int, model: str | None) -> bool:
@@ -91,6 +144,7 @@ def run_eval(eval_obj: dict, out_dir: Path, timeout: int, model: str | None) -> 
     (out_dir / "stream.jsonl").write_text(result.stdout)
     (out_dir / "output.md").write_text(extract_final_text(stream_lines))
     (out_dir / "trigger.json").write_text(json.dumps(detect_skill_trigger(stream_lines), indent=2))
+    (out_dir / "files.json").write_text(json.dumps(collect_written_files(stream_lines), indent=2))
     if result.returncode != 0:
         (out_dir / "stderr.log").write_text(result.stderr)
         return False

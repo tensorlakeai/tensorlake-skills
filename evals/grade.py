@@ -22,6 +22,11 @@ DEFAULT_JUDGE_MODEL = "claude-opus-4-7"
 
 JUDGE_PROMPT = """You are grading a model's response to a Tensorlake skill eval.
 
+The model may have answered partly in chat (MODEL RESPONSE) and partly by
+writing source files (FILES WRITTEN BY MODEL). Treat both as part of the
+artifact under evaluation: an expectation that asks for specific code is
+satisfied if that code appears in either place.
+
 EVAL PROMPT:
 {prompt}
 
@@ -36,7 +41,12 @@ MODEL RESPONSE:
 {output}
 ---
 
-For each expectation in order, decide pass/fail strictly from the response.
+FILES WRITTEN BY MODEL:
+---
+{files}
+---
+
+For each expectation in order, decide pass/fail strictly from the response and the files.
 Reply with ONLY a JSON object of this shape (no prose, no markdown fences):
 
 {{"results": [{{"passed": true|false, "evidence": "<short citation or 'not present'>", "reason": "<one sentence explaining why this passed or failed>"}}]}}
@@ -72,7 +82,29 @@ def extract_json(text: str) -> dict:
     return json.loads(m.group(0))
 
 
-def grade_one(eval_obj: dict, output_md: str, timeout: int, judge_model: str) -> list[dict]:
+def load_json(path: Path, default):
+    try:
+        return json.loads(path.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return default
+
+
+def format_files(files: dict[str, str]) -> str:
+    if not files:
+        return "(no files written)"
+    chunks = []
+    for path, content in files.items():
+        chunks.append(f"=== {path} ===\n{content}")
+    return "\n\n".join(chunks)
+
+
+def grade_one(
+    eval_obj: dict,
+    output_md: str,
+    files: dict[str, str],
+    timeout: int,
+    judge_model: str,
+) -> list[dict]:
     expectations = eval_obj["expectations"]
     numbered = "\n".join(f"{i + 1}. {e}" for i, e in enumerate(expectations))
     prompt = JUDGE_PROMPT.format(
@@ -81,6 +113,7 @@ def grade_one(eval_obj: dict, output_md: str, timeout: int, judge_model: str) ->
         expectations=numbered,
         n=len(expectations),
         output=output_md,
+        files=format_files(files),
     )
     result = subprocess.run(
         ["claude", "-p", prompt, "--output-format", "text", "--model", judge_model],
@@ -130,23 +163,22 @@ def main() -> None:
             print(f"  • eval {eval_id}: no output.md, skipping", file=sys.stderr)
             continue
         trigger_path = slug_dir / "with_skill" / "trigger.json"
-        jobs.append((eval_id, eval_obj, out_path, trigger_path))
-
-    def load_trigger(trigger_path: Path):
-        if not trigger_path.exists():
-            return None
-        try:
-            return json.loads(trigger_path.read_text())
-        except json.JSONDecodeError:
-            return None
+        files_path = slug_dir / "with_skill" / "files.json"
+        jobs.append((eval_id, eval_obj, out_path, trigger_path, files_path))
 
     def grade_job(job):
-        eval_id, eval_obj, out_path, trigger_path = job
-        trigger = load_trigger(trigger_path)
+        eval_id, eval_obj, out_path, trigger_path, files_path = job
+        trigger = load_json(trigger_path, None)
         if trigger is not None and not trigger.get("skill_triggered"):
             return eval_id, eval_obj, None, trigger, None
         try:
-            results = grade_one(eval_obj, out_path.read_text(), args.timeout, args.model)
+            results = grade_one(
+                eval_obj,
+                out_path.read_text(),
+                load_json(files_path, {}),
+                args.timeout,
+                args.model,
+            )
         except Exception as exc:
             return eval_id, eval_obj, None, trigger, str(exc)
         return eval_id, eval_obj, results, trigger, None
