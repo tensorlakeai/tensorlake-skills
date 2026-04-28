@@ -27,9 +27,52 @@ def next_iteration() -> int:
     return max(existing, default=0) + 1
 
 
+SKILL_NAME = "tensorlake"
+
+
+def detect_skill_trigger(stream_lines: list[str]) -> dict:
+    """Scan stream-json output for a Skill tool_use that loads the tensorlake skill.
+
+    Returns {"skill_triggered": bool, "skill_invocations": [...]}.
+    """
+    invocations = []
+    for line in stream_lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if obj.get("type") != "assistant":
+            continue
+        for block in obj.get("message", {}).get("content", []) or []:
+            if block.get("type") != "tool_use" or block.get("name") != "Skill":
+                continue
+            skill_arg = (block.get("input") or {}).get("skill", "")
+            invocations.append(skill_arg)
+    triggered = any(SKILL_NAME in s.lower() for s in invocations)
+    return {"skill_triggered": triggered, "skill_invocations": invocations}
+
+
+def extract_final_text(stream_lines: list[str]) -> str:
+    """Pull the final result text from a stream-json transcript."""
+    for line in reversed(stream_lines):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if obj.get("type") == "result" and obj.get("subtype") == "success":
+            return obj.get("result", "") or ""
+    return ""
+
+
 def run_eval(eval_obj: dict, out_dir: Path, timeout: int, model: str | None) -> bool:
     out_dir.mkdir(parents=True, exist_ok=True)
-    cmd = ["claude", "-p", eval_obj["prompt"], "--output-format", "text"]
+    cmd = ["claude", "-p", eval_obj["prompt"], "--output-format", "stream-json", "--verbose"]
     if model:
         cmd += ["--model", model]
     result = subprocess.run(
@@ -40,7 +83,10 @@ def run_eval(eval_obj: dict, out_dir: Path, timeout: int, model: str | None) -> 
         timeout=timeout,
         env={**os.environ, "SKILL_EVAL_RUNNING": "1"},
     )
-    (out_dir / "output.md").write_text(result.stdout)
+    stream_lines = result.stdout.splitlines()
+    (out_dir / "stream.jsonl").write_text(result.stdout)
+    (out_dir / "output.md").write_text(extract_final_text(stream_lines))
+    (out_dir / "trigger.json").write_text(json.dumps(detect_skill_trigger(stream_lines), indent=2))
     if result.returncode != 0:
         (out_dir / "stderr.log").write_text(result.stderr)
         return False

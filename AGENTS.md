@@ -1,7 +1,7 @@
 # Tensorlake SDK
-<!-- version: 2.5.4 -->
+<!-- version: 2.5.5 -->
 
-Tensorlake provides two APIs for building agentic applications:
+Guide for writing code that uses Tensorlake's sandbox product to build applications and AI agents. Tensorlake provides two APIs:
 
 - **Sandbox** — Stateful execution environments for agents and isolated tool calls, with suspend/resume, snapshots, and clone for persistence between tasks
 - **Orchestration** — Sandbox-native durable workflow orchestration for agents, with parallel map/reduce, auto-scaling, and crash recovery (imported as `tensorlake.applications`)

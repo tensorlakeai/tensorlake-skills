@@ -2,17 +2,23 @@
 name: tensorlake
 license: MIT
 description: >
-  Tensorlake SDK for agent sandboxes and sandbox-native orchestration.
-  Use when the user mentions tensorlake, or asks about Tensorlake APIs/docs/capabilities.
-  Also use when the user is building AI agents or agentic applications that need
-  stateful sandboxed execution environments for agents and isolated tool calls,
-  with suspend/resume and snapshots for persistence between tasks,
-  or durable workflow orchestration for agents (parallel map/reduce DAGs).
-  Works with any LLM provider (OpenAI, Anthropic), agent framework (LangChain),
-  database, or API as the infrastructure layer.
+  Tensorlake SDK — guide for writing code that uses Tensorlake's sandbox
+  product to build applications and AI agents. Use when the user mentions
+  tensorlake or sandboxes, or asks about Tensorlake APIs/docs/capabilities.
+  Also use when the user is building an application, coding agent, or agentic
+  system that needs a sandbox to run code — for example, executing
+  LLM-generated or untrusted code, a sandbox that persists across sessions
+  via suspend/resume, snapshots for forking parallel workers, custom
+  sandbox images, exposing ports out of a sandbox, egress allowlists,
+  PTY/interactive shells, computer-use / desktop automation, or file
+  transfer in/out. Also covers Tensorlake's sandbox-native durable
+  workflow orchestration (parallel map/reduce DAGs via `@application` /
+  `@function`). Works alongside any LLM provider (OpenAI, Anthropic),
+  agent framework (LangChain), database, or API as the infrastructure
+  layer.
 metadata:
   author: tensorlake
-  version: 2.5.4
+  version: 2.5.5
 ---
 
 # Tensorlake SDK

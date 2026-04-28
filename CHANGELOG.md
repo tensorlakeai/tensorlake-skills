@@ -2,6 +2,16 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [2.5.5] — 2026-04-28
+
+### Changed (Eval harness — skill-trigger detection)
+- **`evals/run.py`** — switched `claude -p` to `--output-format stream-json --verbose` and added `detect_skill_trigger()` / `extract_final_text()`. Each run now writes `stream.jsonl`, `output.md`, and `trigger.json` (`{"skill_triggered": bool, "skill_invocations": [...]}`).
+- **`evals/grade.py`** — reads `trigger.json` first; if the skill didn't trigger, the judge LLM call is skipped and all expectations are recorded as failed with reason `"skill not triggered; grading skipped"`. Adds `skill_triggered`, `skill_invocations`, and aggregate `skill_trigger_rate` to `benchmark.json`.
+- **`evals/ci_summary.py`** — added a `Skill triggered` column to the per-eval table (with `_(skipped)_` annotation when the judge was bypassed) and a new `## Skill trigger rate` section with the overall rate and per-eval invocation list.
+
+### Why
+Eval pass-rate alone conflates "skill didn't fire" with "skill fired but answered wrong" — two very different failure modes. Surfacing trigger detection as a first-class signal makes regressions in the description/trigger criteria visible immediately, and short-circuiting the judge on no-trigger runs saves the cost of grading a response that was never going to consult the skill.
+
 ## [2.5.4] — 2026-04-28
 
 ### Changed (Snapshot restore — surfacing the filesystem/full distinction earlier)
