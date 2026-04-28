@@ -344,6 +344,13 @@ def main() -> None:
         eval_id = int(slug_dir.name.split("-")[1])
 
         blocks = CODE_FENCE.findall(out_path.read_text())
+        try:
+            files_data = json.loads((slug_dir / "with_skill" / "files.json").read_text())
+        except (FileNotFoundError, json.JSONDecodeError):
+            files_data = {}
+        for path, content in files_data.items():
+            if path.endswith(".py") and isinstance(content, str):
+                blocks.append(content)
         unknown_attrs: list[str] = []
         syntax_errors: list[str] = []
         for block in blocks:

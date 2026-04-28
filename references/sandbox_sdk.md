@@ -282,7 +282,7 @@ result.stdout      # str
 result.stderr      # str
 ```
 
-> **Canonical forms — don't invent variants.** For LLM tool-use, the idiom is `sandbox.run("python", ["-c", code])`. There is no `sandbox.exec()`, `sandbox.python()`, `sandbox.eval()`, or `sandbox.repl()`. The return object exposes exactly `stdout`, `stderr`, `exit_code` (Python) / `stdout`, `stderr`, `exitCode` (TypeScript) — don't reference `.output`, `.result`, `.logs`, or streaming fields like `.stream` / `.lines` on the result. For live stdout from a long-running process, use `start_process` + `follow_output` (see [Process Management](#process-management)), not a fabricated field on `run()`.
+> **Canonical forms — don't invent variants.** For LLM tool-use, the idiom is `sandbox.run("python", ["-c", code])`. There is no `sandbox.exec()`, `sandbox.python()`, `sandbox.eval()`, or `sandbox.repl()`. The return object exposes exactly `stdout`, `stderr`, `exit_code` (Python) / `stdout`, `stderr`, `exitCode` (TypeScript) — don't reference `.output`, `.result`, `.logs`, or streaming fields like `.stream` / `.lines` on the result. **The Python field is `exit_code`, NOT `returncode`** — `CommandResult` is a Pydantic model with no `subprocess.CompletedProcess`-style alias, so `result.returncode` raises `AttributeError`. For live stdout from a long-running process, use `start_process` + `follow_output` (see [Process Management](#process-management)), not a fabricated field on `run()`.
 
 **TypeScript:**
 
