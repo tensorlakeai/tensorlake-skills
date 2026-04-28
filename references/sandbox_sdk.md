@@ -14,7 +14,7 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/computer-use.md
   - https://docs.tensorlake.ai/sandboxes/docker.md
 SDK version: tensorlake 0.5.1
-Last verified: 2026-04-25
+Last verified: 2026-04-26
 -->
 
 # TensorLake Sandbox SDK Reference
@@ -148,7 +148,7 @@ In 0.5.1, rename and port-exposure live on the `Sandbox` instance via `sandbox.u
 ```python
 from tensorlake.sandbox import Sandbox, SandboxClient
 
-# Rename / promote ephemeral → named, or change exposed ports — instance method
+# Rename / promote ephemeral → named, or change exposed ports — instance method (preferred)
 info = sandbox.update(name="my-env")                            # -> Traced[SandboxInfo]
 info = sandbox.update(exposed_ports=[8080], allow_unauthenticated_access=False)
 print(info.value.name, info.value.exposed_ports)
@@ -157,25 +157,35 @@ print(info.value.name, info.value.exposed_ports)
 client = SandboxClient()
 for sb in client.list():                                        # -> iterator[SandboxInfo]
     print(sb.sandbox_id, sb.status)
-
-# Equivalent client form (still works, takes sandbox_id)
-client.update_sandbox("sbx-123", "my-env")
 ```
+
+> Legacy client form `client.update_sandbox("sbx-123", "my-env")` still works in 0.5.x but is **deprecated** — prefer `sandbox.update(...)` on the instance handle. If you only have a `sandbox_id`, do `Sandbox.connect("sbx-123").update(name="my-env")`.
 
 **TypeScript:**
 
 ```typescript
-// Given an existing sandbox management client
+import { Sandbox, SandboxClient } from "tensorlake";
+
+const client = new SandboxClient();
 const sandboxes = await client.list();
 for (const sb of sandboxes) {
-  console.log(sb.sandboxId, sb.status);
+  // status values are capitalized strings: "Pending" | "Running" | "Suspending" | "Suspended" | "Snapshotting" | "Terminated"
+  console.log(sb.sandboxId, sb.name, sb.status, sb.createdAt);
 }
 
+// Filter then terminate — terminate is an INSTANCE method, so connect first
+const stale = sandboxes.filter((sb) => sb.status === "Suspended");
+for (const sb of stale) {
+  const handle = await Sandbox.connect(sb.sandboxId);
+  await handle.terminate();
+}
+
+// Rename via the client (legacy but still supported)
 const renamed = await client.update("sbx-123", { name: "my-env" });
 console.log(renamed.name);
 ```
 
-> Termination is an **instance** method (`sandbox.terminate()`), not a static. Get a handle via `Sandbox.connect(...)` first if you only have an identifier.
+> Termination is an **instance** method (`sandbox.terminate()` / `await sandbox.terminate()`), not a static or client method. There is no `client.delete(id)` — get a handle via `Sandbox.connect(...)` first if you only have an identifier. The `status` field on `SandboxInfo` is the capitalized string form (`"Suspended"`, not `"suspended"`); the lowercase form only appears as `sandbox.status.value` on the Python `SandboxStatus` enum.
 
 ### Snapshot Management (Static)
 
@@ -215,7 +225,7 @@ await sandbox.resume();
 await sandbox.terminate();
 ```
 
-Suspend/resume only works on **named** sandboxes. Ephemeral sandboxes return an error. To convert an ephemeral sandbox into a named one after creation, call `sandbox.update(name="my-env")` (or the legacy `SandboxClient().update_sandbox(id, name)`).
+Suspend/resume only works on **named** sandboxes. Ephemeral sandboxes return an error. To convert an ephemeral sandbox into a named one after creation, call `sandbox.update(name="my-env")` on the instance handle — same `sandbox_id` is preserved, no recreation needed. (The legacy `SandboxClient().update_sandbox(id, name)` form still works but is deprecated.) Note: this is fundamentally different from `sandbox.checkpoint()` + `Sandbox.create(snapshot_id=...)`, which produces a *new* sandbox with a *new* `sandbox_id`.
 
 ### Snapshots (Instance)
 
@@ -618,6 +628,26 @@ RUN python3 -m pip install --break-system-packages -r /tmp/requirements.txt
 RUN mkdir -p /workspace/cache
 ENV APP_ENV=prod
 WORKDIR /workspace
+```
+
+**Inline pip install (no `requirements.txt`):**
+
+For ad-hoc package lists, chain everything in `.run(...)` steps. The base Ubuntu images ship a PEP 668-managed system Python, so `pip install` requires `--break-system-packages` (or an explicit venv) — do **not** sidestep this with `ensurepip` and a bare `pip install`, and do **not** assume a deadsnakes Python is needed.
+
+```python
+from tensorlake import Image
+from tensorlake.sandbox import Sandbox
+
+image = (
+    Image(name="etl-tools", base_image="tensorlake/ubuntu-minimal")
+    .run("apt-get update && apt-get install -y python3 python3-pip")
+    .run("python3 -m pip install --break-system-packages pandas pyarrow duckdb")
+)
+image.build()
+
+sandbox = Sandbox.create(image="etl-tools", cpus=4.0, memory_mb=8192)
+result = sandbox.run("python3", ["-c", "import pandas, pyarrow, duckdb; print('ok')"])
+print(result.stdout, result.exit_code)
 ```
 
 ### Build / Register the Image

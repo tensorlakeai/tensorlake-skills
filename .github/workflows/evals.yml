@@ -1,0 +1,94 @@
+name: Evals
+
+on:
+  pull_request:
+    paths:
+      - 'references/**.md'
+  workflow_dispatch:
+    inputs:
+      evals:
+        description: "Comma-separated eval IDs (leave empty to run all)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evals-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Pick evals to run
+        id: filter
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ids="${{ github.event.inputs.evals }}"
+          else
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+            mapfile -t changed < <(git diff --name-only "$base" "$head")
+            printf 'changed files:\n'
+            printf '  %s\n' "${changed[@]}"
+            ids=$(python evals/filter.py "${changed[@]}")
+          fi
+          if [ -z "$ids" ]; then
+            echo "no evals to run for this change"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "running eval ids: $ids"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "ids=$ids" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Claude Code
+        if: steps.filter.outputs.skip == 'false'
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run evals
+        if: steps.filter.outputs.skip == 'false'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          args=(--workers 4 --model claude-sonnet-4-6)
+          if [ -n "${{ steps.filter.outputs.ids }}" ]; then
+            args+=(--evals "${{ steps.filter.outputs.ids }}")
+          fi
+          python evals/run.py "${args[@]}"
+
+      - name: Grade evals
+        if: steps.filter.outputs.skip == 'false'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python evals/grade.py --workers 4 --model claude-haiku-4-5-20251001
+
+      - name: Upload eval workspace
+        if: always() && steps.filter.outputs.skip == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-workspace
+          path: evals/workspace/
+
+      - name: Summarize and gate on results
+        if: steps.filter.outputs.skip == 'false'
+        run: |
+          benchmark=$(ls -t evals/workspace/iteration-*/benchmark.json | head -1)
+          python evals/ci_summary.py "$benchmark" >> "$GITHUB_STEP_SUMMARY"
