@@ -27,6 +27,10 @@ The skill is especially useful for tasks like:
 
 - running code, scripts, or services inside isolated sandboxes
 - giving each agent its own workspace, files, and execution environment
+- running interactive shell sessions inside sandboxes (with reconnect across processes) for coding agents that need shell continuity
+- driving a sandboxed Linux desktop with screenshot, keyboard, and mouse for computer-use agents
+- exposing a port from inside a sandbox to a public URL so agents can serve a webapp, API, or dev server
+- forking a snapshot into N parallel sandboxes for batch or map-style workloads
 - building agentic applications with an orchestrator and specialist sub-agents
 - coordinating parallel agents and collecting their outputs
 - building demos and prototypes that show why agent infrastructure matters

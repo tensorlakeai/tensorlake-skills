@@ -2,6 +2,22 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [2.6.0] — 2026-04-28
+
+### Changed (Core Patterns — sandbox capabilities promoted to first-class)
+- **`SKILL.md`, `AGENTS.md`** — split Core Patterns into `### Sandboxes` and `### Orchestration` sub-sections. Sandboxes now has 8 bullets: agentic+sandbox framing, persistent named sandboxes, snapshots (restore + parallel forks), LLM code-execution tool, interactive PTY shells, computer use / desktop automation, public URLs / port exposure, and custom sandbox images. Orchestration kept at 3 bullets. Every bullet links to the relevant `references/` anchor for verifiability.
+- **`SKILL.md`, `AGENTS.md`** — `AGENTS.md` Quick Start switched from an orchestration-first `@application` example to a sandbox-first `Sandbox.create()` example to mirror `SKILL.md`. Added a one-line TypeScript / CLI pointer at the bottom of Quick Start in both files.
+- **`SKILL.md`, `AGENTS.md`** — `## Key Rules` renamed to `## Orchestration Key Rules` and trimmed from 8 rules to 3 (decorators, reduce signature, secrets). The dropped rules were first-touch info already documented in `references/applications_sdk.md`, not gotcha-level facts that earn top-level skill prominence.
+- **`SKILL.md`** — frontmatter `description` dropped the parenthetical "(parallel map/reduce DAGs via `@application` / `@function`)". No other capability phrase names SDK symbols, so the decorators read as outliers without earning extra trigger signal.
+- **`SKILL.md`, `AGENTS.md`** — Setup section dropped the "Provider keys" bullet entirely. The `secrets=[...]` declaration pattern remains in Orchestration Key Rules; the "never inline keys" rule remains in the next-paragraph guidance.
+- **`README.md`** — added 4 use-case bullets surfacing the now-first-class sandbox capabilities: interactive shell sessions, sandboxed Linux desktop (computer use), public URL port exposure, snapshot forks for parallel batch work.
+
+### Fixed
+- **`SKILL.md`** — split a collapsed API Reference bullet that had `Sandbox Advanced` and `Orchestration SDK` running together on one line.
+
+### Why
+The Core Patterns section had grown sandbox-light: PTY, computer use, port exposure, custom images, and snapshot-fork were all triggers named in the frontmatter description but invisible at the Core Patterns level. Promoting them surfaces capabilities an agent would otherwise miss while reading `SKILL.md`, and the per-bullet reference links make each claim verifiable. Renaming Key Rules → Orchestration Key Rules makes the file's now-sandbox-first orientation honest — these rules were never general, they were always orchestration-specific. `AGENTS.md` had also drifted significantly from `SKILL.md`; this commit re-syncs them per `CLAUDE.md`.
+
 ## [2.5.5] — 2026-04-28
 
 ### Changed (Eval harness — skill-trigger detection)
