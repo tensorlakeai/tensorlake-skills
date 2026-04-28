@@ -72,7 +72,11 @@ def extract_final_text(stream_lines: list[str]) -> str:
 
 def run_eval(eval_obj: dict, out_dir: Path, timeout: int, model: str | None) -> bool:
     out_dir.mkdir(parents=True, exist_ok=True)
-    cmd = ["claude", "-p", eval_obj["prompt"], "--output-format", "stream-json", "--verbose"]
+    cmd = [
+        "claude", "-p", eval_obj["prompt"],
+        "--output-format", "stream-json", "--verbose",
+        "--dangerously-skip-permissions",
+    ]
     if model:
         cmd += ["--model", model]
     result = subprocess.run(
