@@ -2,7 +2,7 @@
 
 Build production agent workflows with [Tensorlake's](https://tensorlake.ai).
 
-This skill helps coding agents use Tensorlake to build real agent systems with sandboxed execution and orchestration. It covers both the **Python** (`pip install tensorlake`) and **TypeScript** (`npm install tensorlake`) SDKs. It is designed for modern agent use cases like multi-agent applications, isolated code execution, long-running workflows, and tool-using agents that need a real workspace.
+This skill helps coding agents use Tensorlake to build real agent systems with sandboxed execution and orchestration. It covers the **Python** (`pip install tensorlake`) and **TypeScript** (`npm install tensorlake`) SDKs, plus the **CLI** (`curl -fsSL https://tensorlake.ai/install | sh`). It is designed for modern agent use cases like multi-agent applications, isolated code execution, long-running workflows, and tool-using agents that need a real workspace.
 
 Instead of treating Tensorlake as just another API, this skill teaches agents how to use Tensorlake as infrastructure: run tasks in isolated environments with the Sandbox SDK, coordinate durable workflows with the sandbox-native Orchestration SDK, and compose reliable agent systems for production use.
 
@@ -76,6 +76,7 @@ Tensorlake requires a `TENSORLAKE_API_KEY` configured in the local environment. 
 tensorlake-skills/
 ├── SKILL.md                  # Skill definition (Claude Code, Google ADK)
 ├── AGENTS.md                 # Skill definition (OpenAI Codex)
+├── CLAUDE.md                 # Repo governance (sync rules, version bump policy)
 ├── CHANGELOG.md              # Changes tracked per SDK version
 ├── .claude-plugin/
 │   ├── plugin.json               # Claude Code plugin metadata
@@ -84,11 +85,19 @@ tensorlake-skills/
 │   └── bump-version.sh          # Version bump automation
 ├── .github/
 │   ├── workflows/
-│   │   └── sync-check.yml        # Weekly drift detection (CI)
+│   │   ├── sync-check.yml        # Weekly drift detection (CI)
+│   │   └── evals.yml             # PR eval CI (skill-trigger + judge-graded)
 │   └── scripts/
 │       ├── fetch_docs.py         # Fetch live doc pages
 │       ├── check_drift.py        # Compare fetched vs bundled
 │       └── sources.yaml          # Map: reference file → source URLs
+├── evals/
+│   ├── evals.json               # Eval suite: prompts, expected references, judge criteria
+│   ├── run.py                   # Run evals (claude -p with stream-json + trigger detection)
+│   ├── grade.py                 # Judge-LLM grading (skipped when skill didn't trigger)
+│   ├── grade_static.py          # Static / non-judge grading checks
+│   ├── filter.py                # Map changed references/** files → impacted eval IDs
+│   └── ci_summary.py            # Render PR summary table (trigger rate + pass/fail)
 └── references/
     ├── applications_sdk.md       # Orchestration API reference
     ├── sandbox_sdk.md            # Sandbox API reference
@@ -166,6 +175,17 @@ The full mapping is in `.github/scripts/sources.yaml`.
 ### Drift Detection
 
 A weekly GitHub Action (`sync-check.yml`) fetches the live TensorLake docs and compares them against the bundled reference files. If new APIs, removed endpoints, or changed signatures are detected, it opens a GitHub Issue with a summary of what drifted.
+
+### Eval Suite
+
+The `evals/` directory contains a test harness that runs the skill end-to-end on representative prompts and grades the responses. CI (`.github/workflows/evals.yml`) runs it automatically on PRs that touch `references/**.md`; version bumps, `SKILL.md` / `AGENTS.md` edits, and `evals/**` script changes don't auto-trigger (use `workflow_dispatch` to run on-demand, optionally with a comma-separated list of eval IDs).
+
+Each run captures two signals:
+
+- **Skill-trigger rate** — did the skill actually fire? Surfaced separately so a "skill didn't fire" failure doesn't masquerade as a "skill fired but answered wrong" failure. Detected from `claude -p`'s `--output-format stream-json` output.
+- **Judge-graded pass/fail** — an LLM judge evaluates each response against per-eval expected references and criteria. If the skill didn't trigger, judging is skipped and all expectations record `skill not triggered; grading skipped`.
+
+`evals/filter.py` maps changed reference files to impacted eval IDs (so PRs only run the evals their changes can affect). PR runs render a summary table to the GitHub Step Summary via `evals/ci_summary.py` and upload the full eval workspace as an artifact. Evals are report-only — failures show in the table but never block the PR.
 
 ### Maintenance Cadence
 

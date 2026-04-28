@@ -2,6 +2,16 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [Unreleased]
+
+### Changed (Repo housekeeping)
+- **`README.md`** — Repository Structure section refreshed to surface tooling that had drifted out of view: `evals/` directory (eval suite + run/grade/filter/ci_summary scripts), `.github/workflows/evals.yml` (PR eval CI alongside the existing `sync-check.yml`), and root-level `CLAUDE.md` (sync rules + version-bump policy).
+- **`README.md`** — added an `### Eval Suite` subsection under `## Maintaining References` documenting the test harness: when CI runs (PRs touching `references/**.md`, plus `workflow_dispatch`), the two signals captured per run (skill-trigger rate + judge-graded pass/fail), how `evals/filter.py` narrows runs to impacted eval IDs, and that evals are report-only (never block the PR).
+- **`README.md`** — top-line grammar fixed: "It covers both the Python, TypeScript SDKs and CLI" was awkward ("both" with three things) — rewritten as "the Python and TypeScript SDKs, plus the CLI".
+
+### Why
+README's repo-structure listing had fallen behind the eval infrastructure added in 2.5.2 / 2.5.4 / 2.5.5, and the eval CI was undocumented entirely — anyone landing on the repo couldn't see the harness, the trigger-detection signal, or how to invoke it ad-hoc. Surfacing it makes the maintenance story complete: source tracking → drift detection → eval suite → cadence.
+
 ## [2.6.0] — 2026-04-28
 
 ### Changed (Core Patterns — sandbox capabilities promoted to first-class)
