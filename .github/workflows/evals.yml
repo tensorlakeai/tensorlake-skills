@@ -63,6 +63,13 @@ jobs:
         if: steps.filter.outputs.skip == 'false'
         run: npm install -g @anthropic-ai/claude-code
 
+      - name: Install tensorlake skill
+        if: steps.filter.outputs.skip == 'false'
+        run: |
+          mkdir -p ~/.claude/skills
+          ln -s "$GITHUB_WORKSPACE" ~/.claude/skills/tensorlake
+          ls -la ~/.claude/skills/tensorlake/SKILL.md
+
       - name: Run evals
         if: steps.filter.outputs.skip == 'false'
         env:
