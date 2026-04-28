@@ -81,12 +81,6 @@ print(file_bytes.decode("utf-8"))
 
 For integration examples (LangChain, OpenAI, Anthropic, multi-agent orchestration): See [references/integrations.md](references/integrations.md)
 
-## Orchestration Key Rules
-
-1. **Entry point needs both decorators**: `@application()` then `@function()` on the same function.
-2. **Reduce signature**: `def my_reduce(accumulated, next_item) -> accumulated_type` — two positional args.
-3. **Secrets**: Declare with `secrets=["MY_SECRET"]` in `@function()`, manage via `tensorlake secrets <ls|set|rm>`.
-
 ## API Reference
 
 Bundled references (use when building with Tensorlake):
