@@ -14,7 +14,7 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/computer-use.md
   - https://docs.tensorlake.ai/sandboxes/docker.md
 SDK version: tensorlake 0.5.3
-Last verified: 2026-04-27
+Last verified: 2026-04-28
 -->
 
 # TensorLake Sandbox SDK Reference
@@ -263,7 +263,7 @@ const snapshots = await sandbox.listSnapshots();
 const restored = await Sandbox.create({ snapshotId: snapshot.snapshotId });
 ```
 
-When restoring, the new sandbox inherits image, resources, entrypoint, and secrets from the snapshot — these cannot be overridden. If you need different resources, create a fresh sandbox instead.
+Restore behavior depends on the snapshot type — see [sandbox_persistence.md → Snapshot Types](sandbox_persistence.md#snapshot-types--filesystem-default-vs-full) for the full table. In short: **filesystem snapshots (the default)** accept `cpus=`, `memory_mb=`, and `disk_mb=` overrides at restore (`disk_mb` is **growth-only**, range `10240`–`102400` MiB / 10–100 GiB) — useful for booting on bigger hardware than where the snapshot was baked. **Full snapshots** lock image, resources, entrypoint, and secrets to the snapshot; if you need different resources from a full snapshot, create a fresh sandbox instead. Image is locked to the snapshot in both cases.
 
 ### Execute Commands
 

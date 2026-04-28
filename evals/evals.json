@@ -3,21 +3,23 @@
   "evals": [
     {
       "id": 1,
-      "name": "named-sandbox-suspend-resume",
+      "name": "named-sandbox-suspend-resume-and-reconnect",
       "references": [
         "sandbox_persistence.md#suspend-and-resume",
-        "sandbox_persistence.md#ephemeral-vs-named"
+        "sandbox_persistence.md#ephemeral-vs-named",
+        "sandbox_sdk.md#connect-to-an-existing-sandbox"
       ],
-      "prompt": "I'm building a long-running coding agent and want its sandbox to survive across tasks. Pause it when the agent is idle, and resume it exactly where it left off on the next request, same sandbox ID and URL. Show me how to create the sandbox and the suspend/resume calls. Does this work if I make the sandbox ephemeral?",
-      "expected_output": "Guidance that persistence requires a NAMED sandbox (name=...), with correct `sandbox.suspend()` / `sandbox.resume()` instance-method calls on the `Sandbox` handle (0.5.1 canonical form), and an explicit note that ephemeral sandboxes cannot be suspended or resumed.",
+      "prompt": "I'm building a long-running coding agent that needs its sandbox to survive across multiple sessions. Day 1: create a sandbox called 'agent-env' that can be paused and resumed across tasks, run a quick command in it, then suspend it for the night. (Quick aside — would this work if I'd made it ephemeral instead?) Day 2: from a totally fresh Python script, where I do NOT have the sandbox_id memorized, get a handle to the same sandbox by name, resume it, run a single command, then suspend it again so it's ready for day 3. I do NOT want to terminate it — it needs to stick around for future sessions. Python SDK. Show me both scripts.",
+      "expected_output": "Day 1 script: `Sandbox.create(name=\"agent-env\")` (the 0.5.1 canonical static method, not the deprecated `SandboxClient().create_and_connect(...)`), runs a command via `sandbox.run(...)`, then `sandbox.suspend()`. Answer states explicitly that ephemeral sandboxes cannot be suspended or resumed. Day 2 script: `Sandbox.connect(\"agent-env\")` to get a handle by name (connect accepts either a name or sandbox_id), then `sandbox.resume()` BEFORE running the command and `sandbox.suspend()` AFTER. Day 2 does NOT call `sandbox.terminate()` and does NOT call `Sandbox.create(name=\"agent-env\")` to 'find' the existing sandbox. Answer notes the same sandbox_id and name are preserved across suspend/resume, and distinguishes this from snapshot/restore (which creates a NEW sandbox with a new id).",
       "files": [],
       "expectations": [
-        "Sandbox is created with a `name=` argument via `Sandbox.create(name=\"...\")` (the 0.5.1 canonical static method) — does NOT use the deprecated `SandboxClient().create_and_connect(...)` form",
-        "Code uses `sandbox.suspend()` and `sandbox.resume()` as INSTANCE methods on the `Sandbox` handle — not `client.suspend(...)`, `client.resume(...)`, or invented methods like pause()/unpause()/stop()",
+        "Day 1 sandbox is created with `Sandbox.create(name=\"agent-env\")` (the 0.5.1 canonical static method) — does NOT use the deprecated `SandboxClient().create_and_connect(...)` form",
         "Answer states explicitly that ephemeral sandboxes cannot be suspended or resumed",
-        "Answer notes that suspend/resume preserves the same sandbox_id and name",
-        "Does not claim that snapshot + restore alone gives you the same sandbox identity back",
-        "Does not hallucinate SDK methods or arguments not present in references/sandbox_persistence.md"
+        "Day 2 uses `Sandbox.connect(\"agent-env\")` to get a handle by name — recognizes that connect accepts either a sandbox_id (UUID) or a name string; does NOT invent `Sandbox.find_by_name(...)`, `Sandbox.get(name=...)`, `client.get_sandbox_by_name(...)`, require listing+filtering, or call `Sandbox.create(name=\"agent-env\")` to 'find' the existing sandbox (which would either create a new one or error on name collision)",
+        "`sandbox.suspend()` and `sandbox.resume()` are used as INSTANCE methods on the `Sandbox` handle — not `client.suspend(...)`, `client.resume(...)`, or invented methods like pause()/unpause()/stop(). On Day 2, `resume()` is called BEFORE the command and `suspend()` AFTER",
+        "Answer notes that suspend/resume preserves the same sandbox_id and name across both days, and distinguishes connect-by-name + suspend/resume (SAME sandbox, SAME id) from snapshot/restore (NEW sandbox with a new id) — does not confuse the two workflows",
+        "Day 2 script does NOT call `sandbox.terminate()` at the end — answer recognizes that the user explicitly wants the sandbox preserved for future sessions, and that `Sandbox.connect()` does NOT auto-terminate when the handle goes out of scope",
+        "Does not hallucinate SDK methods or arguments not present in references/sandbox_persistence.md or references/sandbox_sdk.md; if identifying fields are read off the connected handle, uses Python snake_case `sandbox.sandbox_id` and `sandbox.name` — not `sandbox.id`, `sandbox.uuid`, or TypeScript-style `sandboxId`"
       ]
     },
     {
@@ -27,10 +29,10 @@
         "sandbox_sdk.md#sandbox-images"
       ],
       "prompt": "I'm using the Python SDK. Build a custom sandbox image for a data pipeline that needs Python 3.11, pandas, pyarrow, and duckdb pre-installed on top of Ubuntu. Register it as 'etl-tools' in my project, then spin up a sandbox from it with 4 CPUs and 8 GB of memory and run a quick import smoke check inside it. Walk me through the whole flow.",
-      "expected_output": "Image is defined via the Python Image DSL with tensorlake/ubuntu-* as base_image; apt and pip install steps are ordered correctly; registration uses `image.build()` (Python SDK) or the `tl sbx image create` CLI; the sandbox is launched via `Sandbox.create(image=\"etl-tools\", ...)` with the requested resources; a smoke check is run via sandbox.run and its exit code / stdout is inspected.",
+      "expected_output": "Image is defined via the Python Image DSL with one of the documented Ubuntu base images (`ubuntu-minimal` or `ubuntu-systemd`, with or without the legacy `tensorlake/` prefix) as base_image; apt and pip install steps are ordered correctly; registration uses `image.build()` (Python SDK) or the `tl sbx image create` CLI; the sandbox is launched via `Sandbox.create(image=\"etl-tools\", ...)` with the requested resources; a smoke check is run via sandbox.run and its exit code / stdout is inspected.",
       "files": [],
       "expectations": [
-        "Image is built via `Image(name=..., base_image=\"tensorlake/ubuntu-minimal\")` or `tensorlake/ubuntu-systemd` — uses the `tensorlake/` prefix for the base image",
+        "Image is built via `Image(name=..., base_image=\"ubuntu-minimal\")` or `ubuntu-systemd` — uses one of the documented Ubuntu base image names (the legacy `tensorlake/` prefix is also acceptable)",
         "apt-get install runs BEFORE pip install (system Python must exist before pip can use it), and both are chained via `.run(...)` on the Image object",
         "pip install uses `--break-system-packages` (or an explicit venv) since the base Ubuntu images ship a PEP 668-managed system Python",
         "Registration step uses `image.build()` from the Python SDK OR the `tl sbx image create <Dockerfile> --registered-name etl-tools` CLI — does NOT hallucinate `client.create_image(...)`, `image.register()`, or a `createSandboxImage(...)` function in Python",
@@ -51,7 +53,7 @@
       "files": [],
       "expectations": [
         "Recommends a 'pre-install once, fork many' pattern — either Snapshots (checkpoint + restore) or Custom Images (Image DSL + registered name + launch many). Does NOT suggest reinstalling deps in every worker. Does NOT suggest suspend/resume (which is 1:1, not fork-N)",
-        "Uses a real documented primitive for the pre-build step: either `sandbox.checkpoint()` (instance method on the Sandbox handle, returns a `SnapshotInfo`) for the snapshot path, OR an `Image(name=..., base_image=\"tensorlake/...\")` DSL plus `image.build()` (Python SDK) or `tl sbx image create ... --registered-name` CLI for the image path. Does NOT hallucinate `sandbox.commit()`, `client.snapshot_and_wait(...)`, `builder.snapshot(name=...)`, `client.sandboxes.create_from_snapshot()`, or a Python `createSandboxImage()` function",
+        "Uses a real documented primitive for the pre-build step: either `sandbox.checkpoint()` (instance method on the Sandbox handle, returns a `SnapshotInfo`) for the snapshot path, OR an `Image(name=..., base_image=\"ubuntu-...\")` (or `debian-...`; legacy `tensorlake/` prefix also acceptable) DSL plus `image.build()` (Python SDK) or `tl sbx image create ... --registered-name` CLI for the image path. Does NOT hallucinate `sandbox.commit()`, `client.snapshot_and_wait(...)`, `builder.snapshot(name=...)`, `client.sandboxes.create_from_snapshot()`, or a Python `createSandboxImage()` function",
         "Uses a real documented primitive for spawning each worker: either `Sandbox.create(snapshot_id=...)` for snapshots OR `Sandbox.create(image=\"<name>\", cpus=..., memory_mb=...)` for images (the 0.5.1 canonical static method). Parameter names match the Python SDK; does NOT use the deprecated `SandboxClient().create_and_connect(...)`",
         "Each worker is a new, isolated sandbox with its own sandbox_id — no shared state after launch. Does not confuse this with resume (which reuses the same sandbox) or with a shared-filesystem mount",
         "Demonstrates parallel fan-out (ThreadPoolExecutor + as_completed, asyncio.gather, Promise.all, or equivalent) — not a sequential loop over the 10 jobs",
@@ -151,7 +153,8 @@
         "Key combos use `desktop.press([\"ctrl\", \"alt\", \"t\"])` — a LIST of lowercase modifier/key strings — not a single compound string like `\"ctrl+alt+t\"`, not separate positional args, and not an invented `desktop.key_combo(...)`",
         "Screenshot is captured via `desktop.screenshot()` which returns raw PNG bytes, and those bytes are written to the local laptop via `Path(\"desktop.png\").write_bytes(...)` or equivalent file write — answer does NOT claim `screenshot()` returns a URL, a PIL Image, or a path inside the sandbox that needs a separate download",
         "Does NOT hallucinate shortcut methods like `sandbox.screenshot()`, `sandbox.desktop()`, `sandbox.computer_use(...)`, `desktop.open_browser(...)`, `desktop.navigate(url)`, `desktop.goto(url)`, or `desktop.open_terminal()` — the real desktop API is low-level (screenshot / press / type_text / click / move_mouse / scroll / key_down / key_up)",
-        "Answer states (or the code reflects) that the desktop connection is proxied through Tensorlake's authenticated endpoint and does NOT require publicly exposing port 5901 via `client.expose_ports(...)` — and does not claim the user must open a VNC client or configure noVNC for this programmatic flow"
+        "Answer states (or the code reflects) that the desktop connection is proxied through Tensorlake's authenticated endpoint and does NOT require publicly exposing port 5901 via `client.expose_ports(...)` — and does not claim the user must open a VNC client or configure noVNC for this programmatic flow",
+        "Code or accompanying explanation acknowledges the fresh `ubuntu-vnc` startup delay — either by adding a brief sleep (e.g. `time.sleep(4)`) before the first `desktop.screenshot()`, or by noting that XFCE and the desktop services need a few seconds to finish booting and the first screenshot may otherwise be blank. Does NOT screenshot immediately after `connect_desktop(...)` with no acknowledgement of the warm-up window"
       ]
     },
     {
@@ -217,9 +220,9 @@
         "sandbox_sdk.md#sandbox-images"
       ],
       "prompt": "I'm building a coding-agent setup where Claude Code runs *inside* the Tensorlake sandbox and uses the tensorlake skill (so it can look up SDK references at startup). Build me a custom image that has Node, the `skills` CLI, the tensorlake-skills bundle preinstalled at the right discovery path for Claude Code, and the `tensorlake` Python package. Register it as `agent-with-tl-skills`. Python SDK. And — important — I do NOT want this touching my laptop's `~/.claude/skills/` directory; the skill should only live inside the image.",
-      "expected_output": "An `Image(name=\"agent-with-tl-skills\", base_image=\"tensorlake/ubuntu-systemd\")` (or ubuntu-minimal) build that installs nodejs/npm and python3/pip via apt, then `npm install -g skills`, then `skills add tensorlakeai/tensorlake-skills --all -y --copy`, then `python3 -m pip install --break-system-packages tensorlake`. The `skills add` command runs INSIDE the build (a `.run(...)` step on the Image), not on the user's laptop. Image is registered via `image.build()`. Answer explicitly notes that nothing in the flow writes to the host's `~/.claude/skills/` — the skill only lands at the in-sandbox discovery path that the build step targets.",
+      "expected_output": "An `Image(name=\"agent-with-tl-skills\", base_image=\"ubuntu-systemd\")` (or `ubuntu-minimal`; the legacy `tensorlake/` prefix is also acceptable) build that installs nodejs/npm and python3/pip via apt, then `npm install -g skills`, then `skills add tensorlakeai/tensorlake-skills --all -y --copy`, then `python3 -m pip install --break-system-packages tensorlake`. The `skills add` command runs INSIDE the build (a `.run(...)` step on the Image), not on the user's laptop. Image is registered via `image.build()`. Answer explicitly notes that nothing in the flow writes to the host's `~/.claude/skills/` — the skill only lands at the in-sandbox discovery path that the build step targets.",
       "expectations": [
-        "Image is built via the Python `Image` DSL with `base_image=\"tensorlake/ubuntu-systemd\"` (preferred for the multi-tool install) or `tensorlake/ubuntu-minimal` — uses the `tensorlake/` prefix for the base",
+        "Image is built via the Python `Image` DSL with `base_image=\"ubuntu-systemd\"` (preferred for the multi-tool install) or `ubuntu-minimal` — uses one of the documented Ubuntu base image names (the legacy `tensorlake/` prefix is also acceptable)",
         "Build chain installs Node/npm and Python/pip via apt FIRST (`apt-get update && apt-get install -y nodejs npm python3 python3-pip`), THEN `npm install -g skills`, THEN `skills add tensorlakeai/tensorlake-skills --all -y --copy`, THEN `python3 -m pip install --break-system-packages tensorlake` — order reflects the dependency chain",
         "The `skills add` invocation uses the documented flags: `--all` (deploy to all detected agents), `-y` (non-interactive), `--copy` (avoid symlink issues in containers) — does NOT invent flags like `--target=claude` or `--path=~/.claude/skills`",
         "Registration uses `image.build()` from the SDK (not the `tl sbx image create <Dockerfile>` CLI, since the user asked for the Python SDK path) — and does NOT hallucinate a `client.create_image(...)` or `image.register()` method",
@@ -266,21 +269,22 @@
     },
     {
       "id": 15,
-      "name": "sandbox-connect-by-name-and-resume",
+      "name": "filesystem-snapshot-restore-with-resource-overrides",
       "references": [
-        "sandbox_sdk.md#connect-to-an-existing-sandbox",
-        "sandbox_persistence.md#suspend-and-resume"
+        "sandbox_persistence.md#snapshot-types--filesystem-default-vs-full",
+        "sandbox_persistence.md#restore-from-a-snapshot",
+        "sandbox_sdk.md#create-a-sandbox"
       ],
-      "prompt": "Yesterday I created a named sandbox 'agent-env' and suspended it at the end of the session. Today, from a fresh Python script, I want to: get a handle to that same sandbox by name (I don't have the sandbox_id memorized), resume it, run a single command in it, then suspend it again so it's ready for tomorrow. I do NOT want to terminate it — it needs to stick around. Python SDK.",
-      "expected_output": "`Sandbox.connect(\"agent-env\")` returns a handle (connect accepts either a name or a sandbox_id). Then `sandbox.resume()` to bring it back to Running, `sandbox.run(\"...\", [...])`, and `sandbox.suspend()` at the end. The script must NOT call `sandbox.terminate()` — terminate is final and would destroy the work. `Sandbox.connect()` does not auto-terminate on garbage collection. The same sandbox_id and name are preserved across suspend/resume.",
+      "prompt": "Last week I baked a snapshot of a Tensorlake sandbox while running on tiny hardware (1 CPU, 1GB RAM, default 10GB disk) — it has all my data-pipeline dependencies pre-installed and a small sample dataset. Now I want to spin up a fresh sandbox from that snapshot but on much bigger hardware (4 CPUs, 8GB RAM) and grow the root disk to 50GB so I can run the full dataset. Is that possible at restore time, or do I have to rebuild the environment on a new sandbox? If it's possible, show me the exact `Sandbox.create(...)` call. Python SDK. Also — does it matter what *kind* of snapshot I have?",
+      "expected_output": "Yes, this is possible *if the snapshot is a filesystem snapshot* (the default kind in 0.5.3). The restore call is `Sandbox.create(snapshot_id=..., cpus=4.0, memory_mb=8192, disk_mb=51200)` — `cpus`, `memory_mb`, and `disk_mb` are all overridable at restore for filesystem snapshots. `disk_mb` is **growth-only** (range 10240–102400 MiB / 10–100 GiB), so going from 10GB → 50GB is fine but you couldn't shrink it. Answer distinguishes filesystem snapshots (default; resources overridable at restore) from full snapshots (memory + processes captured; resources locked to the snapshot — for those, you'd have to create a fresh sandbox and reinstall). Does NOT claim restore is uniformly as-is, does NOT invent kwargs, and does NOT tell the user they have to rebuild from scratch.",
       "files": [],
       "expectations": [
-        "Uses `Sandbox.connect(\"agent-env\")` to get a handle — recognizes that connect accepts either a sandbox_id (UUID) or a name string; does NOT invent `Sandbox.find_by_name(...)`, `Sandbox.get(name=...)`, `client.get_sandbox_by_name(...)`, or require listing all sandboxes and filtering by name",
-        "Calls `sandbox.resume()` BEFORE running commands (since the sandbox is in Suspended state) and `sandbox.suspend()` AFTER — both are INSTANCE methods on the connected handle, not statics or client methods",
-        "Does NOT call `sandbox.terminate()` at the end of the script — answer recognizes that the user explicitly wants to keep the sandbox around for future sessions, and that `Sandbox.connect()` does NOT auto-terminate when the handle goes out of scope",
-        "Does NOT recommend calling `Sandbox.create(name=\"agent-env\")` to 'find' the existing sandbox — that would either create a new sandbox or error on name collision, not return the existing one",
-        "Distinguishes connect-by-name (returns the SAME sandbox with the SAME sandbox_id) from snapshot/restore (creates a NEW sandbox with a new id) — does not confuse the two workflows",
-        "If the answer reads identifying fields off the connected handle, it uses the documented attribute names `sandbox.sandbox_id` and `sandbox.name` (Python snake_case) — not `sandbox.id`, `sandbox.uuid`, or TypeScript-style `sandboxId`"
+        "Answer correctly states that resource overrides at restore are supported for **filesystem snapshots (the default)**, and explicitly distinguishes them from **full snapshots** where image, resources, entrypoint, and secrets are locked to the snapshot — does NOT claim restore is uniformly 'as-is' for all snapshot types (which was true pre-0.5.3 but is now wrong)",
+        "Restore call is `Sandbox.create(snapshot_id=..., cpus=4.0, memory_mb=8192, disk_mb=51200)` (or equivalent values matching the user's 4 CPUs / 8GB / 50GB request). Uses the documented kwargs `cpus`, `memory_mb`, `disk_mb` on the canonical 0.5.x static method `Sandbox.create(...)` — does NOT use `SandboxClient().create_and_connect(...)`, does NOT pass GB instead of MiB, and does NOT invent kwargs like `resources=`, `cpu_count=`, `ram_gb=`, or `disk_gb=`",
+        "Answer notes that `disk_mb` is **growth-only** at restore (you can grow the root disk but not shrink it) — and ideally calls out the documented range `10240–102400` MiB (10–100 GiB). Does NOT claim disk size is fixed by the snapshot",
+        "Does NOT recommend creating a fresh sandbox and reinstalling dependencies for this case — the filesystem snapshot already contains the deps, and restore-with-overrides is the documented path. (For *full* snapshots needing different resources, recommending a fresh sandbox + rebuild is correct.)",
+        "Does NOT hallucinate a `Sandbox.restore(...)`, `snapshot.restore(cpus=...)`, `Sandbox.create_from_snapshot(...)`, or a separate `resize` step after restore — the override happens in the single `Sandbox.create(snapshot_id=..., cpus=..., memory_mb=..., disk_mb=...)` call",
+        "If the answer mentions how to tell which snapshot type you have, it points to the dashboard or `Sandbox.get_snapshot(snapshot_id).snapshot_type` (or equivalent metadata inspection) — does NOT invent a `is_filesystem` flag or claim the type is encoded in the snapshot_id"
       ]
     },
     {

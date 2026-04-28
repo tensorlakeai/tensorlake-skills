@@ -3,7 +3,7 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/lifecycle.md
   - https://docs.tensorlake.ai/sandboxes/snapshots.md
 SDK version: tensorlake 0.5.3
-Last verified: 2026-04-27
+Last verified: 2026-04-28
 -->
 
 # TensorLake Sandbox Persistence
@@ -88,6 +88,8 @@ An ephemeral sandbox can be promoted to a named sandbox after creation via `Sand
 Snapshots capture sandbox state into a reusable artifact you can boot a **new** sandbox from. Unlike suspend, snapshots do not pause the original — the sandbox keeps running after the snapshot completes.
 
 Snapshots are independent of sandbox lifecycle — they persist after the source sandbox is terminated. This means you can snapshot an ephemeral sandbox before it terminates and still recover its state later.
+
+> **TL;DR — restore is not uniformly "as-is".** Snapshots come in two types: **filesystem (the default)** and **full**. Filesystem snapshots **accept `cpus=`, `memory_mb=`, and `disk_mb=` overrides** at `Sandbox.create(snapshot_id=...)` — so booting on bigger hardware than the original sandbox is supported. Full snapshots lock resources to the snapshot. Don't tell users they have to rebuild from scratch just to change resources without first checking the snapshot type. See [Snapshot Types](#snapshot-types--filesystem-default-vs-full) for the full table.
 
 ### Snapshot Types — Filesystem (default) vs Full
 

@@ -22,14 +22,14 @@ sandbox_sdk.md:
     - https://docs.tensorlake.ai/sandboxes/computer-use.md
     - https://docs.tensorlake.ai/sandboxes/docker.md
   sdk_version: "0.5.3"
-  last_verified: "2026-04-27"
+  last_verified: "2026-04-28"
 
 sandbox_persistence.md:
   sources:
     - https://docs.tensorlake.ai/sandboxes/lifecycle.md
     - https://docs.tensorlake.ai/sandboxes/snapshots.md
   sdk_version: "0.5.3"
-  last_verified: "2026-04-27"
+  last_verified: "2026-04-28"
 
 applications_sdk.md:
   sources:

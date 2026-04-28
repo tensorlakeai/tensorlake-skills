@@ -2,6 +2,17 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [2.5.4] — 2026-04-28
+
+### Changed (Snapshot restore — surfacing the filesystem/full distinction earlier)
+- **`SKILL.md`, `AGENTS.md`** — added a Core Patterns bullet stating that snapshot restore is **not** uniformly "as-is": filesystem snapshots (the default) accept `cpus=`, `memory_mb=`, `disk_mb=` overrides at `Sandbox.create(snapshot_id=...)` (`disk_mb` growth-only, 10240–102400 MiB); full snapshots lock resources. Eagerly loaded so the agent doesn't fall back on stale priors when answering snapshot-restore questions without reading `sandbox_persistence.md`.
+- **`references/sandbox_persistence.md`** — added a TL;DR callout at the top of the Snapshots section so the filesystem-default override behavior is encountered before the per-row "cannot be changed at restore time" wording in the Snapshot Types table. `Last verified: 2026-04-28`.
+- **`references/sandbox_sdk.md`** — replaced the absolute "When restoring, the new sandbox inherits image, resources, entrypoint, and secrets from the snapshot — these cannot be overridden" line in the Snapshots (Instance) section with a type-distinguished version that links to `sandbox_persistence.md#snapshot-types--filesystem-default-vs-full`. `Last verified: 2026-04-28`.
+- **`.github/scripts/sources.yaml`** — bumped `last_verified` for `sandbox_sdk.md` and `sandbox_persistence.md` to `2026-04-28`.
+
+### Why
+Eval 15 (`filesystem-snapshot-restore-with-resource-overrides`) regressed to 0/6 with the CI-pinned sonnet agent: the pre-0.5.3 absolute claim still in `sandbox_sdk.md:266` contradicted the 0.5.3 filesystem/full distinction in `sandbox_persistence.md`, and the agent was answering from a strong "restore is as-is" prior — fabricating quotes rather than reading the reference. Putting the override fact directly in `SKILL.md` / `AGENTS.md` lifted the score to 6/6.
+
 ## [2.5.3] — SDK 0.5.3 — 2026-04-27
 
 ### Changed (References — verified against live docs)
