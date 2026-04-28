@@ -2,6 +2,13 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [2.5.3] — SDK 0.5.3 — 2026-04-27
+
+### Changed (References — verified against live docs)
+- **`references/sandbox_sdk.md`** — bumped to SDK 0.5.3. Added `disk_mb` (10240–102400 MiB, growth-only) to `Sandbox.create()` and `resources` info. Added intro paragraph on Firecracker/CloudHypervisor MicroVMs, boot times, HIPAA + SOC 2 Type II + EU residency + zero data retention. Expanded TypeScript `createPty()` example with `args`, `env`, `workingDir`, `onData`, `onExit` (with note that Python attaches via `pty.on_data(...)` after creation). Expanded desktop API table with `mouse_press`, `mouse_release`, `scroll`, `width`/`height` properties, plus ~4s startup delay note. Documented `image.build(cpus, memory_mb, disk_mb)` (defaults 2.0 / 4096 / 10240) and `tl sbx image create --cpus --memory --disk_mb`. Added `tl sbx clone` to CLI commands. Added `debian11-minimal`, `debian12-minimal`, `debian-minimal` to base images table; dropped `tensorlake/` prefix from base-image references.
+- **`references/sandbox_persistence.md`** — bumped to SDK 0.5.3. Added Filesystem (default) vs Full snapshot distinction with comparison table. Documented `sandbox.checkpoint(timeout=300, poll_interval=1.0)` defaults. Added `tl sbx clone` CLI shortcut (CLI-only, no SDK equivalent). Updated restore semantics: filesystem snapshots accept `cpus=`, `memory_mb=`, `disk_mb=` overrides at restore (`disk_mb` growth-only); full snapshots remain locked.
+- **`references/sandbox_advanced.md`** — dropped `tensorlake/` prefix from base-image references for consistency with the docs' base-image table.
+
 ## [2.5.2] — 2026-04-27
 
 ### Added (Eval CI)

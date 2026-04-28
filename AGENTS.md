@@ -1,5 +1,5 @@
 # Tensorlake SDK
-<!-- version: 2.5.2 -->
+<!-- version: 2.5.3 -->
 
 Tensorlake provides two APIs for building agentic applications:
 
