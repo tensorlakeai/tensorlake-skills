@@ -9,7 +9,7 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/agentic-swarm-intelligence.md
   - https://docs.tensorlake.ai/sandboxes/gspo-agentic-rl.md
 SDK version: tensorlake 0.5.0
-Last verified: 2026-04-24
+Last verified: 2026-04-27
 -->
 
 # TensorLake Sandbox Advanced Patterns
@@ -47,7 +47,7 @@ Install agent skill files into sandbox images so coding agents (Claude Code, Cod
 from tensorlake import Image
 
 image = (
-    Image(name="with-skills", base_image="tensorlake/ubuntu-systemd")
+    Image(name="with-skills", base_image="ubuntu-systemd")
     .run("apt-get update && apt-get install -y nodejs npm python3 python3-pip")
     .run("npm install -g skills")
     .run("skills add tensorlakeai/tensorlake-skills --all -y --copy")
@@ -62,7 +62,7 @@ import { Image } from "tensorlake";
 
 const image = new Image({
   name: "with-skills",
-  baseImage: "tensorlake/ubuntu-systemd",
+  baseImage: "ubuntu-systemd",
 })
   .run("apt-get update && apt-get install -y nodejs npm python3 python3-pip")
   .run("npm install -g skills")
@@ -80,7 +80,7 @@ Flags: `--all` deploys to all detected agents, `-y` non-interactive, `--copy` av
 from tensorlake import Image
 
 image = (
-    Image(name="claude-code-skills", base_image="tensorlake/ubuntu-systemd")
+    Image(name="claude-code-skills", base_image="ubuntu-systemd")
     .run("apt-get update && apt-get install -y git python3 python3-pip")
     .run("git clone https://github.com/tensorlakeai/tensorlake-skills /tmp/tensorlake-skills")
     .run("mkdir -p /root/.claude/skills/tensorlake && cp -r /tmp/tensorlake-skills/SKILL.md /tmp/tensorlake-skills/references /root/.claude/skills/tensorlake/")
@@ -96,7 +96,7 @@ import { Image } from "tensorlake";
 
 const image = new Image({
   name: "claude-code-skills",
-  baseImage: "tensorlake/ubuntu-systemd",
+  baseImage: "ubuntu-systemd",
 })
   .run("apt-get update && apt-get install -y git python3 python3-pip")
   .run("git clone https://github.com/tensorlakeai/tensorlake-skills /tmp/tensorlake-skills")

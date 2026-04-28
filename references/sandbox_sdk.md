@@ -13,11 +13,13 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/pty-sessions.md
   - https://docs.tensorlake.ai/sandboxes/computer-use.md
   - https://docs.tensorlake.ai/sandboxes/docker.md
-SDK version: tensorlake 0.5.1
-Last verified: 2026-04-26
+SDK version: tensorlake 0.5.3
+Last verified: 2026-04-28
 -->
 
 # TensorLake Sandbox SDK Reference
+
+TensorLake Sandboxes are MicroVMs backed by Firecracker and CloudHypervisor. The `ubuntu-minimal` base image starts up in a few hundred milliseconds; `ubuntu-systemd` takes around 1 second to boot. The platform is HIPAA and SOC 2 Type II compliant, supports EU data residency, and offers zero data retention.
 
 For state management (snapshots, suspend/resume, ephemeral vs named, state machine), see [sandbox_persistence.md](sandbox_persistence.md).
 
@@ -64,6 +66,7 @@ sandbox = Sandbox.create(
     name=None,             # str | None — promote to named by passing a value
     cpus=1.0,              # float, 1.0–8.0
     memory_mb=1024,        # int, 1024–8192 per CPU
+    disk_mb=10240,         # int, 10240–102400 (10–100 GiB) — root filesystem size in MiB
     timeout_secs=None,     # int | None — None means no timeout
     image=None,            # str | None — registered image name or base image
     snapshot_id=None,      # str | None — restore from a snapshot
@@ -93,6 +96,7 @@ print(named.status.value)      # "running"
 const ephemeral = await Sandbox.create({
   cpus: 1.0,
   memoryMb: 1024,
+  diskMb: 10240,         // 10240–102400 (10–100 GiB)
   timeoutSecs: 300,
 });
 
@@ -234,7 +238,10 @@ Snapshots persist a sandbox's filesystem, memory, and running processes into a r
 **Python:**
 
 ```python
-snapshot = sandbox.checkpoint()     # -> SnapshotInfo
+snapshot = sandbox.checkpoint(
+    timeout=300,        # float — max seconds to wait for completion (default 300)
+    poll_interval=1.0,  # float — seconds between status polls (default 1.0)
+)                                   # -> SnapshotInfo
 print(snapshot.snapshot_id)
 
 snapshots = sandbox.list_snapshots()   # snapshots created from THIS sandbox
@@ -256,7 +263,7 @@ const snapshots = await sandbox.listSnapshots();
 const restored = await Sandbox.create({ snapshotId: snapshot.snapshotId });
 ```
 
-When restoring, the new sandbox inherits image, resources, entrypoint, and secrets from the snapshot — these cannot be overridden. If you need different resources, create a fresh sandbox instead.
+Restore behavior depends on the snapshot type — see [sandbox_persistence.md → Snapshot Types](sandbox_persistence.md#snapshot-types--filesystem-default-vs-full) for the full table. In short: **filesystem snapshots (the default)** accept `cpus=`, `memory_mb=`, and `disk_mb=` overrides at restore (`disk_mb` is **growth-only**, range `10240`–`102400` MiB / 10–100 GiB) — useful for booting on bigger hardware than where the snapshot was baked. **Full snapshots** lock image, resources, entrypoint, and secrets to the snapshot; if you need different resources from a full snapshot, create a fresh sandbox instead. Image is locked to the snapshot in both cases.
 
 ### Execute Commands
 
@@ -475,15 +482,23 @@ pty = sandbox.connect_pty(session_id, token)
 ```
 
 ```typescript
+// TypeScript: onData / onExit can be passed at creation time
 const pty = await sandbox.createPty({
   command: "/bin/bash",
+  args: ["-l"],
+  env: { TERM: "xterm-256color" },
+  workingDir: "/workspace",
   rows: 24,
   cols: 80,
+  onData: (data) => process.stdout.write(Buffer.from(data)),
+  onExit: (exitCode) => console.log("Exited:", exitCode),
 });
 
 await pty.sendInput("pwd\nexit\n");
 console.log(await pty.wait());
 ```
+
+> **Python differs.** `create_pty()` in Python does not accept `on_data` / `on_exit` in its keyword arguments. Attach them after creation via `pty.on_data(callback)` and `pty.on_exit(callback)` instead. TypeScript supports both forms — at-creation in the options object, or post-creation via `pty.onData(...)` / `pty.onExit(...)`.
 
 ## Computer Use (Desktop Automation)
 
@@ -499,7 +514,9 @@ import time
 sandbox = Sandbox.create(image="ubuntu-vnc")
 try:
     with sandbox.connect_desktop(password="tensorlake") as desktop:
+        time.sleep(4.0)  # XFCE + desktop services need a few seconds before screenshots are reliable
         Path("sandbox-desktop.png").write_bytes(desktop.screenshot())
+        print(f"desktop is {desktop.width}x{desktop.height}")
 
         desktop.press(["ctrl", "alt", "t"])
         time.sleep(1.0)
@@ -520,21 +537,35 @@ with sandbox.connect_desktop(password="tensorlake") as desktop:
     Path("existing-sandbox.png").write_bytes(desktop.screenshot())
 ```
 
-### Desktop Methods
+### Desktop Methods and Properties
 
-| Method            | Description                                              |
-|-------------------|----------------------------------------------------------|
-| `screenshot()`    | Returns PNG bytes of the current desktop                 |
-| `press(key)`      | Press key or key combo (e.g., `["ctrl", "alt", "t"]`)    |
-| `type_text(text)` | Type text input                                          |
-| `move_mouse()`    | Move cursor                                              |
-| `click()`         | Single mouse click                                       |
-| `double_click()`  | Double mouse click                                       |
-| `scroll_up()`     | Scroll up                                                |
-| `scroll_down()`   | Scroll down                                              |
-| `key_down()`      | Key press (held)                                         |
-| `key_up()`        | Key release                                              |
-| `close()`         | Close desktop connection (auto on context-manager exit)  |
+**Properties** (no parentheses — read directly):
+
+| Property  | Description                          |
+|-----------|--------------------------------------|
+| `width`   | Desktop width in pixels              |
+| `height`  | Desktop height in pixels             |
+
+**Methods** (Python `snake_case` shown; TypeScript mirrors in `camelCase` — e.g., `moveMouse`, `mousePress`):
+
+| Method             | Description                                              |
+|--------------------|----------------------------------------------------------|
+| `screenshot()`     | Returns PNG bytes of the current desktop                 |
+| `press(key)`       | Press key or key combo (e.g., `["ctrl", "alt", "t"]`)    |
+| `type_text(text)`  | Type text input                                          |
+| `move_mouse(x, y)` | Move cursor to coordinates                               |
+| `click()`          | Single mouse click at current cursor position            |
+| `double_click()`   | Double mouse click at current cursor position            |
+| `mouse_press()`    | Press a mouse button (held — pair with `mouse_release`)  |
+| `mouse_release()`  | Release a held mouse button                              |
+| `scroll()`         | Scroll (generic — direction/amount via parameters)       |
+| `scroll_up()`      | Scroll up                                                |
+| `scroll_down()`    | Scroll down                                              |
+| `key_down()`       | Press and hold a key (pair with `key_up`)                |
+| `key_up()`         | Release a held key                                       |
+| `close()`          | Close desktop connection (auto on context-manager exit)  |
+
+> **Startup delay.** Fresh `ubuntu-vnc` sandboxes need a few seconds (≈4s) for XFCE and the rest of the desktop services to finish booting before screenshots are reliable. Sleep before the first `screenshot()` or you may capture a blank/loading frame.
 
 ### Browser Access with noVNC
 
@@ -587,7 +618,7 @@ A sandbox image is a project-scoped, named snapshot built from a base image plus
 from tensorlake import Image
 
 image = (
-    Image(name="data-tools-image", base_image="tensorlake/ubuntu-systemd")
+    Image(name="data-tools-image", base_image="ubuntu-systemd")
     .copy("requirements.txt", "/tmp/requirements.txt")
     .run("apt-get update && apt-get install -y python3 python3-pip")
     .run("python3 -m pip install --break-system-packages -r /tmp/requirements.txt")
@@ -605,7 +636,7 @@ import { Image } from "tensorlake";
 
 const image = new Image({
   name: "data-tools-image",
-  baseImage: "tensorlake/ubuntu-systemd",
+  baseImage: "ubuntu-systemd",
 })
   .copy("requirements.txt", "/tmp/requirements.txt")
   .run("apt-get update && apt-get install -y python3 python3-pip")
@@ -620,7 +651,7 @@ await image.build();
 **Dockerfile:**
 
 ```dockerfile
-FROM tensorlake/ubuntu-systemd
+FROM ubuntu-systemd
 
 RUN apt-get update && apt-get install -y python3 python3-pip
 COPY requirements.txt /tmp/requirements.txt
@@ -639,7 +670,7 @@ from tensorlake import Image
 from tensorlake.sandbox import Sandbox
 
 image = (
-    Image(name="etl-tools", base_image="tensorlake/ubuntu-minimal")
+    Image(name="etl-tools", base_image="ubuntu-minimal")
     .run("apt-get update && apt-get install -y python3 python3-pip")
     .run("python3 -m pip install --break-system-packages pandas pyarrow duckdb")
 )
@@ -652,11 +683,21 @@ print(result.stdout, result.exit_code)
 
 ### Build / Register the Image
 
-**Python or TypeScript SDK:**
+Build-time resources default to `cpus=2.0`, `memory_mb=4096`, `disk_mb=10240` (10 GiB) and are passed to the build call (not the `Image(...)` constructor):
+
+**Python:**
 
 ```python
-image.build()
+image.build()                                   # use defaults
+
+image.build(
+    cpus=4.0,
+    memory_mb=4096,
+    disk_mb=25600,                              # 25 GiB build/root disk
+)
 ```
+
+**TypeScript:**
 
 ```typescript
 await image.build();
@@ -666,21 +707,29 @@ await image.build();
 
 ```bash
 tl sbx image create ./Dockerfile --registered-name data-tools-image
+tl sbx image create ./Dockerfile \
+  --registered-name data-tools-image \
+  --cpus 4 --memory 4096 --disk_mb 25600
 ```
 
 The positional argument is a Dockerfile path. The `-n/--registered-name` flag sets the registered name; if omitted, it defaults to the parent directory when the file is named `Dockerfile`, otherwise the file stem. Names must be unique within a project.
+
+> **Disk size carries over to launched sandboxes.** Use a larger build-time `disk_mb` when you want to bake big dependencies into the image without forcing every consumer to override `disk_mb` at `Sandbox.create()` time. CPU and memory are *not* inherited — they fall back to `Sandbox.create()`'s own `cpus` / `memory_mb` (defaults `1.0` / `1024`) unless explicitly set at launch.
 
 Before building, run `tl login` and `tl init` (or `npx tl init`) to select the target project.
 
 ### Base Images
 
-| Base Image                  | Description                                                                                              |
-|-----------------------------|----------------------------------------------------------------------------------------------------------|
-| `tensorlake/ubuntu-minimal` | Default. No systemd, boots in hundreds of ms.                                                            |
-| `tensorlake/ubuntu-systemd` | Includes systemd, supports Docker/K8s inside the sandbox.                                                |
-| `tensorlake/ubuntu-vnc`     | Desktop-enabled (XFCE + TigerVNC + Firefox) — use with `sandbox.connect_desktop()` for computer-use.     |
+| Base Image          | Description                                                                                              |
+|---------------------|----------------------------------------------------------------------------------------------------------|
+| `ubuntu-minimal`    | Default. Minimal Ubuntu, no systemd, boots in hundreds of ms.                                            |
+| `ubuntu-systemd`    | Ubuntu with systemd, supports Docker/K8s inside the sandbox.                                             |
+| `ubuntu-vnc`        | Desktop-enabled (XFCE + TigerVNC + Firefox) — use with `sandbox.connect_desktop()` for computer-use.     |
+| `debian11-minimal`  | Minimal Debian 11.                                                                                       |
+| `debian12-minimal`  | Minimal Debian 12.                                                                                       |
+| `debian-minimal`    | Minimal Debian 13.                                                                                       |
 
-Use these prefixed names in `base_image=` / `baseImage:` and in `FROM`. When launching a sandbox from a base image directly via `image=`, the unprefixed form (`image="ubuntu-vnc"`) is also accepted.
+Use these short names directly in `base_image=` / `baseImage:`, in `FROM`, and in `image=` when launching a sandbox from a base image (no `tensorlake/` prefix).
 
 ### Image Builder Methods (chainable)
 
@@ -730,7 +779,7 @@ tl sbx create --image data-tools-image --cpus 4.0 --memory 4096 --timeout 1800
 
 ### Running Docker Inside a Sandbox
 
-Docker requires systemd, so launch with the `tensorlake/ubuntu-systemd` base image and install Docker from the official Ubuntu repository inside the sandbox. See [sandboxes/docker.md](https://docs.tensorlake.ai/sandboxes/docker.md) for the full install script and a `docker run hello-world` verification step.
+Docker requires systemd, so launch with the `ubuntu-systemd` base image and install Docker from the official Ubuntu repository inside the sandbox. See [sandboxes/docker.md](https://docs.tensorlake.ai/sandboxes/docker.md) for the full install script and a `docker run hello-world` verification step.
 
 ## Networking
 
@@ -813,7 +862,7 @@ sandbox = Sandbox.create(deny_out=["example.com"])
 | `namespace`                    | `str`                    | Namespace                                            |
 | `status`                       | `str`                    | `"Pending" \| "Running" \| "Suspending" \| "Suspended" \| "Snapshotting" \| "Terminated"` |
 | `image`                        | `str`                    | Container image used                                 |
-| `resources`                    | `ContainerResourcesInfo` | `.cpus`, `.memory_mb` / `.memoryMb`                  |
+| `resources`                    | `ContainerResourcesInfo` | `.cpus`, `.memory_mb`, `.disk_mb` (camelCase in TS)  |
 | `secret_names`                 | `list[str]`              | Injected secret names                                |
 | `timeout_secs`                 | `int`                    | Timeout in seconds                                   |
 | `exposed_ports`                | `list[int]`              | User ports routed by the proxy                       |
@@ -865,6 +914,8 @@ tl sbx cp file.txt <id>:/path            # Upload file (file-only, no dirs)
 tl sbx cp <id>:/path ./local             # Download file
 tl sbx checkpoint <id>                   # Create snapshot from running sandbox
 tl sbx checkpoint <id> --timeout 600
+tl sbx clone <id>                        # Snapshot + boot new sandbox in one shot (CLI-only)
+tl sbx clone <id> --timeout 600
 tl sbx suspend <id>                      # Suspend named sandbox
 tl sbx resume <id>                       # Resume named sandbox
 tl sbx terminate <id>                    # Terminate sandbox (by name or ID)

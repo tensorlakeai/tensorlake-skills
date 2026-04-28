@@ -1,5 +1,5 @@
 # Tensorlake SDK
-<!-- version: 2.5.2 -->
+<!-- version: 2.5.4 -->
 
 Tensorlake provides two APIs for building agentic applications:
 
@@ -74,6 +74,7 @@ if __name__ == "__main__":
 - **DAG composition**: Chain functions via `.future()`, `.map()`, `.reduce()` to form parallel pipelines
 - **Agentic + Sandbox**: Use Sandbox for agent execution environments and isolated tool calls, Orchestration for durable workflow coordination
 - **Persistent named sandboxes**: Create sandboxes with `name=` when state must survive between steps. Named sandboxes support suspend/resume, can be auto-suspended when idle, and auto-resume on the next sandbox-proxy request. See `references/sandbox_persistence.md` for the full state model.
+- **Snapshot restore is NOT uniformly "as-is"** (0.5.3): two snapshot types exist — **filesystem (default)** and **full**. Filesystem snapshots accept `cpus=`, `memory_mb=`, and `disk_mb=` overrides at `Sandbox.create(snapshot_id=...)` (`disk_mb` is growth-only, range 10240–102400 MiB / 10–100 GiB). Full snapshots lock resources. **Do not tell users they must rebuild from scratch to change resources without first checking the snapshot type** — `Sandbox.get_snapshot(snapshot_id).snapshot_type` or the dashboard. Image is locked in both cases. See `references/sandbox_persistence.md#snapshot-types--filesystem-default-vs-full`.
 - **Document extraction**: Use DocumentAI with Pydantic schemas to extract structured data from PDFs/images
 - **LLM integration**: Use any LLM provider inside `@function()` — install deps via `Image`, pass keys via `secrets`
 - **Framework integration**: Use Sandbox as a code execution tool for LangChain agents or OpenAI function calling, or DocumentAI as a document loader for any RAG pipeline

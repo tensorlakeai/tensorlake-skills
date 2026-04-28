@@ -2,8 +2,8 @@
 Source:
   - https://docs.tensorlake.ai/sandboxes/lifecycle.md
   - https://docs.tensorlake.ai/sandboxes/snapshots.md
-SDK version: tensorlake 0.5.0
-Last verified: 2026-04-27
+SDK version: tensorlake 0.5.3
+Last verified: 2026-04-28
 -->
 
 # TensorLake Sandbox Persistence
@@ -85,9 +85,24 @@ An ephemeral sandbox can be promoted to a named sandbox after creation via `Sand
 
 ## Snapshots
 
-Snapshots capture the filesystem, memory, and running processes of a sandbox. Use them to save work mid-session and restore it later in a **new** sandbox. Unlike suspend, snapshots do not pause the original — the sandbox keeps running after the snapshot completes.
+Snapshots capture sandbox state into a reusable artifact you can boot a **new** sandbox from. Unlike suspend, snapshots do not pause the original — the sandbox keeps running after the snapshot completes.
 
 Snapshots are independent of sandbox lifecycle — they persist after the source sandbox is terminated. This means you can snapshot an ephemeral sandbox before it terminates and still recover its state later.
+
+> **TL;DR — restore is not uniformly "as-is".** Snapshots come in two types: **filesystem (the default)** and **full**. Filesystem snapshots **accept `cpus=`, `memory_mb=`, and `disk_mb=` overrides** at `Sandbox.create(snapshot_id=...)` — so booting on bigger hardware than the original sandbox is supported. Full snapshots lock resources to the snapshot. Don't tell users they have to rebuild from scratch just to change resources without first checking the snapshot type. See [Snapshot Types](#snapshot-types--filesystem-default-vs-full) for the full table.
+
+### Snapshot Types — Filesystem (default) vs Full
+
+Two snapshot types exist; they differ in what they capture and how flexibly you can restore from them.
+
+|                            | Filesystem snapshot (default)                          | Full snapshot                                                       |
+|----------------------------|--------------------------------------------------------|---------------------------------------------------------------------|
+| **What it captures**       | Filesystem only                                        | Filesystem **+ memory + running processes** — exact frozen state    |
+| **Restore semantics**      | Boot a fresh sandbox onto the captured filesystem      | Resume into the exact in-memory state, processes still running      |
+| **Resource changes at restore?** | **Yes** — `cpus`, `memory_mb`, `disk_mb` may all be passed to `Sandbox.create(snapshot_id=...)` (`disk_mb` is growth-only) | **No** — image, resources, entrypoint, secrets all locked to the snapshot |
+| **Use for**                | Reusable starting points, baking dependencies, forking on different hardware | Pause-and-fork an agent mid-execution, debug-after-the-fact         |
+
+> **Heads-up:** the snapshot type is not currently selectable through a documented `checkpoint()` parameter or `tl sbx checkpoint` flag. Verify in the dashboard or `Sandbox.get_snapshot(...)` metadata which type you have before relying on resource-override behavior at restore.
 
 ### Create a Snapshot
 
@@ -99,7 +114,10 @@ from tensorlake.sandbox import Sandbox
 sandbox = Sandbox.create()
 sandbox.run("pip", ["install", "numpy", "pandas", "--user", "--break-system-packages"])
 
-snapshot = sandbox.checkpoint()         # SnapshotInfo
+snapshot = sandbox.checkpoint(
+    timeout=300,        # float — max seconds to wait for completion (default 300)
+    poll_interval=1.0,  # float — seconds between status polls (default 1.0)
+)                                       # -> SnapshotInfo
 print(snapshot.snapshot_id)
 # snapshot.status, snapshot.size_bytes
 ```
@@ -163,7 +181,10 @@ This is **snapshot/restore semantics** (new sandbox, new id), not **suspend/resu
 
 ### Restore from a Snapshot
 
-Create a new sandbox from a snapshot. The new sandbox restores the captured filesystem, memory, and running processes **exactly as they were** — image, resources (CPUs, memory), entrypoint, and secrets all come from the snapshot and cannot be changed at restore time. If you need different resources, create a fresh sandbox instead of restoring.
+Create a new sandbox from a snapshot. Behavior depends on the snapshot type (see [Snapshot Types](#snapshot-types--filesystem-default-vs-full) above):
+
+- **Filesystem snapshot (default):** the new sandbox boots onto the captured filesystem. You may pass `cpus=`, `memory_mb=`, and `disk_mb=` to `Sandbox.create(snapshot_id=...)` (or `--cpus`, `--memory`, `--disk_mb` on the CLI) to override resources. `disk_mb` is **growth-only** — range `10240`–`102400` MiB (10–100 GiB).
+- **Full snapshot:** the new sandbox restores filesystem, memory, and running processes **exactly as they were**. Image, resources (CPUs, memory, disk), entrypoint, and secrets all come from the snapshot and cannot be changed at restore time. If you need different resources, create a fresh sandbox instead of restoring.
 
 **Python:**
 
@@ -235,6 +256,15 @@ fork_b = Sandbox.create(snapshot_id=snapshot.snapshot_id)
 ```
 
 The intermediate snapshot persists and consumes storage until you delete it with `Sandbox.delete_snapshot(snapshot_id)` (or `tl sbx checkpoint rm <snapshot-id>`).
+
+**CLI shortcut — `tl sbx clone`:** for a one-shot checkpoint-then-restore flow, use:
+
+```bash
+tl sbx clone <sandbox-id>
+tl sbx clone <sandbox-id> --timeout 600
+```
+
+This creates a snapshot and immediately boots a new sandbox from it. The intermediate snapshot persists — it shows up in `tl sbx checkpoint ls` and counts toward storage until you delete it. **CLI-only** — there is no equivalent in the Python SDK, TypeScript SDK, or HTTP API. From those, call `checkpoint()` followed by `Sandbox.create(snapshot_id=...)` explicitly.
 
 ## Suspend & Resume
 
@@ -311,7 +341,7 @@ Rule of thumb: **suspend** when you want *this* sandbox back later; **checkpoint
 - **Suspend/resume requires named sandboxes.** Ephemeral sandboxes return an error on suspend. Promote to named first via `SandboxClient().update_sandbox(id, name)` if you need to suspend.
 - **Terminated is final.** A terminated sandbox cannot be resumed. Use `sandbox.checkpoint()` beforehand if you need a restore path.
 - **Snapshot restore is to a new sandbox.** Restoring does not mutate the original sandbox; it creates a new one with a new `sandbox_id`.
-- **Snapshot restore is as-is.** A restored sandbox inherits image, resources, entrypoint, and secrets from the snapshot — none of these can be changed at restore time. If you need different CPUs, memory, or an updated image, create a fresh sandbox instead.
+- **Restore semantics depend on snapshot type.** *Full* snapshots restore as-is — image, resources, entrypoint, and secrets all come from the snapshot and cannot be changed. *Filesystem* snapshots (the default) accept `cpus=`, `memory_mb=`, and `disk_mb=` overrides at restore (`disk_mb` is growth-only). If you need a different image or are working with a full snapshot and need different resources, create a fresh sandbox instead.
 
 ## See Also
 
