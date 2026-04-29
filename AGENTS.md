@@ -74,7 +74,7 @@ For integration examples (LangChain, OpenAI, Anthropic, multi-agent orchestratio
 
 ## API Reference
 
-Bundled references — each entry lists the triggers (topics, symbols, user phrases) that should send you into that file:
+Bundled references — each entry lists the triggers that should send you into that file:
 
 - **Sandbox SDK** — `references/sandbox_sdk.md`. Triggers: creating or connecting to sandboxes, running commands inside a sandbox, file operations (read/write/upload/download), background processes, environment variables and secrets, networking and egress allow/deny lists, port exposure and public URLs (authenticated or unauthenticated), building or registering custom sandbox images, PTY / interactive shells with reconnect, computer-use / desktop automation (XFCE, Firefox, screenshots, mouse/keyboard, noVNC), Docker-in-sandbox, TypeScript SDK examples.
 - **Sandbox Persistence** — `references/sandbox_persistence.md`. Triggers: snapshots / checkpoints, filesystem vs memory snapshot types, resource overrides at restore, restoring from a snapshot, forking N parallel sandboxes from one snapshot, suspend / resume, idle auto-suspend and timeouts, ephemeral vs named sandboxes, sandbox state machine, choosing between suspend and snapshot, persistence limitations.
