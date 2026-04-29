@@ -2,6 +2,11 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [2.6.1] — 2026-04-28
+
+### Changed
+- **`AGENTS.md`** — re-synced with `SKILL.md` per `CLAUDE.md`. Added `## Usage` heading and reordered "For building" before "For documentation questions"; expanded the description's agent framework list to include Claude/OpenAI agents SDKs and "snapshots / checkpoints"; updated Quick Start with explicit defaults, `cpus/memory_mb/timeout_secs` args, named-sandbox example, and `result.stdout/stderr/exit_code` note; dropped "direct the user to" wording from the API key paragraph; removed "Orchestration for durable workflow coordination" from the Agentic + Sandbox bullet; reordered DAG composition before LLM integration; removed `tl secrets ls` from CLI Commands and switched `Dockerfile` → `./Dockerfile`.
+
 ## [2.6.0] — 2026-04-28
 
 ### Changed (Core Patterns — sandbox capabilities promoted to first-class)

@@ -28,7 +28,7 @@ sandbox_persistence.md:
   sources:
     - https://docs.tensorlake.ai/sandboxes/lifecycle.md
     - https://docs.tensorlake.ai/sandboxes/snapshots.md
-  sdk_version: "0.5.3"
+  sdk_version: "0.5.5"
   last_verified: "2026-04-28"
 
 applications_sdk.md:
