@@ -13,7 +13,7 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/pty-sessions.md
   - https://docs.tensorlake.ai/sandboxes/computer-use.md
   - https://docs.tensorlake.ai/sandboxes/docker.md
-SDK version: tensorlake 0.5.3
+SDK version: tensorlake 0.5.5
 Last verified: 2026-04-28
 -->
 
@@ -23,7 +23,7 @@ TensorLake Sandboxes are MicroVMs backed by Firecracker and CloudHypervisor. The
 
 For state management (snapshots, suspend/resume, ephemeral vs named, state machine), see [sandbox_persistence.md](sandbox_persistence.md).
 
-> **0.5.1 note:** `Sandbox` is the preferred handle for create/connect/run/suspend/resume/checkpoint and now also for **rename and port exposure** via the `sandbox.update(name=..., exposed_ports=..., allow_unauthenticated_access=...)` instance method. `SandboxClient` still ships and emits a `DeprecationWarning` on construction; only `client.list()` lacks a direct `Sandbox`-level replacement. `Sandbox.name`, `Sandbox.status`, and `Sandbox.sandbox_id` are properties (no parens). `sandbox.status` returns a `SandboxStatus` enum (`SandboxStatus.RUNNING`, `.SUSPENDED`, etc.) — use `sandbox.status.value` for the lowercase string form. Snapshot creation is `sandbox.checkpoint()`; restore is `Sandbox.create(snapshot_id=...)`.
+> `Sandbox` is the preferred handle for create/connect/run/suspend/resume/checkpoint and also for **rename and port exposure** via the `sandbox.update(name=..., exposed_ports=..., allow_unauthenticated_access=...)` instance method. `SandboxClient` still ships and emits a `DeprecationWarning` on construction; only `client.list()` lacks a direct `Sandbox`-level replacement. `Sandbox.name`, `Sandbox.status`, and `Sandbox.sandbox_id` are properties (no parens). `sandbox.status` returns a `SandboxStatus` enum (`SandboxStatus.RUNNING`, `.SUSPENDED`, etc.) — use `sandbox.status.value` for the lowercase string form. Snapshot creation is `sandbox.checkpoint()`; restore is `Sandbox.create(snapshot_id=...)`.
 
 ## Table of Contents
 
@@ -67,7 +67,7 @@ sandbox = Sandbox.create(
     cpus=1.0,              # float, 1.0–8.0
     memory_mb=1024,        # int, 1024–8192 per CPU
     disk_mb=10240,         # int, 10240–102400 (10–100 GiB) — root filesystem size in MiB
-    timeout_secs=None,     # int | None — None means no timeout
+    timeout_secs=None,     # int | None — server default 600; pass an int to override
     image=None,            # str | None — registered image name or base image
     snapshot_id=None,      # str | None — restore from a snapshot
     secret_names=None,     # list[str] | None — secrets to inject as env vars
@@ -85,7 +85,7 @@ print(named.name)              # "my-agent-env"
 print(named.status)            # SandboxStatus.RUNNING
 print(named.status.value)      # "running"
 
-# Port exposure is a post-create operation in 0.5.1 — see "Port Exposure" below.
+# Port exposure is a post-create operation — see "Port Exposure" below.
 # Use sandbox.update(exposed_ports=[8080], allow_unauthenticated_access=False)
 # or SandboxClient().expose_ports(...).
 ```
@@ -113,7 +113,7 @@ console.log(named.sandboxId);
 console.log(named.name);
 console.log(named.status);
 
-// Port exposure is a post-create operation in 0.5.1 — see "Port Exposure" below.
+// Port exposure is a post-create operation — see "Port Exposure" below.
 ```
 
 `Sandbox.create()` returns an operable `Sandbox` handle that is already connected — you can call instance methods on it directly without a separate `connect()` step.
@@ -145,7 +145,7 @@ console.log(result.stdout);
 
 ### List, Update
 
-In 0.5.1, rename and port-exposure live on the `Sandbox` instance via `sandbox.update(...)`. `SandboxClient` is still required for listing sandboxes (no instance equivalent) and emits a `DeprecationWarning` on construction.
+Rename and port-exposure live on the `Sandbox` instance via `sandbox.update(...)`. `SandboxClient` is still required for listing sandboxes (no instance equivalent) and emits a `DeprecationWarning` on construction.
 
 **Python:**
 
@@ -163,7 +163,7 @@ for sb in client.list():                                        # -> iterator[Sa
     print(sb.sandbox_id, sb.status)
 ```
 
-> Legacy client form `client.update_sandbox("sbx-123", "my-env")` still works in 0.5.x but is **deprecated** — prefer `sandbox.update(...)` on the instance handle. If you only have a `sandbox_id`, do `Sandbox.connect("sbx-123").update(name="my-env")`.
+> Legacy client form `client.update_sandbox("sbx-123", "my-env")` still works but is **deprecated** — prefer `sandbox.update(...)` on the instance handle. If you only have a `sandbox_id`, do `Sandbox.connect("sbx-123").update(name="my-env")`.
 
 **TypeScript:**
 
@@ -205,7 +205,7 @@ await Sandbox.deleteSnapshot("snap-xyz");
 
 ### Port Exposure
 
-In 0.5.1, prefer `sandbox.update(exposed_ports=[...], allow_unauthenticated_access=...)` on the instance. `SandboxClient.expose_ports(...)` / `unexpose_ports(...)` and the CLI still work. Full examples and the auth-vs-public trade-off live in [Networking → Port Exposure](#port-exposure) below.
+Prefer `sandbox.update(exposed_ports=[...], allow_unauthenticated_access=...)` on the instance. `SandboxClient.expose_ports(...)` / `unexpose_ports(...)` and the CLI still work. Full examples and the auth-vs-public trade-off live in [Networking → Port Exposure](#port-exposure) below.
 
 ## Sandbox — Instance Methods
 
@@ -725,8 +725,6 @@ Before building, run `tl login` and `tl init` (or `npx tl init`) to select the t
 | `ubuntu-minimal`    | Default. Minimal Ubuntu, no systemd, boots in hundreds of ms.                                            |
 | `ubuntu-systemd`    | Ubuntu with systemd, supports Docker/K8s inside the sandbox.                                             |
 | `ubuntu-vnc`        | Desktop-enabled (XFCE + TigerVNC + Firefox) — use with `sandbox.connect_desktop()` for computer-use.     |
-| `debian11-minimal`  | Minimal Debian 11.                                                                                       |
-| `debian12-minimal`  | Minimal Debian 12.                                                                                       |
 | `debian-minimal`    | Minimal Debian 13.                                                                                       |
 
 Use these short names directly in `base_image=` / `baseImage:`, in `FROM`, and in `image=` when launching a sandbox from a base image (no `tensorlake/` prefix).
@@ -789,7 +787,7 @@ Docker requires systemd, so launch with the `ubuntu-systemd` base image and inst
 | `deny_out`             | `denyOut`                   | `list[str]` | `[]`    | Blocked outbound destinations (domains/IPs/CIDRs)            |
 | `allow_out`            | `allowOut`                  | `list[str]` | `[]`    | Allowed outbound destinations (when internet disabled)       |
 
-These are parameters on `Sandbox.create()`. Port exposure (`exposed_ports`, `allow_unauthenticated_access`) is a separate post-create operation in 0.5.1 — see [Port Exposure](#port-exposure).
+These are parameters on `Sandbox.create()`. Port exposure (`exposed_ports`, `allow_unauthenticated_access`) is a separate post-create operation — see [Port Exposure](#port-exposure).
 
 ### Public URLs
 
@@ -801,7 +799,7 @@ The hostname accepts either the sandbox ID or a sandbox name.
 
 ### Port Exposure
 
-In 0.5.1, prefer the `Sandbox` instance method:
+Prefer the `Sandbox` instance method:
 
 ```python
 sandbox.update(exposed_ports=[8080], allow_unauthenticated_access=False)
