@@ -285,9 +285,8 @@ EXAMPLE_TOKEN_RE = re.compile(
 MODULE_OWNERS = {
     "applications_sdk.md": ("tensorlake.applications",),
     "sandbox_sdk.md": ("tensorlake.sandbox",),
-    "sandbox_advanced.md": ("tensorlake.sandbox",),
+    "sandbox_usecases.md": ("tensorlake.sandbox",),
     "sandbox_persistence.md": ("tensorlake.sandbox",),
-    "documentai_sdk.md": ("tensorlake.document_ai",),
     "integrations.md": (),
     "platform.md": (),
     "troubleshooting.md": (),
@@ -372,7 +371,7 @@ VERIFIED_FALSE_POSITIVES = {
         # disabled (see main() below), the checker would otherwise flag it as drift.
         "in_ref_not_docs": {"ReplayMode"},
     },
-    "sandbox_advanced.md": {
+    "sandbox_usecases.md": {
         # Upstream `sandboxes/*` pages still use the older `Client.close()` /
         # `sandbox.close()` cleanup pattern; this ref standardizes on
         # `Sandbox.create()` + `sandbox.terminate()` per the 0.5.0 SDK (see
@@ -419,15 +418,10 @@ REFERENCE_RULES = {
         deny_tokens=frozenset({"close", "Sandbox"}),
         allowed_cli_prefixes=("sbx_",),
     ),
-    "sandbox_advanced.md": RefRule(
+    "sandbox_usecases.md": RefRule(
         enabled_kinds=frozenset({IMPORTS, METHODS, CLI, OPTIONS, JSON_FIELDS, PROSE}),
-        owned_modules=MODULE_OWNERS["sandbox_advanced.md"],
+        owned_modules=MODULE_OWNERS["sandbox_usecases.md"],
         deny_tokens=frozenset({"analysis", "market"}),
-    ),
-    "documentai_sdk.md": RefRule(
-        enabled_kinds=frozenset({IMPORTS, METHODS, CLI, OPTIONS, JSON_FIELDS, PROSE}),
-        owned_modules=MODULE_OWNERS["documentai_sdk.md"],
-        deny_tokens=frozenset({"structured_data", "text_lines"}),
     ),
     "integrations.md": RefRule(
         enabled_kinds=frozenset({IMPORTS, METHODS, CLI}),
@@ -463,16 +457,15 @@ ROUTE_RULES = [
     ("/faqs/", "_skip"),
     ("/opensource/", "_skip"),
     ("/use-cases/", "_skip"),
-    ("/sandboxes/skills-in-sandboxes", "sandbox_advanced.md"),
-    ("/sandboxes/ai-code-execution", "sandbox_advanced.md"),
-    ("/sandboxes/data-analysis", "sandbox_advanced.md"),
-    ("/sandboxes/cicd-build", "sandbox_advanced.md"),
+    ("/sandboxes/skills-in-sandboxes", "sandbox_usecases.md"),
+    ("/sandboxes/ai-code-execution", "sandbox_usecases.md"),
+    ("/sandboxes/data-analysis", "sandbox_usecases.md"),
+    ("/sandboxes/cicd-build", "sandbox_usecases.md"),
     ("/applications/production/", "troubleshooting.md"),
     ("/document-ingestion/production/", "troubleshooting.md"),
     ("/applications/overview", "troubleshooting.md"),
     ("/sandboxes/", "sandbox_sdk.md"),
     ("/applications/", "applications_sdk.md"),
-    ("/document-ingestion/", "documentai_sdk.md"),
     ("/integrations/", "integrations.md"),
     ("/platform/", "platform.md"),
 ]

@@ -169,8 +169,6 @@ def main() -> None:
     def grade_job(job):
         eval_id, eval_obj, out_path, trigger_path, files_path = job
         trigger = load_json(trigger_path, None)
-        if trigger is not None and not trigger.get("skill_triggered"):
-            return eval_id, eval_obj, None, trigger, None
         try:
             results = grade_one(
                 eval_obj,
@@ -189,37 +187,23 @@ def main() -> None:
         futures = [pool.submit(grade_job, j) for j in jobs]
         for fut in as_completed(futures):
             eval_id, eval_obj, results, trigger, err = fut.result()
-            if err is not None:
+            if err is not None or results is None:
                 print(f"  ✗ eval {eval_id} ({eval_obj['name']}): judge failed: {err}", file=sys.stderr)
                 continue
             triggered = bool(trigger and trigger.get("skill_triggered"))
             expectations = eval_obj["expectations"]
-            if results is None:
-                total = len(expectations)
-                passed = 0
-                expectation_records = [
-                    {
-                        "text": expectations[i],
-                        "passed": False,
-                        "evidence": "not present",
-                        "reason": "skill not triggered; grading skipped",
-                    }
-                    for i in range(total)
-                ]
-                trigger_label = "no-skill (skipped)"
-            else:
-                passed = sum(1 for r in results if r.get("passed"))
-                total = len(results)
-                expectation_records = [
-                    {
-                        "text": expectations[i],
-                        "passed": bool(r.get("passed")),
-                        "evidence": r.get("evidence", ""),
-                        "reason": r.get("reason", ""),
-                    }
-                    for i, r in enumerate(results)
-                ]
-                trigger_label = "skill" if triggered else "trigger?"
+            passed = sum(1 for r in results if r.get("passed"))
+            total = len(results)
+            expectation_records = [
+                {
+                    "text": expectations[i],
+                    "passed": bool(r.get("passed")),
+                    "evidence": r.get("evidence", ""),
+                    "reason": r.get("reason", ""),
+                }
+                for i, r in enumerate(results)
+            ]
+            trigger_label = "skill" if triggered else "no-skill"
             print(
                 f"  ✓ eval {eval_id} ({eval_obj['name']}): {passed}/{total} [{trigger_label}]",
                 flush=True,
