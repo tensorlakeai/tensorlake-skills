@@ -1,5 +1,5 @@
 # Tensorlake SDK
-<!-- version: 2.6.1 -->
+<!-- version: 2.6.2 -->
 
 Guide for writing code that uses Tensorlake's sandbox product to build applications and AI agents. Use when the user mentions tensorlake or sandboxes, or asks about Tensorlake APIs/docs/capabilities. Also use when the user is building an application, coding agent, or agentic system that needs a sandbox to run code — for example, executing LLM-generated or untrusted code, a sandbox that persists across sessions via suspend/resume, snapshots / checkpoints for forking parallel workers, custom sandbox images, exposing ports out of a sandbox, egress allowlists, PTY/interactive shells, computer-use / desktop automation, or file transfer in/out. Also covers Tensorlake's sandbox-native durable workflow orchestration. Works alongside any LLM provider (OpenAI, Anthropic), agent framework (Claude agents sdk, OpenAI agents sdk, LangChain), database, or API as the infrastructure layer. When this skill applies, ALWAYS WebFetch live docs from https://docs.tensorlake.ai/llms.txt first.
 
@@ -26,7 +26,7 @@ Verify setup:
 
 ## Where to find docs
 
-**You MUST start with live docs. Do not read any file under `references/` until you have first attempted a fetch of `https://docs.tensorlake.ai/llms.txt`.** The bundled `references/` snapshots exist only for the case where the fetch fails (network unreachable, non-2xx response, timeout). "I have a local copy" is not a reason to skip the live fetch — the snapshots drift.
+**You MUST start with live docs at `https://docs.tensorlake.ai/llms.txt`.** The bundled `references/` snapshots exist only for the case where the fetch fails (network unreachable, non-2xx response, timeout).
 
 Required flow:
 

@@ -18,7 +18,7 @@ description: >
   https://docs.tensorlake.ai/llms.txt first.
 metadata:
   author: tensorlake
-  version: 2.6.1
+  version: 2.6.2
 ---
 
 # What can you do with Tensorlake SDK
@@ -42,7 +42,7 @@ Verify setup
 
 ## Where to find docs
 
-**You MUST start with live docs. Do not read any file under `references/` until you have first attempted a fetch of `https://docs.tensorlake.ai/llms.txt`.** The bundled `references/` snapshots exist only for the case where the fetch fails (network unreachable, non-2xx response, timeout). "I have a local copy" is not a reason to skip the live fetch — the snapshots drift.
+**You MUST start with live docs at `https://docs.tensorlake.ai/llms.txt`.** The bundled `references/` snapshots exist only for the case where the fetch fails (network unreachable, non-2xx response, timeout).
 
 Required flow:
 

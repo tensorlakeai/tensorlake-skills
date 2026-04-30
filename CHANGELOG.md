@@ -2,6 +2,11 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [2.6.2] — 2026-04-30
+
+### Changed
+- **`AGENTS.md`** — re-synced with `SKILL.md` per `CLAUDE.md`. Trimmed the "Where to find docs" intro paragraph to match `SKILL.md`'s shorter form (removed the "Do not read any file under `references/`..." sentence and the "'I have a local copy' is not a reason..." closing line).
+
 ## [2.6.1] — 2026-04-28
 
 ### Changed
