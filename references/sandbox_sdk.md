@@ -208,7 +208,7 @@ const renamed = await client.update("sbx-123", { name: "my-env" });
 console.log(renamed.name);
 ```
 
-> Termination is called on the handle (`sandbox.terminate()` / `await sandbox.terminate()`), not on the `Sandbox` class or `SandboxClient`. There is no `client.delete(id)` — get a handle via `Sandbox.connect(...)` first if you only have an identifier. The `status` field on `SandboxInfo` is the capitalized string form (`"Suspended"`, not `"suspended"`); the lowercase form only appears as `sandbox.status.value` on the Python `SandboxStatus` enum.
+> Termination is called on the handle (`sandbox.terminate()` / `await sandbox.terminate()`), not on the `Sandbox` class or `SandboxClient`. There is **no `sandbox.destroy()`** — that name is a common hallucination from other SDKs (Playwright, Selenium, etc.); the only termination method is `sandbox.terminate()`. There is also no `client.delete(id)` — get a handle via `Sandbox.connect(...)` first if you only have an identifier. The `status` field on `SandboxInfo` is the capitalized string form (`"Suspended"`, not `"suspended"`); the lowercase form only appears as `sandbox.status.value` on the Python `SandboxStatus` enum.
 
 Port exposure is also a `sandbox.update(...)` operation — see [Networking → Port Exposure](#port-exposure).
 
@@ -353,6 +353,15 @@ await sandbox.deleteFile("/workspace/data.csv");
 
 Best practice: use `/workspace` as the default working directory.
 
+**CLI shortcut — `tl sbx cp`:** mirrors `scp` syntax for transferring files between your machine and a sandbox. The `<sandbox-id-or-name>:/path` form indicates the sandbox side; the bare path is local.
+
+```bash
+tl sbx cp ./data.csv <sandbox-id>:/workspace/input.csv     # Upload
+tl sbx cp <sandbox-id>:/workspace/output.parquet ./out.pq  # Download
+```
+
+> **`tl sbx cp` is file-only today** — it does not support recursive directory copy. For directory transfers, use the Python SDK, TypeScript SDK, or the raw file API (e.g., tar the directory locally, upload the archive with `write_file`, then extract inside the sandbox with `sandbox.run("tar", [...])`).
+
 ### Environment Variables
 
 Pass `env` per invocation — choose the scope that matches the lifetime you want:
@@ -492,9 +501,12 @@ pty = sandbox.create_pty(
 # Subscribe to output: pty.on_data(callback), pty.on_exit(callback)
 
 pty.send_input("pwd\nexit\n")
-print(pty.wait())
+exit_code = pty.wait()       # block until the PTY exits naturally
+pty.kill()                   # idempotent; safe even if already exited
+sandbox.terminate()          # final sandbox teardown
 
-# Reconnect to an existing PTY session
+# Reconnect to an existing PTY session — only works if the previous
+# client called pty.disconnect() (or crashed) rather than pty.kill()
 pty = sandbox.connect_pty(session_id, token)
 ```
 
@@ -512,10 +524,20 @@ const pty = await sandbox.createPty({
 });
 
 await pty.sendInput("pwd\nexit\n");
-console.log(await pty.wait());
+const exitCode = await pty.wait();   // block until PTY exits
+await pty.kill();                    // idempotent
+await sandbox.terminate();
 ```
 
 > **Python differs.** `create_pty()` in Python does not accept `on_data` / `on_exit` in its keyword arguments. Attach them after creation via `pty.on_data(callback)` and `pty.on_exit(callback)` instead. TypeScript supports both forms — at-creation in the options object, or post-creation via `pty.onData(...)` / `pty.onExit(...)`.
+
+> **PTY lifecycle: four distinct methods, do not conflate them.**
+> - `pty.wait()` — blocks until the PTY exits naturally and returns the exit code. **Does not initiate teardown** on its own; if the shell never exits, `wait()` never returns.
+> - `pty.disconnect()` — closes the WebSocket but **leaves the PTY running server-side**. The session can be reattached later via `sandbox.connect_pty(session_id, token)`. Use this when your client is going away but the shell should keep running (e.g., your script may crash and restart).
+> - `pty.kill()` — terminates the PTY session over HTTP. After `kill()`, `connect_pty(...)` will fail because the session is gone.
+> - `sandbox.terminate()` — tears down the **entire sandbox**, killing any PTYs and processes inside it. There is no `sandbox.destroy()`.
+>
+> Typical patterns: agent driving a one-shot command → `wait()` → `kill()` → `terminate()`. Agent that needs to survive a client crash → `disconnect()` (no `kill`, no `terminate`) → reconnect later via `connect_pty(session_id, token)`.
 
 ## Sandbox Images
 

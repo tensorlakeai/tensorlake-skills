@@ -2,6 +2,12 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [2.6.3] — 2026-04-30
+
+### Changed
+- **`references/sandbox_persistence.md`** — added a callout in the "Restore from a Snapshot" section directing agents to read an existing snapshot's type from the documented inspection API (`Sandbox.get_snapshot(...).snapshot_type` / `Sandbox.getSnapshot(...).snapshotType` / `tl sbx checkpoint ls` / `GET /snapshots/<id>` / dashboard) instead of deducing from creation-time defaults. Bumped `Last verified:` to 2026-04-30 in both the file header and `.github/scripts/sources.yaml`.
+- **`evals/evals.json`** — tightened task 15 (`filesystem-snapshot-restore-with-resource-overrides`): the snapshot-type-inspection expectation is now an unconditional requirement and explicitly disallows deducing the type from `CheckpointType` defaults.
+
 ## [2.6.2] — 2026-04-30
 
 ### Changed

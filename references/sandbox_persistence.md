@@ -3,7 +3,7 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/lifecycle.md
   - https://docs.tensorlake.ai/sandboxes/snapshots.md
 SDK version: tensorlake 0.5.5
-Last verified: 2026-04-28
+Last verified: 2026-04-30
 -->
 
 # TensorLake Sandbox Persistence
@@ -203,6 +203,8 @@ Create a new sandbox from a snapshot. Behavior depends on the snapshot type (see
 
 - **Filesystem snapshot (default):** the new sandbox boots onto the captured filesystem. You may pass `cpus=`, `memory_mb=`, and `disk_mb=` to `Sandbox.create(snapshot_id=...)` (or `--cpus`, `--memory`, `--disk_mb` on the CLI) to override resources. `disk_mb` is **growth-only** — range `10240`–`102400` MiB (10–100 GiB). Image is locked to the snapshot.
 - **Memory snapshot:** the new sandbox warm-restores filesystem, memory, and running processes **exactly as they were**. Image, resources (CPUs, memory, disk), entrypoint, and secrets all come from the snapshot and cannot be changed at restore time. If you need different resources, create a fresh sandbox instead of restoring.
+
+> **Don't deduce the snapshot type from creation defaults — read it from the API.** When a user asks "does the kind of my existing snapshot matter?" or wants to restore with overrides, do not guess based on "the default is filesystem unless `CheckpointType.MEMORY` was passed." Point them at `Sandbox.get_snapshot(snapshot_id).snapshot_type` (Python) / `Sandbox.getSnapshot(...).snapshotType` (TypeScript) / `tl sbx checkpoint ls` (CLI) / `GET /snapshots/<id>` (REST) — the documented metadata inspection. The dashboard surfaces this too. Defaults can change and the snapshot may have been created by someone else; the API is authoritative.
 
 **Python:**
 

@@ -18,7 +18,7 @@ description: >
   https://docs.tensorlake.ai/llms.txt first.
 metadata:
   author: tensorlake
-  version: 2.6.2
+  version: 2.6.3
 ---
 
 # What can you do with Tensorlake SDK
