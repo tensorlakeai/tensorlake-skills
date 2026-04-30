@@ -9,15 +9,19 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/agentic-swarm-intelligence.md
   - https://docs.tensorlake.ai/sandboxes/gspo-agentic-rl.md
 SDK version: tensorlake 0.5.0
-Last verified: 2026-04-27
+Last verified: 2026-04-30
 -->
 
-# TensorLake Sandbox Advanced Patterns
+# TensorLake Sandbox Use Cases
 
 ## Table of Contents
 
 - [Skills in Sandboxes](#skills-in-sandboxes)
 - [AI Code Execution](#ai-code-execution)
+- [Agentic Swarm Intelligence](#agentic-swarm-intelligence)
+- [Agentic Autoresearch Loop](#agentic-autoresearch-loop)
+- [RL Reproducible Environments](#rl-reproducible-environments)
+- [RL Training with GSPO](#rl-training-with-gspo)
 - [Data Analysis](#data-analysis)
 - [CI/CD Build Pipelines](#cicd-build-pipelines)
 
@@ -221,6 +225,216 @@ Do not work around the fresh-process model by building a persistent interpreter:
 - **Don't tell the downstream LLM that variables persist across turns** in its system prompt. They don't. Tell it instead: "You have a persistent workspace directory and installed packages; module imports and variables reset between calls — write intermediate state to `/workspace/` if you need it across turns."
 - **Don't flip `allow_internet_access=True` to enable pip for untrusted code.** Pre-install dependencies into a custom `Image` or a snapshot, then boot the sandbox from that snapshot with `snapshot_id=`.
 - **Don't fabricate methods or fields.** There is no `sandbox.exec()`, `sandbox.python()`, `sandbox.eval()`, `sandbox.repl()`, or `persistent=True` / `repl_mode=True` / `session=True` kwarg. The return object has `stdout`, `stderr`, `exit_code` — not `.output`, `.result`, or `.logs`.
+
+---
+
+## Agentic Swarm Intelligence
+
+Map-reduce over LLM agents: each worker generates perspective-specific code, executes it in its own sandbox, and a lead agent aggregates the worker reports.
+
+### Pattern
+
+1. **Workers (map)** — N specialist agents, each prompts an LLM for code from its own perspective
+2. **Sandbox per worker** — generated code runs in an isolated sandbox with `allow_internet_access=False`
+3. **Lead (reduce)** — aggregator agent synthesizes worker reports into final insights
+
+### Python
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+from pydantic import BaseModel
+from tensorlake.sandbox import Sandbox
+
+class ScoutReport(BaseModel):
+    agent_id: str
+    raw_data: str
+
+def scout_agent(task_id: str) -> ScoutReport:
+    code = generate_perspective_code(task_id)  # LLM call
+    sandbox = Sandbox.create(allow_internet_access=False)
+    try:
+        sandbox.run("pip", ["install", "--user", "--break-system-packages", "numpy"])
+        result = sandbox.run("python", ["-c", code])
+        return ScoutReport(agent_id=task_id, raw_data=result.stdout)
+    finally:
+        sandbox.terminate()
+
+def intelligence_swarm(task_ids: list[str]):
+    with ThreadPoolExecutor(max_workers=len(task_ids)) as pool:
+        reports = list(pool.map(scout_agent, task_ids))
+    return lead_aggregator(reports)  # LLM synthesis
+```
+
+### TypeScript
+
+```typescript
+import { Sandbox } from "tensorlake";
+
+async function scoutAgent(taskId: string) {
+  const code = await generatePerspectiveCode(taskId);
+  const sandbox = await Sandbox.create({ allowInternetAccess: false });
+  try {
+    const result = await sandbox.run("python", { args: ["-c", code] });
+    return { agentId: taskId, rawData: result.stdout };
+  } finally {
+    await sandbox.terminate();
+  }
+}
+
+const reports = await Promise.all(taskIds.map(scoutAgent));
+```
+
+### Latency optimization
+
+Pre-create a snapshot with the common deps (numpy, pandas, etc.) and boot each scout from `snapshot_id=` instead of pip-installing per call.
+
+---
+
+## Agentic Autoresearch Loop
+
+Iterative ML script self-improvement: an LLM agent proposes candidate code modifications, parallel sandboxes race them, and a greedy hill-climbing loop accepts the winner if it lowers validation loss.
+
+### Loop structure
+
+1. **Calibration** — run the baseline script in a sandbox to establish starting validation loss
+2. **Proposal** — agent generates N candidates with increasing temperatures (e.g. `0.9 + i * 0.1`)
+3. **Parallel race** — each candidate runs in its own sandbox with a fixed step budget
+4. **Evaluation** — parse `val_loss` from stdout, rank
+5. **Hill-climb** — accept the winner only if it beats the current best
+6. **Iterate** — repeat with the updated script and the last 8 experiments as memory
+
+### TypeScript: sandbox per candidate
+
+```typescript
+async function evaluateCandidate(script: string) {
+  const sandbox = await Sandbox.create({
+    cpus: 2.0,
+    memoryMb: 4096,
+    timeoutSecs: 900,
+  });
+  try {
+    await sandbox.writeFile("/workspace/train.py", script);
+    const result = await sandbox.run("python", { args: ["/workspace/train.py"] });
+    const match = result.stdout.match(/val_loss:\s*([0-9.]+)/);
+    return { valLoss: match ? Number(match[1]) : Infinity };
+  } finally {
+    await sandbox.terminate();
+  }
+}
+```
+
+### Why sandboxes here
+
+- LLM-generated training code is untrusted — running it in your host process risks arbitrary fs/network ops
+- Per-candidate isolation means a runaway candidate can't affect siblings
+- Fixed `STEPS` budget (treated as immutable in agent guidance) prevents reward hacking via longer training
+
+### Operational modes
+
+- **Smoke** — 3 iterations × 2 candidates × 150 steps (~5 minutes)
+- **Full** — 8 iterations × 3 candidates × 300 steps (~20 minutes)
+
+---
+
+## RL Reproducible Environments
+
+Use sandboxes as deterministic, isolated rollout environments for reinforcement learning. Same seed + same action sequence = byte-identical trajectory.
+
+### Pattern
+
+- One fresh sandbox per rollout — isolation is structural, not dependent on cleanup
+- Embed the seed *into the harness script*, not on the host (keeps host-side RNG out of the loop)
+- For gymnasium envs, seed both the env *and* the action space:
+
+```python
+env.reset(seed=seed)
+env.action_space.seed(seed)
+```
+
+### Parallel rollouts (Python)
+
+```python
+import json
+from concurrent.futures import ThreadPoolExecutor
+from tensorlake.sandbox import Sandbox
+
+def rollout(seed: int):
+    sandbox = Sandbox.create()
+    try:
+        harness = f"""
+import gymnasium, json
+env = gymnasium.make("CartPole-v1")
+obs, _ = env.reset(seed={seed})
+env.action_space.seed({seed})
+trajectory = []
+for _ in range(200):
+    action = env.action_space.sample()
+    obs, reward, done, trunc, _ = env.step(action)
+    trajectory.append((int(action), float(reward)))
+    if done or trunc:
+        break
+print(json.dumps(trajectory))
+"""
+        result = sandbox.run("python", ["-c", harness])
+        return json.loads(result.stdout)
+    finally:
+        sandbox.terminate()
+
+with ThreadPoolExecutor(max_workers=4) as pool:
+    trajectories = list(pool.map(rollout, [42, 43, 44, 45]))
+```
+
+### Why fresh-per-rollout
+
+- Cached pip packages, `/tmp` files, and residual process state from a prior episode break reproducibility
+- ThreadPoolExecutor manages concurrency; sandboxes manage isolation — separate concerns
+
+---
+
+## RL Training with GSPO
+
+Use sandboxes as a reward oracle for fine-tuning code-generation models with Group Sequence Policy Optimization.
+
+### Two-phase strategy
+
+1. **SFT warmup** — supervised fine-tune on reference solutions so the model emits valid Python. Without this, all completions score 0 and there's no gradient signal.
+2. **GSPO fine-tune** — trainer generates G completions per step, dispatches each to a sandbox, receives `tests_passed / total_tests` as reward.
+
+### GSPO vs GRPO
+
+| Aspect | GRPO | GSPO |
+|---|---|---|
+| Importance sampling | per-token: `clip(π_θ(t) / π_old(t))` | sequence-level: `clip(∏_t π_θ(t) / π_old(t))` |
+| Best for | token-level control | long function bodies — trajectory-level treatment avoids noisy single tokens dominating the gradient |
+
+### Sandbox reward function
+
+```python
+from tensorlake.sandbox import Sandbox
+
+def reward(completion: str, hidden_tests: str) -> float:
+    sandbox = Sandbox.create(allow_internet_access=False)
+    try:
+        sandbox.write_file("/workspace/solution.py", completion)
+        sandbox.write_file("/workspace/tests.py", hidden_tests)
+        result = sandbox.run("pytest", ["/workspace/tests.py", "--tb=no", "-q"],
+                            working_dir="/workspace")
+        return parse_pass_rate(result.stdout)  # tests_passed / total_tests
+    finally:
+        sandbox.terminate()
+```
+
+The model never sees the test files — preventing reward hacking.
+
+### Key hyperparameters
+
+- `importance_sampling_level="sequence"` — enables GSPO
+- `temperature=1.4` — forces diversity across G completions; without it, GSPO collapses to zero reward variance
+- Hidden pytest suite per task (4 tests typical), 75/25 train/eval split
+
+### Expected scale
+
+A 135M-parameter model with this loop reaches ~25% pass rate on held-out functions after limited training. Pre-training baseline is ~0%.
 
 ---
 

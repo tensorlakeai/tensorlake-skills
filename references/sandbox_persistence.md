@@ -364,4 +364,4 @@ Rule of thumb: **suspend** when you want *this* sandbox back later; **checkpoint
 ## See Also
 
 - [sandbox_sdk.md](sandbox_sdk.md) — create, connect, run commands, file ops, processes, networking, images
-- [sandbox_advanced.md](sandbox_advanced.md) — patterns: skills-in-sandboxes, AI code execution, CI/CD
+- [sandbox_usecases.md](sandbox_usecases.md) — patterns: skills-in-sandboxes, AI code execution, CI/CD

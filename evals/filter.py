@@ -14,9 +14,9 @@ bumps, docs — is ignored. Full runs are triggered manually via the
 workflow's `workflow_dispatch` entry point.
 
 Today every eval references a `sandbox_*.md` file, so a PR that only
-touches `applications_sdk.md` / `documentai_sdk.md` / `integrations.md`
-/ `platform.md` / `troubleshooting.md` produces an empty result and the
-CI workflow skips the eval job.
+touches `applications_sdk.md` / `integrations.md` / `platform.md` /
+`troubleshooting.md` produces an empty result and the CI workflow skips
+the eval job.
 """
 import json
 import sys

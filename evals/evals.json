@@ -64,7 +64,7 @@
       "id": 4,
       "name": "sandbox-as-untrusted-llm-code-execution-tool",
       "references": [
-        "sandbox_advanced.md#ai-code-execution",
+        "sandbox_usecases.md#ai-code-execution",
         "sandbox_sdk.md#execute-commands",
         "sandbox_sdk.md#outbound-internet-control"
       ],
@@ -216,7 +216,7 @@
       "id": 12,
       "name": "sandbox-image-with-bundled-skills",
       "references": [
-        "sandbox_advanced.md#skills-in-sandboxes",
+        "sandbox_usecases.md#skills-in-sandboxes",
         "sandbox_sdk.md#sandbox-images"
       ],
       "prompt": "I'm building a coding-agent setup where Claude Code runs *inside* the Tensorlake sandbox and uses the tensorlake skill (so it can look up SDK references at startup). Build me a custom image that has Node, the `skills` CLI, the tensorlake-skills bundle preinstalled at the right discovery path for Claude Code, and the `tensorlake` Python package. Register it as `agent-with-tl-skills`. Python SDK. And — important — I do NOT want this touching my laptop's `~/.claude/skills/` directory; the skill should only live inside the image.",

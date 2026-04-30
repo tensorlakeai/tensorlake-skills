@@ -28,6 +28,8 @@ def next_iteration() -> int:
 
 
 SKILL_NAME = "tensorlake"
+SKILL_CONTENT_PATHS = ("SKILL.md", "AGENTS.md", "references/")
+FILE_READ_TOOLS = {"Read", "Grep", "Glob"}
 FILE_WRITE_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 FILES_MAX_BYTES = 200_000
 FILES_TOTAL_MAX_BYTES = 1_000_000
@@ -52,17 +54,35 @@ def iter_assistant_tool_uses(stream_lines):
 
 
 def detect_skill_trigger(stream_lines: list[str]) -> dict:
-    """Scan stream-json output for a Skill tool_use that loads the tensorlake skill.
+    """Decide whether the run actually used the tensorlake skill.
 
-    Returns {"skill_triggered": bool, "skill_invocations": [...]}.
+    Two signals count:
+      1. A `Skill` tool_use naming the tensorlake skill (the loader path).
+      2. A read of skill content — `SKILL.md`, `AGENTS.md`, or anything under
+         `references/` — via Read/Grep/Glob. The harness auto-injects the
+         skill description into the system prompt, so a model may consult
+         skill content directly without ever issuing a Skill call.
     """
-    invocations = [
-        inp.get("skill", "")
-        for name, inp in iter_assistant_tool_uses(stream_lines)
-        if name == "Skill"
-    ]
-    triggered = any(SKILL_NAME in s.lower() for s in invocations)
-    return {"skill_triggered": triggered, "skill_invocations": invocations}
+    invocations: list[str] = []
+    content_reads: list[str] = []
+    for name, inp in iter_assistant_tool_uses(stream_lines):
+        if name == "Skill":
+            invocations.append(inp.get("skill", ""))
+            continue
+        if name not in FILE_READ_TOOLS:
+            continue
+        path = inp.get("file_path") or inp.get("path") or inp.get("pattern") or ""
+        if any(marker in path for marker in SKILL_CONTENT_PATHS):
+            content_reads.append(path)
+    triggered = (
+        any(SKILL_NAME in s.lower() for s in invocations)
+        or bool(content_reads)
+    )
+    return {
+        "skill_triggered": triggered,
+        "skill_invocations": invocations,
+        "skill_content_reads": content_reads,
+    }
 
 
 def extract_final_text(stream_lines: list[str]) -> str:

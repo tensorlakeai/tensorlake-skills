@@ -1,10 +1,20 @@
-# Maps each bundled reference file to its upstream doc sources.
-# The drift-check script fetches these URLs and compares against the local file.
+# Maps each bundled reference snapshot to its upstream doc sources.
+#
+# Live docs at docs.tensorlake.ai are the primary source of truth (see
+# references/feature_lookup.md and the skill's Documentation lookup
+# section). The files under references/ are offline-fallback snapshots
+# for use when network access is unavailable. The drift-check script
+# fetches these URLs and compares against the local snapshot to surface
+# divergence — divergence is expected over time and not a build break,
+# but the staleness should be visible.
+#
+# feature_lookup.md is a curated index, not a doc-page snapshot, and
+# therefore has no entry here.
 #
 # Fields:
-#   sources     – doc pages consolidated into this reference file
-#   sdk_version – tensorlake SDK version the reference was written for
-#   last_verified – date someone last confirmed the reference matches live docs
+#   sources       – doc pages consolidated into this reference file
+#   sdk_version   – tensorlake SDK version the snapshot was written for
+#   last_verified – date someone last confirmed the snapshot matches live docs
 
 sandbox_sdk.md:
   sources:
@@ -59,30 +69,6 @@ applications_sdk.md:
   sdk_version: "0.5.0"
   last_verified: "2026-04-24"
 
-documentai_sdk.md:
-  sources:
-    - https://docs.tensorlake.ai/document-ingestion/overview.md
-    - https://docs.tensorlake.ai/document-ingestion/quickstart.md
-    - https://docs.tensorlake.ai/document-ingestion/parsing/read.md
-    - https://docs.tensorlake.ai/document-ingestion/parsing/structured-extraction.md
-    - https://docs.tensorlake.ai/document-ingestion/parsing/page-classification.md
-    - https://docs.tensorlake.ai/document-ingestion/parsing/edit.md
-    - https://docs.tensorlake.ai/document-ingestion/parsing/parse-output.md
-    - https://docs.tensorlake.ai/document-ingestion/parsing/docx-parsing.md
-    - https://docs.tensorlake.ai/document-ingestion/parsing/chart-extraction.md
-    - https://docs.tensorlake.ai/document-ingestion/parsing/key-value-extraction.md
-    - https://docs.tensorlake.ai/document-ingestion/parsing/header-correction.md
-    - https://docs.tensorlake.ai/document-ingestion/parsing/table-merging.md
-    - https://docs.tensorlake.ai/document-ingestion/parsing/signature.md
-    - https://docs.tensorlake.ai/document-ingestion/parsing/barcode.md
-    - https://docs.tensorlake.ai/document-ingestion/parsing/summarization.md
-    - https://docs.tensorlake.ai/document-ingestion/datasets/create.md
-    - https://docs.tensorlake.ai/document-ingestion/datasets/data.md
-    - https://docs.tensorlake.ai/document-ingestion/file-management/overview.md
-    - https://docs.tensorlake.ai/document-ingestion/parsing/on-prem.md
-  sdk_version: "0.5.0"
-  last_verified: "2026-04-24"
-
 integrations.md:
   sources:
     - https://docs.tensorlake.ai/integrations/overview.md
@@ -113,10 +99,10 @@ platform.md:
   sdk_version: "0.5.0"
   last_verified: "2026-04-24"
 
-sandbox_advanced.md:
+sandbox_usecases.md:
   sources:
     - https://docs.tensorlake.ai/sandboxes/skills-in-sandboxes.md
-    - https://docs.tensorlake.ai/sandboxes/tool-calls.md
+    - https://docs.tensorlake.ai/sandboxes/ai-code-execution.md
     - https://docs.tensorlake.ai/sandboxes/data-analysis.md
     - https://docs.tensorlake.ai/sandboxes/cicd-build.md
     - https://docs.tensorlake.ai/sandboxes/agentic-autoresearch.md
@@ -124,7 +110,7 @@ sandbox_advanced.md:
     - https://docs.tensorlake.ai/sandboxes/agentic-swarm-intelligence.md
     - https://docs.tensorlake.ai/sandboxes/gspo-agentic-rl.md
   sdk_version: "0.5.0"
-  last_verified: "2026-04-27"
+  last_verified: "2026-04-30"
 
 troubleshooting.md:
   sources:
