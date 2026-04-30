@@ -107,7 +107,7 @@ platform.md:
 sandbox_usecases.md:
   sources:
     - https://docs.tensorlake.ai/sandboxes/skills-in-sandboxes.md
-    - https://docs.tensorlake.ai/sandboxes/ai-code-execution.md
+    - https://docs.tensorlake.ai/sandboxes/tool-calls.md
     - https://docs.tensorlake.ai/sandboxes/data-analysis.md
     - https://docs.tensorlake.ai/sandboxes/cicd-build.md
     - https://docs.tensorlake.ai/sandboxes/agentic-autoresearch.md

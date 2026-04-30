@@ -1,57 +1,43 @@
 # Tensorlake Skill
 
-Build production agent workflows with [Tensorlake's](https://tensorlake.ai).
+A lightweight skill that points coding agents at the live [Tensorlake](https://tensorlake.ai) docs whenever they need to write Tensorlake code.
 
-This skill helps coding agents use Tensorlake to build real agent systems with sandboxed execution and orchestration. It covers the **Python** (`pip install tensorlake`) and **TypeScript** (`npm install tensorlake`) SDKs, plus the **CLI** (`curl -fsSL https://tensorlake.ai/install | sh`). It is designed for modern agent use cases like multi-agent applications, isolated code execution, long-running workflows, and tool-using agents that need a real workspace.
+Tensorlake's docs change frequently. Rather than freezing a large chunk of API surface into the skill, this skill stays small: it tells the agent what Tensorlake is, makes sure the SDK and `TENSORLAKE_API_KEY` are set up, and then routes it to `https://docs.tensorlake.ai/llms.txt` to fetch the live docs that match the task. It covers the **Python** (`pip install tensorlake`) and **TypeScript** (`npm install tensorlake`) SDKs, plus the **CLI** (`curl -fsSL https://tensorlake.ai/install | sh`).
 
-Instead of treating Tensorlake as just another API, this skill teaches agents how to use Tensorlake as infrastructure: run tasks in isolated environments with the Sandbox SDK, coordinate durable workflows with the sandbox-native Orchestration SDK, and compose reliable agent systems for production use.
-
-Use it when you want your coding agent to build:
-
-- multi-agent applications
-- sandboxed coding or execution workflows
-- agent teams with separate workspaces
-- long-running or stateful agent systems
-- production-ready orchestration patterns
+Bundled snapshots under `references/` are an offline fallback only — used when the live fetch fails (network unreachable, non-2xx, timeout). They are not the source of truth and are expected to lag.
 
 ## What This Skill Does
 
-It guides agents to:
+When it triggers, the skill instructs the agent to:
 
-- use the **Sandbox SDK** for agent execution environments and isolated tool calls
-- use the **Orchestration SDK** for sandbox-native durable workflow orchestration and multi-agent coordination
-- combine both SDKs to build production-style agent systems
-- choose Tensorlake patterns that are better than a single-agent or stateless approach
+1. Verify the SDK is installed and `TENSORLAKE_API_KEY` is configured.
+2. `WebFetch https://docs.tensorlake.ai/llms.txt` to get the current doc index.
+3. From that index, fetch the `.md` page(s) relevant to the task and use them as the source of truth.
+4. Only on fetch failure, fall back to [`references/feature_lookup.md`](references/feature_lookup.md), which routes features and keywords to a bundled snapshot.
 
-The skill is especially useful for tasks like:
+It also enforces a few guardrails: verify every symbol against the live docs or installed package before suggesting code, prefer live docs over snapshots when they disagree, and never request, embed, or print API keys.
 
-- running code, scripts, or services inside isolated sandboxes
-- giving each agent its own workspace, files, and execution environment
-- running interactive shell sessions inside sandboxes (with reconnect across processes) for coding agents that need shell continuity
-- driving a sandboxed Linux desktop with screenshot, keyboard, and mouse for computer-use agents
-- exposing a port from inside a sandbox to a public URL so agents can serve a webapp, API, or dev server
-- forking a snapshot into N parallel sandboxes for batch or map-style workloads
-- building agentic applications with an orchestrator and specialist sub-agents
-- coordinating parallel agents and collecting their outputs
-- building demos and prototypes that show why agent infrastructure matters
-Works with any LLM provider (OpenAI, Anthropic) and any agent framework (LangChain, etc.). Tensorlake is the infrastructure layer — bring your own models and frameworks.
+## When It Triggers
 
-The skill triggers automatically when you ask the agent to:
+The skill activates when the user mentions Tensorlake or sandboxes, or asks the agent to do anything that maps to the Tensorlake product surface — for example:
 
-- Run LLM-generated code in a secure sandbox
-- Build agentic workflows or multi-agent pipelines
-- Orchestrate complex multi-step AI applications
-- Integrate Tensorlake with any LLM, framework, database, or API
+- Run LLM-generated or untrusted code in an isolated sandbox
+- Persist a sandbox across sessions via suspend/resume, or fork from a snapshot
+- Build a custom sandbox image, expose a port, or configure egress allowlists
+- Drive PTY/interactive shells or computer-use / desktop automation
+- Build durable workflows or multi-agent orchestration with the Applications SDK
 - Ask questions about Tensorlake APIs or documentation
+
+It works alongside any LLM provider (OpenAI, Anthropic) and any agent framework (Claude Agents SDK, OpenAI Agents SDK, LangChain, etc.) — Tensorlake is the infrastructure layer.
 
 ## Supported Agents
 
 
-| Agent                                                         | File        | How to Install                               |
-| ------------------------------------------------------------- | ----------- | -------------------------------------------- |
-| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `SKILL.md`  | See [Claude Code installation](#claude-code) |
-| [Google ADK](https://google.github.io/adk-docs/skills/)       | `SKILL.md`  | See [Google ADK installation](#google-adk)   |
-| [OpenAI Codex](https://openai.com/index/codex/)               | `AGENTS.md` | See [Codex installation](#openai-codex)      |
+| Agent                                                         | File        | How to Install                |
+| ------------------------------------------------------------- | ----------- | ----------------------------- |
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `SKILL.md`  | See [Quick Install](#quick-install) |
+| [Google ADK](https://google.github.io/adk-docs/skills/)       | `SKILL.md`  | See [Quick Install](#quick-install) |
+| [OpenAI Codex](https://openai.com/index/codex/)               | `AGENTS.md` | See [Quick Install](#quick-install) |
 
 
 ## Installation
@@ -99,9 +85,11 @@ tensorlake-skills/
 │   ├── filter.py                # Map changed references/** files → impacted eval IDs
 │   └── ci_summary.py            # Render PR summary table (trigger rate + pass/fail)
 └── references/
+    ├── feature_lookup.md         # Curated index — routes features/keywords to the snapshot below
     ├── applications_sdk.md       # Orchestration API reference
     ├── sandbox_sdk.md            # Sandbox API reference
     ├── sandbox_persistence.md    # Sandbox state: snapshots, suspend/resume, state machine
+    ├── computer_use.md           # Desktop automation: XFCE + Firefox, screenshots, mouse/keyboard, noVNC
     ├── integrations.md           # Integration patterns (LangChain, OpenAI, ChromaDB, Qdrant, etc.)
     ├── platform.md               # Webhooks, auth, access control, EU data residency
     ├── sandbox_usecases.md       # Skills-in-sandboxes, AI code execution, data analysis, CI/CD
@@ -164,8 +152,8 @@ Each reference file has a source header that tracks which doc pages it was built
 Source:
   - https://docs.tensorlake.ai/sandboxes/lifecycle.md
   - https://docs.tensorlake.ai/sandboxes/commands.md
-SDK version: tensorlake 0.5.0
-Last verified: 2026-04-24
+SDK version: tensorlake 0.5.5
+Last verified: 2026-04-30
 -->
 ```
 
