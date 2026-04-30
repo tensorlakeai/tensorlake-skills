@@ -11,30 +11,57 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/networking.md
   - https://docs.tensorlake.ai/sandboxes/images.md
   - https://docs.tensorlake.ai/sandboxes/pty-sessions.md
-  - https://docs.tensorlake.ai/sandboxes/computer-use.md
   - https://docs.tensorlake.ai/sandboxes/docker.md
 SDK version: tensorlake 0.5.5
-Last verified: 2026-04-28
+Last verified: 2026-04-30
 -->
 
 # TensorLake Sandbox SDK Reference
 
 TensorLake Sandboxes are MicroVMs backed by Firecracker and CloudHypervisor. The `ubuntu-minimal` base image starts up in a few hundred milliseconds; `ubuntu-systemd` takes around 1 second to boot. The platform is HIPAA and SOC 2 Type II compliant, supports EU data residency, and offers zero data retention.
 
-For state management (snapshots, suspend/resume, ephemeral vs named, state machine), see [sandbox_persistence.md](sandbox_persistence.md).
+For state management (snapshots, suspend/resume, ephemeral vs named), see [sandbox_persistence.md](sandbox_persistence.md). For desktop automation / computer-use (the `ubuntu-vnc` image, `sandbox.connect_desktop()`, screenshot and keyboard/mouse APIs, noVNC bridge), see [computer_use.md](computer_use.md).
 
-> `Sandbox` is the preferred handle for create/connect/run/suspend/resume/checkpoint and also for **rename and port exposure** via the `sandbox.update(name=..., exposed_ports=..., allow_unauthenticated_access=...)` instance method. `SandboxClient` still ships and emits a `DeprecationWarning` on construction; only `client.list()` lacks a direct `Sandbox`-level replacement. `Sandbox.name`, `Sandbox.status`, and `Sandbox.sandbox_id` are properties (no parens). `sandbox.status` returns a `SandboxStatus` enum (`SandboxStatus.RUNNING`, `.SUSPENDED`, etc.) — use `sandbox.status.value` for the lowercase string form. Snapshot creation is `sandbox.checkpoint()`; restore is `Sandbox.create(snapshot_id=...)`.
+> `Sandbox` is the preferred handle for create/connect/run/suspend/resume/checkpoint and also for **rename and port exposure** via `sandbox.update(name=..., exposed_ports=..., allow_unauthenticated_access=...)`. `SandboxClient` still ships and emits a `DeprecationWarning` on construction; only `client.list()` lacks a direct `Sandbox`-level replacement. `Sandbox.name`, `Sandbox.status`, and `Sandbox.sandbox_id` are properties (no parens). `sandbox.status` returns a `SandboxStatus` enum (`SandboxStatus.RUNNING`, `.SUSPENDED`, etc.) — use `sandbox.status.value` for the lowercase string form. Snapshot creation is `sandbox.checkpoint()`; restore is `Sandbox.create(snapshot_id=...)`.
 
 ## Table of Contents
 
-- [Imports](#imports)
-- [Sandbox — Static Methods](#sandbox--static-methods)
-- [Sandbox — Instance Methods](#sandbox--instance-methods)
-- [Computer Use (Desktop Automation)](#computer-use-desktop-automation)
-- [Sandbox Images](#sandbox-images)
-- [Networking](#networking)
-- [Data Models](#data-models)
-- [CLI Quick Reference](#cli-quick-reference)
+- [TensorLake Sandbox SDK Reference](#tensorlake-sandbox-sdk-reference)
+  - [Table of Contents](#table-of-contents)
+  - [Imports](#imports)
+  - [Managing Sandboxes](#managing-sandboxes)
+    - [Create a Sandbox](#create-a-sandbox)
+    - [Connect to an Existing Sandbox](#connect-to-an-existing-sandbox)
+    - [List and Rename](#list-and-rename)
+  - [Working in a Sandbox](#working-in-a-sandbox)
+    - [Suspend, Resume, Terminate](#suspend-resume-terminate)
+    - [Checkpoint and Restore](#checkpoint-and-restore)
+    - [Get and Delete Snapshots](#get-and-delete-snapshots)
+    - [Run a Command](#run-a-command)
+    - [File Operations](#file-operations)
+    - [Environment Variables](#environment-variables)
+    - [Background Processes](#background-processes)
+    - [Writing to stdin](#writing-to-stdin)
+    - [PTY Sessions](#pty-sessions)
+  - [Sandbox Images](#sandbox-images)
+    - [Define an Image](#define-an-image)
+    - [Build / Register the Image](#build--register-the-image)
+    - [Base Images](#base-images)
+    - [Image Builder Methods (chainable)](#image-builder-methods-chainable)
+    - [Supported Build Operations](#supported-build-operations)
+    - [Launching Sandboxes from Custom Images](#launching-sandboxes-from-custom-images)
+    - [Running Docker Inside a Sandbox](#running-docker-inside-a-sandbox)
+  - [Networking](#networking)
+    - [Public URLs](#public-urls)
+    - [Port Exposure](#port-exposure)
+    - [Outbound Internet Control](#outbound-internet-control)
+  - [Data Models](#data-models)
+    - [SandboxInfo](#sandboxinfo)
+    - [CommandResult](#commandresult)
+    - [ProcessInfo](#processinfo)
+    - [SnapshotInfo](#snapshotinfo)
+    - [Process Status / Mode Enums](#process-status--mode-enums)
+  - [CLI Quick Reference](#cli-quick-reference)
 
 ## Imports
 
@@ -50,11 +77,9 @@ from tensorlake.sandbox import Sandbox
 import { Sandbox } from "tensorlake";
 ```
 
-Install: `pip install tensorlake` (Python) or `npm install tensorlake` (TypeScript). Both ship with the `tl` and `tensorlake` CLI tools. Authenticate once with `tl login`, or export `TENSORLAKE_API_KEY` in the environment.
+## Managing Sandboxes
 
-## Sandbox — Static Methods
-
-All sandbox lifecycle operations live as static methods on the `Sandbox` class.
+Creating, connecting to, listing, renaming, and managing snapshots are operations on the `Sandbox` class itself (called as `Sandbox.create(...)`, `Sandbox.connect(...)`, etc.) rather than on a specific sandbox handle.
 
 ### Create a Sandbox
 
@@ -84,10 +109,6 @@ print(named.sandbox_id)        # server-assigned UUID, e.g. "5gm9wex8dm6ko1ed441
 print(named.name)              # "my-agent-env"
 print(named.status)            # SandboxStatus.RUNNING
 print(named.status.value)      # "running"
-
-# Port exposure is a post-create operation — see "Port Exposure" below.
-# Use sandbox.update(exposed_ports=[8080], allow_unauthenticated_access=False)
-# or SandboxClient().expose_ports(...).
 ```
 
 **TypeScript:**
@@ -112,11 +133,9 @@ const named = await Sandbox.create({
 console.log(named.sandboxId);
 console.log(named.name);
 console.log(named.status);
-
-// Port exposure is a post-create operation — see "Port Exposure" below.
 ```
 
-`Sandbox.create()` returns an operable `Sandbox` handle that is already connected — you can call instance methods on it directly without a separate `connect()` step.
+`Sandbox.create()` returns an operable `Sandbox` handle that is already connected — you can call methods on it directly without a separate `connect()` step. Port exposure is a post-create operation; see [Port Exposure](#port-exposure) under Networking.
 
 ### Connect to an Existing Sandbox
 
@@ -143,16 +162,16 @@ const result = await sandbox.run("python", { args: ["main.py"] });
 console.log(result.stdout);
 ```
 
-### List, Update
+### List and Rename
 
-Rename and port-exposure live on the `Sandbox` instance via `sandbox.update(...)`. `SandboxClient` is still required for listing sandboxes (no instance equivalent) and emits a `DeprecationWarning` on construction.
+Rename and port-exposure live on the `Sandbox` handle via `sandbox.update(...)`. `SandboxClient` is still required for listing sandboxes (no `Sandbox`-level equivalent) and emits a `DeprecationWarning` on construction.
 
 **Python:**
 
 ```python
 from tensorlake.sandbox import Sandbox, SandboxClient
 
-# Rename / promote ephemeral → named, or change exposed ports — instance method (preferred)
+# Rename / promote ephemeral → named, or change exposed ports — preferred form
 info = sandbox.update(name="my-env")                            # -> Traced[SandboxInfo]
 info = sandbox.update(exposed_ports=[8080], allow_unauthenticated_access=False)
 print(info.value.name, info.value.exposed_ports)
@@ -163,7 +182,7 @@ for sb in client.list():                                        # -> iterator[Sa
     print(sb.sandbox_id, sb.status)
 ```
 
-> Legacy client form `client.update_sandbox("sbx-123", "my-env")` still works but is **deprecated** — prefer `sandbox.update(...)` on the instance handle. If you only have a `sandbox_id`, do `Sandbox.connect("sbx-123").update(name="my-env")`.
+> If you only have a `sandbox_id`, bridge to the handle: `Sandbox.connect("sbx-123").update(name="my-env")`. The legacy `client.update_sandbox("sbx-123", "my-env")` form still works but is deprecated.
 
 **TypeScript:**
 
@@ -177,7 +196,7 @@ for (const sb of sandboxes) {
   console.log(sb.sandboxId, sb.name, sb.status, sb.createdAt);
 }
 
-// Filter then terminate — terminate is an INSTANCE method, so connect first
+// Filter then terminate — terminate is called on the handle, so connect first
 const stale = sandboxes.filter((sb) => sb.status === "Suspended");
 for (const sb of stale) {
   const handle = await Sandbox.connect(sb.sandboxId);
@@ -189,29 +208,15 @@ const renamed = await client.update("sbx-123", { name: "my-env" });
 console.log(renamed.name);
 ```
 
-> Termination is an **instance** method (`sandbox.terminate()` / `await sandbox.terminate()`), not a static or client method. There is no `client.delete(id)` — get a handle via `Sandbox.connect(...)` first if you only have an identifier. The `status` field on `SandboxInfo` is the capitalized string form (`"Suspended"`, not `"suspended"`); the lowercase form only appears as `sandbox.status.value` on the Python `SandboxStatus` enum.
+> Termination is called on the handle (`sandbox.terminate()` / `await sandbox.terminate()`), not on the `Sandbox` class or `SandboxClient`. There is no `client.delete(id)` — get a handle via `Sandbox.connect(...)` first if you only have an identifier. The `status` field on `SandboxInfo` is the capitalized string form (`"Suspended"`, not `"suspended"`); the lowercase form only appears as `sandbox.status.value` on the Python `SandboxStatus` enum.
 
-### Snapshot Management (Static)
+Port exposure is also a `sandbox.update(...)` operation — see [Networking → Port Exposure](#port-exposure).
 
-```python
-info = Sandbox.get_snapshot("snap-xyz")          # -> SnapshotInfo
-Sandbox.delete_snapshot("snap-xyz")              # -> None
-```
-
-```typescript
-const info = await Sandbox.getSnapshot("snap-xyz");
-await Sandbox.deleteSnapshot("snap-xyz");
-```
-
-### Port Exposure
-
-Prefer `sandbox.update(exposed_ports=[...], allow_unauthenticated_access=...)` on the instance. `SandboxClient.expose_ports(...)` / `unexpose_ports(...)` and the CLI still work. Full examples and the auth-vs-public trade-off live in [Networking → Port Exposure](#port-exposure) below.
-
-## Sandbox — Instance Methods
+## Working in a Sandbox
 
 Once you have a `Sandbox` handle (from `create` or `connect`), use these methods directly on it.
 
-### Lifecycle
+### Suspend, Resume, Terminate
 
 **Python:**
 
@@ -229,9 +234,9 @@ await sandbox.resume();
 await sandbox.terminate();
 ```
 
-Suspend/resume only works on **named** sandboxes. Ephemeral sandboxes return an error. To convert an ephemeral sandbox into a named one after creation, call `sandbox.update(name="my-env")` on the instance handle — same `sandbox_id` is preserved, no recreation needed. (The legacy `SandboxClient().update_sandbox(id, name)` form still works but is deprecated.) Note: this is fundamentally different from `sandbox.checkpoint()` + `Sandbox.create(snapshot_id=...)`, which produces a *new* sandbox with a *new* `sandbox_id`.
+Suspend/resume only works on **named** sandboxes. Ephemeral sandboxes return an error. To convert an ephemeral sandbox into a named one after creation, call `sandbox.update(name="my-env")` on the handle — same `sandbox_id` is preserved, no recreation needed. (The legacy `SandboxClient().update_sandbox(id, name)` form still works but is deprecated.) Note: this is fundamentally different from `sandbox.checkpoint()` + `Sandbox.create(snapshot_id=...)`, which produces a *new* sandbox with a *new* `sandbox_id`.
 
-### Snapshots (Instance)
+### Checkpoint and Restore
 
 Snapshots persist a sandbox's filesystem, memory, and running processes into a reusable artifact. Unlike suspend, the source sandbox keeps running.
 
@@ -265,7 +270,19 @@ const restored = await Sandbox.create({ snapshotId: snapshot.snapshotId });
 
 Restore behavior depends on the snapshot type — see [sandbox_persistence.md → Snapshot Types](sandbox_persistence.md#snapshot-types--filesystem-default-vs-full) for the full table. In short: **filesystem snapshots (the default)** accept `cpus=`, `memory_mb=`, and `disk_mb=` overrides at restore (`disk_mb` is **growth-only**, range `10240`–`102400` MiB / 10–100 GiB) — useful for booting on bigger hardware than where the snapshot was baked. **Full snapshots** lock image, resources, entrypoint, and secrets to the snapshot; if you need different resources from a full snapshot, create a fresh sandbox instead. Image is locked to the snapshot in both cases.
 
-### Execute Commands
+### Get and Delete Snapshots
+
+```python
+info = Sandbox.get_snapshot("snap-xyz")          # -> SnapshotInfo
+Sandbox.delete_snapshot("snap-xyz")              # -> None
+```
+
+```typescript
+const info = await Sandbox.getSnapshot("snap-xyz");
+await Sandbox.deleteSnapshot("snap-xyz");
+```
+
+### Run a Command
 
 **Python:**
 
@@ -378,7 +395,7 @@ tl sbx exec <sandbox-id> --env MODE=prod --env DEBUG=0 bash -lc 'echo $MODE'
 tl sbx ssh  <sandbox-id> --env APP_ENV=dev
 ```
 
-### Process Management
+### Background Processes
 
 **Python:**
 
@@ -434,7 +451,7 @@ await sandbox.sendSignal(proc.pid, 15);   // SIGTERM
 await sandbox.killProcess(proc.pid);       // dedicated kill (no Python equivalent)
 ```
 
-### Process stdin/stdout/stderr (Granular)
+### Writing to stdin
 
 Use `stdin_mode="pipe"` (Python) / `stdinMode: "pipe"` (TypeScript) to write to a process's stdin:
 
@@ -460,7 +477,7 @@ REST equivalents:
 - Send signal: `POST /api/v1/processes/<pid>/signal` (`{"signal": 15}`)
 - Kill process: `DELETE /api/v1/processes/<pid>`
 
-### Interactive PTY Session
+### PTY Sessions
 
 ```python
 pty = sandbox.create_pty(
@@ -499,112 +516,6 @@ console.log(await pty.wait());
 ```
 
 > **Python differs.** `create_pty()` in Python does not accept `on_data` / `on_exit` in its keyword arguments. Attach them after creation via `pty.on_data(callback)` and `pty.on_exit(callback)` instead. TypeScript supports both forms — at-creation in the options object, or post-creation via `pty.onData(...)` / `pty.onExit(...)`.
-
-## Computer Use (Desktop Automation)
-
-Use the `ubuntu-vnc` image to get a desktop-enabled sandbox with XFCE, TigerVNC, and Firefox. Desktop connections are proxied through an authenticated endpoint — no port exposure needed.
-
-**Python:**
-
-```python
-from tensorlake.sandbox import Sandbox
-from pathlib import Path
-import time
-
-sandbox = Sandbox.create(image="ubuntu-vnc")
-try:
-    with sandbox.connect_desktop(password="tensorlake") as desktop:
-        time.sleep(4.0)  # XFCE + desktop services need a few seconds before screenshots are reliable
-        Path("sandbox-desktop.png").write_bytes(desktop.screenshot())
-        print(f"desktop is {desktop.width}x{desktop.height}")
-
-        desktop.press(["ctrl", "alt", "t"])
-        time.sleep(1.0)
-        desktop.type_text("echo docs-test > /tmp/desktop-test.txt")
-        desktop.press("enter")
-
-    result = sandbox.run("bash", ["-lc", "cat /tmp/desktop-test.txt"])
-    print(result.stdout.strip())
-finally:
-    sandbox.terminate()
-```
-
-### Reconnecting to an Existing Desktop Sandbox
-
-```python
-sandbox = Sandbox.connect("your-running-sandbox-id")
-with sandbox.connect_desktop(password="tensorlake") as desktop:
-    Path("existing-sandbox.png").write_bytes(desktop.screenshot())
-```
-
-### Desktop Methods and Properties
-
-**Properties** (no parentheses — read directly):
-
-| Property  | Description                          |
-|-----------|--------------------------------------|
-| `width`   | Desktop width in pixels              |
-| `height`  | Desktop height in pixels             |
-
-**Methods** (Python `snake_case` shown; TypeScript mirrors in `camelCase` — e.g., `moveMouse`, `mousePress`):
-
-| Method             | Description                                              |
-|--------------------|----------------------------------------------------------|
-| `screenshot()`     | Returns PNG bytes of the current desktop                 |
-| `press(key)`       | Press key or key combo (e.g., `["ctrl", "alt", "t"]`)    |
-| `type_text(text)`  | Type text input                                          |
-| `move_mouse(x, y)` | Move cursor to coordinates                               |
-| `click()`          | Single mouse click at current cursor position            |
-| `double_click()`   | Double mouse click at current cursor position            |
-| `mouse_press()`    | Press a mouse button (held — pair with `mouse_release`)  |
-| `mouse_release()`  | Release a held mouse button                              |
-| `scroll()`         | Scroll (generic — direction/amount via parameters)       |
-| `scroll_up()`      | Scroll up                                                |
-| `scroll_down()`    | Scroll down                                              |
-| `key_down()`       | Press and hold a key (pair with `key_up`)                |
-| `key_up()`         | Release a held key                                       |
-| `close()`          | Close desktop connection (auto on context-manager exit)  |
-
-> **Startup delay.** Fresh `ubuntu-vnc` sandboxes need a few seconds (≈4s) for XFCE and the rest of the desktop services to finish booting before screenshots are reliable. Sleep before the first `screenshot()` or you may capture a blank/loading frame.
-
-### Browser Access with noVNC
-
-For a live human-facing desktop stream (instead of polling `screenshot()`), bridge the sandbox's VNC port to the browser with [`noVNC`](https://novnc.com/info.html):
-
-1. Keep `TENSORLAKE_API_KEY` on the backend.
-2. Backend opens a TCP tunnel to the sandbox's VNC port `5901`.
-3. Bridge that tunnel to a browser WebSocket endpoint (e.g. `/vnc/<session-id>`).
-4. Point `noVNC` at your backend WebSocket; authenticate with desktop password `tensorlake`.
-
-You do **not** need to expose port `5901` publicly. For hybrid agent + human sessions, use `noVNC` for the live view and `sandbox.connect_desktop()` for programmatic actions on the backend.
-
-```bash
-npm install @novnc/novnc
-```
-
-```ts
-import RFB from "@novnc/novnc/lib/rfb";
-
-const host = document.getElementById("desktop") as HTMLDivElement;
-const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-const url = `${protocol}//${window.location.host}/vnc`;
-
-const rfb = new RFB(host, url, {
-  credentials: { password: "tensorlake" },
-  shared: true,
-});
-rfb.scaleViewport = true;
-```
-
-```html
-<div id="desktop" style="width: 1200px; height: 800px; background: black;"></div>
-```
-
-### Notes
-
-- Default VNC password for managed `ubuntu-vnc` image: `"tensorlake"`
-- Desktop connection is proxied through an authenticated endpoint (no port exposure needed)
-- `Sandbox.connect()` returns a handle that does **not** auto-terminate the sandbox; call `.terminate()` explicitly when done
 
 ## Sandbox Images
 
@@ -799,7 +710,7 @@ The hostname accepts either the sandbox ID or a sandbox name.
 
 ### Port Exposure
 
-Prefer the `Sandbox` instance method:
+Prefer calling `update()` on the `Sandbox` handle:
 
 ```python
 sandbox.update(exposed_ports=[8080], allow_unauthenticated_access=False)

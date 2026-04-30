@@ -16,7 +16,7 @@ Bundled offline equivalent of [docs.tensorlake.ai/llms.txt](https://docs.tensorl
 - [Environment variables](sandbox_sdk.md) — per-command and per-PTY env, secrets
 - [Networking, egress, port exposure](sandbox_sdk.md#outbound-internet-control) — egress allow/deny lists, full-deny mode, public URLs (authenticated or unauthenticated), serving webapps from a sandbox
 - [Sandbox images](sandbox_sdk.md#sandbox-images) — build and register named images with pre-installed deps (Python / TypeScript / Dockerfile)
-- [Computer use / desktop automation](sandbox_sdk.md#computer-use-desktop-automation) — XFCE + Firefox, screenshots, mouse/keyboard, noVNC live view
+- [Computer use / desktop automation](computer_use.md) — XFCE + Firefox, screenshots, mouse/keyboard, noVNC live view
 - [Skills in sandboxes](sandbox_usecases.md) — bundling Claude Code, Codex, Cursor, Cline, Windsurf, GitHub Copilot, Google ADK skills inside images
 - [Run Docker](sandbox_sdk.md) — Docker-in-sandbox
 
