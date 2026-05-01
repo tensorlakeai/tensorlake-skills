@@ -94,6 +94,10 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python evals/grade.py --workers 4 --model claude-haiku-4-5-20251001
 
+      - name: Build HTML report
+        if: always() && steps.filter.outputs.skip == 'false'
+        run: python evals/report.py --all --trend
+
       - name: Upload eval workspace
         if: always() && steps.filter.outputs.skip == 'false'
         uses: actions/upload-artifact@v4
@@ -101,8 +105,19 @@ jobs:
           name: eval-workspace
           path: evals/workspace/
 
+      - name: Upload HTML report
+        if: always() && steps.filter.outputs.skip == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: |
+            evals/workspace/iteration-*/report.html
+            evals/workspace/trend.html
+
       - name: Summarize and gate on results
         if: steps.filter.outputs.skip == 'false'
         run: |
           benchmark=$(ls -t evals/workspace/iteration-*/benchmark.json | head -1)
           python evals/ci_summary.py "$benchmark" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "📊 Download the **eval-report** artifact above to open the per-iteration HTML report and trend page in your browser." >> "$GITHUB_STEP_SUMMARY"
