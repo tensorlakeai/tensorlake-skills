@@ -1,10 +1,30 @@
 # Tensorlake Skill
 
-A lightweight skill that points coding agents at the live [Tensorlake](https://tensorlake.ai) docs whenever they need to write Tensorlake code.
+**Up-to-date Tensorlake knowledge for AI coding agents.** A lightweight skill that teaches Claude Code, OpenAI Codex, Google ADK, and other coding agents how to write correct Tensorlake code — by routing them to live documentation at [docs.tensorlake.ai](https://docs.tensorlake.ai)
 
-Tensorlake's docs change frequently. Rather than freezing a large chunk of API surface into the skill, this skill stays small: it tells the agent what Tensorlake is, makes sure the SDK and `TENSORLAKE_API_KEY` are set up, and then routes it to `https://docs.tensorlake.ai/llms.txt` to fetch the live docs that match the task. It covers the **Python** (`pip install tensorlake`) and **TypeScript** (`npm install tensorlake`) SDKs, plus the **CLI** (`curl -fsSL https://tensorlake.ai/install | sh`).
+## Why This Exists
 
-Bundled snapshots under `references/` are an offline fallback only — used when the live fetch fails (network unreachable, non-2xx, timeout). They are not the source of truth and are expected to lag.
+AI coding agents hallucinate Tensorlake APIs. Their training data don't have the knowledge, so they invent function signatures, miss new features, and reference removed endpoints. This skill fixes that: when an agent detects a Tensorlake-related task, it fetches the live docs and uses them as the source of truth.
+
+It covers the **Python SDK** (`pip install tensorlake`), **TypeScript SDK** (`npm install tensorlake`), and **CLI** (`curl -fsSL https://tensorlake.ai/install | sh`).
+
+## What is a "skill"?
+
+A skill is a small markdown instruction file that teaches an AI coding agent how to use a specific tool or library — similar in spirit to an MCP server, but lighter weight and model-agnostic. The agent reads the skill on activation, follows its instructions (e.g., "fetch live docs before writing code"), and applies the result to your task. No server to run, no extra runtime — just a file the agent reads.
+
+## Example
+
+Without the skill:
+
+> **User:** Build me a Tensorlake sandbox that runs untrusted Python and exposes port 8000.
+> **Agent:** *(writes code referencing `Sandbox.new()` — an API that doesn't exist in current SDK)*
+
+With the skill:
+
+> **User:** Build me a Tensorlake sandbox that runs untrusted Python and exposes port 8000.
+> **Agent:** *(skill triggers → fetches `https://docs.tensorlake.ai/llms.txt` → loads `sandboxes/lifecycle.md` → writes correct code using current `tensorlake.Sandbox.create()` API)*
+
+
 
 ## What This Skill Does
 
@@ -181,6 +201,39 @@ Each run captures two signals:
 | Weekly (automated) | CI drift-check runs, opens issue if divergence detected |
 | Per SDK release | Manual update of reference files + bump version |
 | Monthly | Review gap coverage — are new doc pages appearing that need a new reference file? |
+
+## FAQ
+
+### How is this different from just pointing agents at `llms.txt` directly?
+
+`llms.txt` is the doc index. This skill adds the trigger logic ("when should the agent reach for Tensorlake docs at all?"), the fetch-and-fallback flow, guardrails (don't print API keys, verify symbols against installed packages), and an offline snapshot for when the network is unreachable. It's the difference between "here are the docs" and "here's how an agent should behave when a task involves Tensorlake."
+
+### How does this compare to an MCP server?
+
+MCP servers are runtime processes that expose tools to an agent over a protocol. Skills are static markdown files the agent reads. Tradeoffs:
+
+- **MCP** is better when you need live state, authenticated API calls, or tool-use semantics (e.g., "list my running sandboxes").
+- **Skills** are better for teaching an agent *how to write code* against an SDK — no server to run, works in any agent that supports skills, zero runtime overhead.
+
+The two are complementary. You can use both.
+
+### Does this work with models other than Claude?
+
+Yes. The skill is model-agnostic — it's a markdown instruction file. It works with Claude Code, OpenAI Codex (via `AGENTS.md`), Google ADK, Cursor, Cline, GitHub Copilot, and Windsurf. The underlying Tensorlake SDK works with any LLM provider (OpenAI, Anthropic, open models) and any agent framework.
+
+### Do I need a Tensorlake API key to install the skill?
+
+No — installing the skill is just adding a file. You'll need a `TENSORLAKE_API_KEY` when the agent actually runs Tensorlake code on your behalf. Get one at [cloud.tensorlake.ai](https://cloud.tensorlake.ai).
+
+### What happens if `docs.tensorlake.ai` is unreachable?
+
+The skill falls back to bundled snapshots in `references/`. They lag the live docs (intentionally — they're not the source of truth) but cover the major API surface: sandboxes, applications/workflows, persistence, computer use, integrations, and platform features.
+
+### How often is this updated?
+
+A weekly CI job diffs the bundled snapshots against live docs and opens an issue if they've drifted. Reference files are refreshed per SDK release. The live docs are always current — the skill just routes to them.
+
+
 
 ## Documentation
 
