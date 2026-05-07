@@ -2,6 +2,11 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [2.7.1] — 2026-05-06
+
+### Changed
+- **`SKILL.md` / `AGENTS.md`** — trimmed the skill description from 1145 → 946 chars to fit under the 1024-char limit enforced by skill loaders. Preserved all trigger keywords (sandboxes, suspend/resume, snapshots, custom images, ports, egress, PTY, computer-use, Chrome CDP, Playwright, tunnels, async, Harbor, RL rollouts, file transfer, orchestration, LLM providers, frameworks, llms.txt). Mainly tightened phrasing — e.g., "guide for writing code that uses Tensorlake's sandbox product to build" → "sandboxes for", "for example" → "e.g.", "Claude agents sdk, OpenAI agents sdk" → "Claude/OpenAI agents SDK"; dropped "as the infrastructure layer" and "live docs from".
+
 ## [2.7.0] — 2026-05-06
 
 ### Added
