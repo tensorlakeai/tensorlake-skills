@@ -1,15 +1,17 @@
 <!--
 Source:
   - https://docs.tensorlake.ai/sandboxes/skills-in-sandboxes.md
-  - https://docs.tensorlake.ai/sandboxes/ai-code-execution.md
+  - https://docs.tensorlake.ai/sandboxes/tool-calls.md
   - https://docs.tensorlake.ai/sandboxes/data-analysis.md
   - https://docs.tensorlake.ai/sandboxes/cicd-build.md
   - https://docs.tensorlake.ai/sandboxes/agentic-autoresearch.md
   - https://docs.tensorlake.ai/sandboxes/agentic-rl-reproducible-env.md
   - https://docs.tensorlake.ai/sandboxes/agentic-swarm-intelligence.md
   - https://docs.tensorlake.ai/sandboxes/gspo-agentic-rl.md
-SDK version: tensorlake 0.5.0
-Last verified: 2026-04-30
+  - https://docs.tensorlake.ai/sandboxes/chrome-cdp.md
+  - https://docs.tensorlake.ai/sandboxes/harbor.md
+SDK version: tensorlake 0.5.8
+Last verified: 2026-05-06
 -->
 
 # TensorLake Sandbox Use Cases
@@ -24,6 +26,8 @@ Last verified: 2026-04-30
 - [RL Training with GSPO](#rl-training-with-gspo)
 - [Data Analysis](#data-analysis)
 - [CI/CD Build Pipelines](#cicd-build-pipelines)
+- [Drive Chrome over CDP](#drive-chrome-over-cdp)
+- [Harbor (evals + RL rollouts)](#harbor-evals--rl-rollouts)
 
 ## Skills in Sandboxes
 
@@ -556,3 +560,184 @@ finally:
 **Key `sandbox.run()` parameters:**
 - `env` — inject environment variables
 - `working_dir` — set working directory for the command
+
+## Drive Chrome over CDP
+
+Run real Google Chrome inside a sandbox and drive it from your laptop with any DevTools-Protocol client (Playwright, Puppeteer, `chrome-remote-interface`, raw WebSocket) — no headless container, no screenshot polling, no public port. Built on the [`ubuntu-vnc`](computer_use.md) image plus a [Local Tunnel](sandbox_sdk.md#local-tunnels) carrying CDP traffic to `127.0.0.1`. The CDP path and the [Computer Use](computer_use.md) desktop path compose: keep the agent loop on CDP and attach a human reviewer over VNC.
+
+### Workflow
+
+1. **Launch the sandbox** with the `ubuntu-vnc` image (4 CPU / 4 GiB is a comfortable default for one Chrome session). The desktop password for the managed image is `tensorlake`.
+
+   ```bash
+   tl sbx create -i ubuntu-vnc -c 4 -m 4096 chrome-cdp
+   ```
+
+2. **Start Chrome with CDP enabled** on the existing VNC display (`:1`) as the desktop user (`tl-user`). Two flags are required:
+
+   - `--remote-debugging-port=9222` — opens the DevTools Protocol endpoint on `127.0.0.1:9222` inside the sandbox.
+   - `--remote-allow-origins=*` — required for Chrome ≥ 111, otherwise `ws://127.0.0.1:9222/devtools/...` returns `403 Forbidden`. The HTTP `/json/version` endpoint works without it; the WebSocket handshake does not.
+   - `--user-data-dir=/tmp/<something>` — required for Chrome ≥ 136, which refuses to enable `--remote-debugging-port` against the default profile (`DevTools remote debugging requires a non-default data directory`).
+
+   ```python
+   from tensorlake.sandbox import Sandbox
+
+   with Sandbox.connect("<sandbox-id>") as sandbox:
+       sandbox.start_process(
+           "sudo",
+           args=[
+               "-u", "tl-user",
+               "env", "DISPLAY=:1", "XAUTHORITY=/home/tl-user/.Xauthority",
+               "google-chrome",
+               "--no-first-run",
+               "--no-default-browser-check",
+               "--remote-debugging-port=9222",
+               "--remote-allow-origins=*",
+               "--user-data-dir=/tmp/chrome-cdp",
+           ],
+       )
+   ```
+
+   `start_process` returns immediately and the sandbox daemon keeps Chrome alive — no `nohup`, no shell, no log redirection. Inspect captured output later via `sandbox.get_stdout(pid)` / `sandbox.get_stderr(pid)`. (TypeScript: `sandbox.startProcess(...)`, `sandbox.getStdout(pid)` / `sandbox.getStderr(pid)`.)
+
+   Confirm CDP is up: `tl sbx exec <sandbox-id> -- bash -lc 'curl -s http://127.0.0.1:9222/json/version'` should return JSON with `Browser`, `Protocol-Version`, and `webSocketDebuggerUrl`.
+
+3. **Open a tunnel** so `127.0.0.1:9222` on your laptop forwards to the sandbox (every byte rides an authenticated WebSocket — port `9222` never has to be in `exposed_ports`):
+
+   ```bash
+   tl sbx tunnel <sandbox-id> 9222
+   ```
+
+   TypeScript SDK form: `await sandbox.createTunnel(9222, { localPort: 9222 })`. Verify locally: `curl http://127.0.0.1:9222/json/version`.
+
+4. **Drive the browser.** Open a fresh tab via CDP's HTTP control surface (`curl -X PUT "http://127.0.0.1:9222/json/new?https://news.ycombinator.com"`), or use a higher-level client:
+
+   ```python
+   from playwright.sync_api import sync_playwright
+
+   with sync_playwright() as p:
+       browser = p.chromium.connect_over_cdp("http://127.0.0.1:9222")
+       page = browser.contexts[0].new_page()
+       page.goto("https://news.ycombinator.com")
+       print(page.locator(".titleline > a").all_text_contents()[:5])
+   ```
+
+   For raw protocol control (`Runtime.evaluate`, `Page.navigate`, `DOM.getDocument`), connect to the per-tab `webSocketDebuggerUrl` directly with `websocket-client` and exchange JSON messages. This is the path to take when wiring CDP into an LLM agent: expose `open_url`, `evaluate`, and `list_targets` as tools that wrap the per-tab WebSocket.
+
+### `chrome-devtools` MCP for coding agents
+
+Claude Code and OpenAI Codex can drive the same sandboxed Chrome through the official [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp). The MCP attaches via `--browser-url`; matching the URL to the tunnel's local port is the only required configuration.
+
+```bash
+# Claude Code (user scope by default; pass --scope project to write to .mcp.json)
+claude mcp add chrome-devtools -- npx chrome-devtools-mcp@latest \
+  --browser-url http://127.0.0.1:9222
+
+# Codex (writes ~/.codex/config.toml; user-global only — no project scope)
+codex mcp add chrome-devtools -- npx chrome-devtools-mcp@latest \
+  --browser-url http://127.0.0.1:9222
+```
+
+If port `9222` is taken on your laptop, pick any free port and keep both sides aligned:
+
+```bash
+tl sbx tunnel <sandbox-id> 9222 --listen-port 12222
+claude mcp add chrome-devtools -- npx chrome-devtools-mcp@latest \
+  --browser-url http://127.0.0.1:12222
+```
+
+Restart the agent so it picks up the new MCP (Claude Code re-reads on launch; Codex reads `config.toml` at startup, no hot-reload), then ask it to do something in the browser. The agent routes through `chrome-devtools` → `127.0.0.1:9222` → tunnel → sandbox Chrome on display `:1`.
+
+> **Verify the path before pointing an agent at it.** `curl http://127.0.0.1:9222/json/version` should return Chrome's JSON. The tunnel CLI keeps the local port bound even when the sandbox upstream goes away (terminated, suspended without auto-resume), so a hung `curl` usually means the sandbox is gone, not that the MCP is misconfigured.
+
+### Pitfalls
+
+- **`--remote-allow-origins=*` is required** for Chrome ≥ 111 — without it the HTTP CDP endpoints work but every WebSocket handshake fails with `403`.
+- **`--user-data-dir` is required** for Chrome ≥ 136 to enable `--remote-debugging-port` at all.
+- **Bind address.** `--remote-debugging-port` only listens on `127.0.0.1` by default — exactly what you want, since the tunnel forwards to `127.0.0.1` inside the sandbox and the debugger stays unreachable from anywhere else.
+- **Headless mode.** If you do not need the VNC view, launch with `--headless=new` instead of attaching to display `:1`. Tunneling and CDP usage are identical.
+- **`Failed to move to new namespace`.** Chrome's setuid sandbox sometimes fails inside container/VM combinations — add `--no-sandbox` to the launch flags.
+- **Multiple agents.** Each tab has its own `webSocketDebuggerUrl` — two clients can drive different tabs of the same Chrome at once (agent loop + human reviewer).
+
+Tear down: `tl sbx exec <sandbox-id> -- bash -lc 'sudo -u tl-user pkill -f google-chrome || true'`, then `tl sbx suspend <sandbox-id>` (named only) to keep the user-data-dir warm, or `tl sbx terminate <sandbox-id>` to release resources.
+
+## Harbor (evals + RL rollouts)
+
+[Harbor](https://github.com/harbor-framework/harbor) is a framework from the creators of [Terminal-Bench](https://www.tbench.ai/) for evaluating and optimizing agents and language models against curated datasets (Terminal-Bench, SWE-Bench, Aider Polyglot) or your own benchmarks, plus generating rollouts for RL optimization. Harbor abstracts the execution backend behind an `--env` flag; **Tensorlake plugs in as one of those providers** — same Harbor commands, same tasks/agents/evaluators, running on Tensorlake sandboxes.
+
+### Quick start
+
+```bash
+# install Harbor with the Tensorlake provider
+uv pip install "harbor[tensorlake]"
+# or: pip install "harbor[tensorlake]"
+
+export TENSORLAKE_API_KEY="tl_..."
+export ANTHROPIC_API_KEY="sk-ant-..."   # or another agent provider
+
+# Run a single Terminal-Bench 2.0 task on Tensorlake with Claude Code as the agent
+harbor run --env tensorlake \
+  --include-task-name pytorch-model-cli \
+  --dataset terminal-bench@2.0 \
+  --agent claude-code \
+  --model anthropic/claude-sonnet-4-6 \
+  --ae ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
+```
+
+Drop `--include-task-name` to run the full Terminal-Bench 2.0 suite. `--ae KEY=VALUE` forwards an env var from your shell into the sandbox where the agent runs — repeat the flag for any other secrets the agent needs.
+
+### Why Tensorlake for Harbor
+
+- **Per-trial sandboxes** — each task starts on a clean machine and is destroyed at the end. No shared kernel state between trials, which matters for both eval reproducibility and RL reward integrity.
+- **Pre-warmed snapshots** — environments with heavy `apt`/`pip` installs (PyTorch, CUDA, full Linux desktops) can be built once, snapshotted, and restored under a second per trial.
+- **Independent verification** — Harbor's test script runs inside the sandbox and writes `1.0`/`0.0` to `reward.txt`. The agent never sees or touches the verifier, so "the agent said it worked" is never confused with "the tests pass."
+- **Parallel scale** — Tensorlake schedules thousands of sandboxes concurrently, exactly what RL rollout generation and full benchmark sweeps need.
+
+### Anatomy of a Harbor task
+
+```
+gcode-to-text/
+├── environment/
+│   ├── Dockerfile              # base image and setup steps
+│   └── text.gcode.gz
+├── instruction.md              # prompt the agent receives
+├── solution/
+│   └── solve.sh                # oracle reference for environment validation
+├── task.toml                   # provisioning config (see below)
+└── tests/
+    ├── test_outputs.py
+    └── test.sh                 # runs after the agent finishes; writes reward.txt
+```
+
+### Tune sandbox resources
+
+`task.toml` controls the sandbox Harbor provisions on Tensorlake. Set resources in the `[environment]` block:
+
+```toml
+[environment]
+cpus = 2
+memory_mb = 4096
+storage_mb = 20480
+allow_internet = true
+```
+
+| Field            | Default | Forwarded to Tensorlake   |
+|------------------|---------|---------------------------|
+| `cpus`           | `1`     | `cpus`                    |
+| `memory_mb`      | `2048`  | `memory_mb`               |
+| `storage_mb`     | `10240` | `ephemeral_disk_mb`       |
+| `allow_internet` | `true`  | `allow_internet_access`   |
+
+> **Memory ratio constraint.** Tensorlake requires `memory_mb` to be between 1024 and 8192 MB **per CPU core**.
+
+Rules of thumb: bump `cpus` and `memory_mb` for heavy Dockerfiles (PyTorch, CUDA, full desktops, large datasets) and raise `storage_mb` past image size + working set — underprovisioning shows up as build timeouts or mid-trial OOMs. Set `allow_internet = false` to stop the agent from web-searching for answers; if the verifier needs network access, bake it into the Dockerfile (per-host allowlists are coming).
+
+### Debugging
+
+Attach to a live trial environment to inspect state and rerun tests by hand:
+
+```bash
+harbor env attach <session_id>
+```
+
+Each trial produces structured artifacts (`agent/`, `verifier/`, `result.json`, `trial.log`) so you can trace agent actions, verifier checks, and pass/fail reasoning.

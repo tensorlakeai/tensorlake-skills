@@ -13,10 +13,13 @@ Bundled offline equivalent of [docs.tensorlake.ai/llms.txt](https://docs.tensorl
 - [File operations](sandbox_sdk.md) — read, write, upload, download, list
 - [Process management](sandbox_sdk.md) — start, monitor, signal, follow background processes
 - [PTY / interactive shells](sandbox_sdk.md#interactive-pty-session) — long-lived terminal sessions, resize, reconnect via session id + token, WebSocket I/O
+- [Async SDK (Python)](sandbox_sdk.md#async-sdk-python) — `AsyncSandbox` with `asyncio.gather` fan-out, async context manager, mirrors every sync method
 - [Environment variables](sandbox_sdk.md) — per-command and per-PTY env, secrets
 - [Networking, egress, port exposure](sandbox_sdk.md#outbound-internet-control) — egress allow/deny lists, full-deny mode, public URLs (authenticated or unauthenticated), serving webapps from a sandbox
+- [Local tunnels](sandbox_sdk.md#local-tunnels) — forward local TCP port to a port inside a sandbox over an authenticated WebSocket; required for non-HTTP protocols (VNC, Postgres, Redis, custom binary)
 - [Sandbox images](sandbox_sdk.md#sandbox-images) — build and register named images with pre-installed deps (Python / TypeScript / Dockerfile)
 - [Computer use / desktop automation](computer_use.md) — XFCE + Firefox, screenshots, mouse/keyboard, noVNC live view
+- [Drive Chrome over CDP](sandbox_usecases.md#drive-chrome-over-cdp) — sandboxed Google Chrome with `--remote-debugging-port`, Playwright `connect_over_cdp`, raw CDP WebSocket, `chrome-devtools-mcp` for Claude Code / Codex
 - [Skills in sandboxes](sandbox_usecases.md) — bundling Claude Code, Codex, Cursor, Cline, Windsurf, GitHub Copilot, Google ADK skills inside images
 - [Run Docker](sandbox_sdk.md) — Docker-in-sandbox
 
@@ -29,6 +32,7 @@ Bundled offline equivalent of [docs.tensorlake.ai/llms.txt](https://docs.tensorl
 - [Agentic autoresearch loop](sandbox_usecases.md) — overnight ML script self-improvement with parallel sandbox races
 - [CI/CD & build systems](sandbox_usecases.md) — isolated reproducible build/test pipelines
 - [Data analysis](sandbox_usecases.md) — parallel data analysis, model benchmarking
+- [Harbor (evals + RL rollouts)](sandbox_usecases.md#harbor-evals--rl-rollouts) — Terminal-Bench / SWE-Bench / Aider Polyglot evaluations and RL rollouts with `harbor[tensorlake]`, per-trial sandboxes, `task.toml` resource tuning
 
 ## Orchestration (Applications SDK)
 
