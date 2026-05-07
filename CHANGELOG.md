@@ -2,6 +2,20 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [2.7.0] — 2026-05-06
+
+### Added
+- **`references/sandbox_sdk.md`** — new "Async SDK (Python)" section covering `AsyncSandbox.create` / `connect`, async context manager, `asyncio.gather` fan-out, the `sandbox_id`-on-fresh-handle caveat, and async background processes / file ops / suspend / checkpoint. New "Local Tunnels" section under Networking covering the CLI (`tl sbx tunnel`), TypeScript `sandbox.createTunnel(remotePort, options)` returning a `TcpTunnel`, the Python subprocess wrapper, common patterns table (VNC/CDP/Postgres/dev server), and troubleshooting.
+- **`references/sandbox_usecases.md`** — new "Drive Chrome over CDP" section (sandboxed Google Chrome with `--remote-debugging-port`, `--remote-allow-origins=*`, `--user-data-dir`; tunnel; Playwright `connect_over_cdp`; raw CDP WebSocket; `chrome-devtools-mcp` registration for Claude Code / Codex; version pitfalls). New "Harbor (evals + RL rollouts)" section covering `harbor[tensorlake]` install, `harbor run --env tensorlake`, `harbor env attach`, `task.toml` `[environment]` block forwarding to `cpus`/`memory_mb`/`ephemeral_disk_mb`/`allow_internet_access`.
+- **`references/feature_lookup.md`** — new entries for Async SDK, Local tunnels, Drive Chrome over CDP (Core), and Harbor (Use cases).
+
+### Changed
+- **`references/sandbox_sdk.md`** — bumped SDK version 0.5.5 → 0.5.8 and `Last verified:` to 2026-05-06. API audit corrections against installed `tensorlake==0.5.8`: TypeScript `Sandbox.connect("name")` examples corrected to `Sandbox.connect({ sandboxId: "name" })` (the static signature requires an options object); `Sandbox.exposePorts/unexposePorts` static-method examples replaced with `sandbox.update({ exposedPorts, allowUnauthenticatedAccess })` and `SandboxClient` instance forms; removed the false claim that Python's `Image` lacks `.workdir(path)`; corrected `SnapshotInfo.status` values (`SnapshotStatus`: `"in_progress" | "completed" | "failed"`) and added `snapshot_type` / `rootfs_disk_bytes` / `base_image` fields; renamed Process Status / Mode enums to actual class names (`ProcessStatus`, `StdinMode`, `OutputMode`).
+- **`references/sandbox_persistence.md`** — corrected the TypeScript `Sandbox.connect("my-env")` example to `Sandbox.connect({ sandboxId: "my-env" })` in the Suspend & Resume section.
+- **`references/sandbox_usecases.md`** — bumped SDK version 0.5.5 → 0.5.8 and `Last verified:` to 2026-05-06; corrected source URL `ai-code-execution.md` → `tool-calls.md` to align with live `llms.txt`.
+- **`.github/scripts/sources.yaml`** — added `async.md` and `tunnels.md` to `sandbox_sdk.md` sources; added `chrome-cdp.md` and `harbor.md` to `sandbox_usecases.md` sources; bumped both `sdk_version` to `0.5.8` and `last_verified` to `2026-05-06`.
+- **`README.md`** — illustrative source-header example bumped to `tensorlake 0.5.8` / `2026-05-06`.
+
 ## [2.6.3] — 2026-04-30
 
 ### Changed

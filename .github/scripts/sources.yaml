@@ -30,8 +30,10 @@ sandbox_sdk.md:
     - https://docs.tensorlake.ai/sandboxes/images.md
     - https://docs.tensorlake.ai/sandboxes/pty-sessions.md
     - https://docs.tensorlake.ai/sandboxes/docker.md
-  sdk_version: "0.5.5"
-  last_verified: "2026-04-30"
+    - https://docs.tensorlake.ai/sandboxes/async.md
+    - https://docs.tensorlake.ai/sandboxes/tunnels.md
+  sdk_version: "0.5.8"
+  last_verified: "2026-05-06"
 
 computer_use.md:
   sources:
@@ -114,8 +116,10 @@ sandbox_usecases.md:
     - https://docs.tensorlake.ai/sandboxes/agentic-rl-reproducible-env.md
     - https://docs.tensorlake.ai/sandboxes/agentic-swarm-intelligence.md
     - https://docs.tensorlake.ai/sandboxes/gspo-agentic-rl.md
-  sdk_version: "0.5.0"
-  last_verified: "2026-04-30"
+    - https://docs.tensorlake.ai/sandboxes/chrome-cdp.md
+    - https://docs.tensorlake.ai/sandboxes/harbor.md
+  sdk_version: "0.5.8"
+  last_verified: "2026-05-06"
 
 troubleshooting.md:
   sources:

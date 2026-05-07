@@ -303,7 +303,7 @@ sandbox.resume()     # brings the same sandbox back to Running
 **TypeScript:**
 
 ```typescript
-const sandbox = await Sandbox.connect("my-env");
+const sandbox = await Sandbox.connect({ sandboxId: "my-env" });
 await sandbox.suspend();
 await sandbox.resume();
 ```

@@ -184,12 +184,12 @@
         "sandbox_sdk.md#lifecycle"
       ],
       "prompt": "TypeScript SDK. My project has accumulated a bunch of sandboxes from past experiments and I have no idea which are still alive. List every sandbox in my project, print id/name/status/created_at, and terminate any that are in the Suspended state (I don't need them anymore). Don't touch Running ones. Show me the code.",
-      "expected_output": "TypeScript snippet that lists sandboxes via `await client.list()` (the documented client list method — listing has no `Sandbox`-static equivalent in 0.5.1), iterates over `SandboxInfo` objects reading `sandboxId`, `name`, `status`, `createdAt`, filters where `status === \"Suspended\"`, then for each match calls `await Sandbox.connect(sandboxId)` and `await sandbox.terminate()`. Answer notes that terminate is an INSTANCE method (must connect first) and that Running sandboxes are skipped by the filter — does not bulk-terminate everything.",
+      "expected_output": "TypeScript snippet that lists sandboxes via `await client.list()` (the documented client list method — listing has no `Sandbox`-static equivalent in 0.5.1), iterates over `SandboxInfo` objects reading `sandboxId`, `name`, `status`, `createdAt`, filters where `status === \"Suspended\"`, then for each match calls `await Sandbox.connect({ sandboxId })` (TypeScript static `Sandbox.connect` takes an options object, not a positional string) and `await sandbox.terminate()`. Answer notes that terminate is an INSTANCE method (must connect first) and that Running sandboxes are skipped by the filter — does not bulk-terminate everything.",
       "expectations": [
         "Uses `await client.list()` to enumerate sandboxes (listing has no `Sandbox`-static equivalent in 0.5.1 — it's the one operation that still requires the SandboxClient); does NOT invent `Sandbox.listAll()`, `Sandbox.findAll()`, `Sandbox.list()`, `client.getSandboxes()`, or a `listSandboxes(projectId)` shape",
         "Reads camelCase TypeScript field names off `SandboxInfo` (`sandboxId`, `name`, `status`, `createdAt`) — does NOT use Python snake_case like `sandbox_id` or `created_at` in the TS code",
         "Filters on `status === \"Suspended\"` (the documented status string) before terminating — does NOT bulk-terminate every returned sandbox, and does NOT confuse `Suspended` with `Terminated` (which is already a final state)",
-        "Termination goes through `await Sandbox.connect(sandboxId)` followed by `await sandbox.terminate()` — answer reflects that `terminate()` is an INSTANCE method on a connected handle, NOT a static like `Sandbox.terminate(id)` or a client method",
+        "Termination goes through `await Sandbox.connect({ sandboxId })` followed by `await sandbox.terminate()` — answer reflects that `terminate()` is an INSTANCE method on a connected handle, NOT a static like `Sandbox.terminate(id)` or a client method. The TypeScript `Sandbox.connect` static takes an options object — does NOT call it with a bare positional string (`Sandbox.connect(sandboxId)`), which is the Python form, not the TS form",
         "Does NOT call `sandbox.suspend()` or `sandbox.resume()` on already-Suspended sandboxes as a precondition for terminate — terminate works directly from the Suspended state",
         "Code uses `await` on every async call (TS SDK is promise-based) and does NOT mix in Python idioms like `with sandbox:` context managers"
       ]
@@ -304,6 +304,86 @@
         "Explicitly explains that deleting a snapshot does NOT affect sandboxes that were previously restored from it — restored sandboxes are independent copies and keep running; only NEW restores from that snapshot id will fail after deletion",
         "Mentions the CLI shortcut using the documented `checkpoint` subcommand: `tl sbx checkpoint ls` and `tl sbx checkpoint rm <snapshot-id>` — does NOT invent `tl sbx snapshot ls`, `tl snapshot delete`, or `tl sbx delete-snapshot`",
         "Does NOT claim snapshots are auto-deleted when the source sandbox terminates — snapshots persist independently of sandbox lifecycle until explicitly deleted"
+      ]
+    },
+    {
+      "id": 17,
+      "name": "async-sandbox-parallel-evaluations",
+      "references": [
+        "sandbox_sdk.md#async-sdk-python"
+      ],
+      "prompt": "I'm building an async Python service (FastAPI) that needs to run 8 LLM-generated Python snippets in parallel, each in its own Tensorlake sandbox, and return the stdout of each. My event loop is already running — I cannot use threads or block on sync calls. Each sandbox should be created fresh, run one snippet, and be cleaned up when the snippet is done. Show me the right Tensorlake API for this and a working `evaluate_all(snippets: list[str])` function that fans out and gathers the results.",
+      "expected_output": "Use `tensorlake.sandbox.AsyncSandbox` (NOT the sync `Sandbox` class wrapped in `asyncio.to_thread`). Each per-snippet coroutine creates a sandbox via `await AsyncSandbox.create(...)`, runs the snippet via `await sandbox.run(\"python\", [\"-c\", code])`, and tears it down — ideally via `async with await AsyncSandbox.create(...) as sandbox:` so termination is automatic. Fan-out uses `asyncio.gather(*coros)`. Answer mentions that AsyncSandbox is a one-to-one async mirror of Sandbox (same method names, same parameters, just `async def`).",
+      "files": [],
+      "expectations": [
+        "Uses `AsyncSandbox` imported from `tensorlake.sandbox` (e.g. `from tensorlake.sandbox import AsyncSandbox`) — does NOT use the sync `Sandbox` class wrapped in `asyncio.to_thread`/`run_in_executor`, does NOT invent `Sandbox.create_async(...)` / `Sandbox.async_create(...)` / `AsyncSandboxClient`, and does NOT claim Python lacks an async sandbox API and the user must shell out to threads",
+        "Sandbox creation uses `await AsyncSandbox.create(...)` and the call is awaited — does NOT call `AsyncSandbox.create(...)` without `await` (the constructor is async)",
+        "Commands are awaited via `await sandbox.run(\"python\", [\"-c\", code])` (or equivalent) — answer recognizes that every `AsyncSandbox` method is an async one-to-one mirror of the sync `Sandbox` method (same name, same parameters, just `async def`); does NOT mix sync calls like `sandbox.run(...)` without `await`",
+        "Fan-out uses `asyncio.gather(*coros)` (or `asyncio.TaskGroup`) — does NOT use `ThreadPoolExecutor`, `concurrent.futures`, `asyncio.to_thread`, or a sequential `for` loop, since the user explicitly said the event loop is running and they cannot block",
+        "Cleanup happens per-sandbox: ideally via `async with await AsyncSandbox.create(...) as sandbox:` (the async context manager terminates on exit) OR an explicit `try/finally` with `await sandbox.terminate()`. Does NOT leak sandboxes by skipping teardown, and does NOT use a sync `with sandbox:` block on an `AsyncSandbox` (it implements `__aenter__`/`__aexit__`, not `__enter__`/`__exit__`)",
+        "Does NOT hallucinate a top-level `tensorlake.AsyncSandbox` import (it lives at `tensorlake.sandbox.AsyncSandbox`) and does NOT claim TypeScript has a separate `AsyncSandbox` class — TypeScript is async by default with the existing `Sandbox` class"
+      ]
+    },
+    {
+      "id": 18,
+      "name": "local-tunnel-postgres-non-http",
+      "references": [
+        "sandbox_sdk.md#local-tunnels",
+        "sandbox_sdk.md#networking"
+      ],
+      "prompt": "I'm running Postgres inside a Tensorlake sandbox on port 5432 and I want to connect to it from `psql` on my laptop. I tried exposing port 5432 with `sandbox.update(exposed_ports=[5432])` and pointing psql at the public URL but it doesn't work. What's the right way? I'd prefer something I can run from a terminal — TypeScript or CLI is fine. The Postgres port should NOT be reachable from the public internet.",
+      "expected_output": "Public sandbox URLs (`https://<port>-<id>.sandbox.tensorlake.ai`) only proxy HTTP/HTTPS/WebSocket/gRPC/SSH — they cannot frame the Postgres wire protocol, which is why `exposed_ports` doesn't help here. Use a **local tunnel** instead: `tl sbx tunnel <sandbox-id> 5432` (CLI, simplest) or `await sandbox.createTunnel(5432, { localPort: 5432 })` from the TypeScript SDK. The tunnel rides an authenticated WebSocket through the sandbox proxy, terminating on `127.0.0.1:5432` on the laptop — no entry in `exposed_ports` required, and the port stays private to the user's account. Answer also notes that the Python SDK does not yet have a native tunnel helper and the user can drive `tl sbx tunnel` from a subprocess if they need Python.",
+      "files": [],
+      "expectations": [
+        "Answer correctly explains that the public sandbox URL proxy only speaks HTTP / HTTPS / WebSocket / gRPC / SSH — Postgres's wire protocol is not framed, so `exposed_ports` and the public URL cannot work for `psql`. Does NOT tell the user to wrap Postgres in an HTTP proxy or pgREST as a workaround",
+        "Recommends a **local tunnel** as the documented primitive: `tl sbx tunnel <sandbox-id-or-name> 5432` (CLI, with optional `--listen-port` / `-l` for a different local port) OR `await sandbox.createTunnel(5432, { localPort: 5432 })` (TypeScript SDK; returns a `TcpTunnel`). Does NOT invent `sandbox.tunnel()`, `sandbox.openTunnel(...)`, `sandbox.portForward(...)`, `tl sbx port forward`, or `tl sbx connect`",
+        "Explicitly states that the tunnel does NOT require the port to be in `exposed_ports` — tunnels and exposed ports are independent mechanisms, and the tunnel keeps the port private to the user's account (authenticated WebSocket, no public hostname). Does NOT claim the user has to set `allow_unauthenticated_access` on the port",
+        "If the TypeScript example is shown, the call shape matches the docs: `createTunnel(remotePort, options)` returning `Promise<TcpTunnel>`, with options like `localPort` / `localHost` / `connectTimeout`; the result is closed via `await tunnel.close()`. Does NOT mix Python snake_case kwargs (`local_port`) into the TS call",
+        "Does NOT claim the Python SDK ships a native `sandbox.create_tunnel(...)` helper in 0.5.8 — the documented Python path is to drive `tl sbx tunnel` from a subprocess. (TypeScript and CLI are first-class.)",
+        "Local-side connection is shown as `psql -h 127.0.0.1 -p 5432 ...` (or the chosen `--listen-port`) — does NOT point psql at `*.sandbox.tensorlake.ai`, since the tunnel terminates locally"
+      ]
+    }
+  ],
+  "_disabled_evals_comment": "Evals below are kept for reference but not picked up by run.py / filter.py (which only read `evals[]`). Move an entry back into `evals[]` to re-enable it.",
+  "disabled_evals": [
+    {
+      "id": 19,
+      "name": "drive-chrome-over-cdp-with-playwright",
+      "references": [
+        "sandbox_usecases.md#drive-chrome-over-cdp",
+        "sandbox_sdk.md#local-tunnels",
+        "computer_use.md"
+      ],
+      "prompt": "I want to drive a real Google Chrome (not headless-only Chromium) running inside a Tensorlake sandbox from Playwright on my laptop, attaching over the Chrome DevTools Protocol on port 9222. The Chrome version inside the sandbox is current (>= 136). Show me the full flow: which sandbox image to use, exactly how to launch Chrome inside, how to reach 9222 from my laptop without making the port public, and the Playwright code to attach. Python on the local side.",
+      "expected_output": "Use the `ubuntu-vnc` sandbox image (XFCE + TigerVNC + Firefox; the documented desktop image — Chrome itself is installed by the user, not bundled). Inside the sandbox, launch Chrome as the desktop user `tl-user` on display `:1` via `sandbox.start_process(\"sudo\", args=[\"-u\", \"tl-user\", \"env\", \"DISPLAY=:1\", \"XAUTHORITY=/home/tl-user/.Xauthority\", \"google-chrome\", \"--no-first-run\", \"--no-default-browser-check\", \"--remote-debugging-port=9222\", \"--remote-allow-origins=*\", \"--user-data-dir=/tmp/chrome-cdp\"])`. All three CDP flags are required at recent Chrome versions: `--remote-debugging-port=9222` opens the endpoint, `--remote-allow-origins=*` is required for Chrome ≥ 111 (otherwise the WebSocket handshake returns 403), and `--user-data-dir=/tmp/<something>` is required for Chrome ≥ 136 (which refuses `--remote-debugging-port` against the default profile). Reach the port from the laptop with a local tunnel (`tl sbx tunnel <sandbox-id> 9222` or the TypeScript `sandbox.createTunnel(9222, { localPort: 9222 })`) — no public port exposure. Then attach with Playwright: `from playwright.sync_api import sync_playwright; with sync_playwright() as p: browser = p.chromium.connect_over_cdp(\"http://127.0.0.1:9222\"); page = browser.contexts[0].new_page(); page.goto(...)`.",
+      "files": [],
+      "expectations": [
+        "Uses the `ubuntu-vnc` sandbox image (the documented desktop-enabled image) — does NOT use `ubuntu-minimal`, `ubuntu-systemd`, or invent images like `chrome`, `playwright`, `puppeteer-image`",
+        "Chrome is launched with **all three** required flags: `--remote-debugging-port=9222`, `--remote-allow-origins=*` (required for Chrome ≥ 111 — without it the WebSocket handshake returns 403), and `--user-data-dir=/tmp/<path>` (required for Chrome ≥ 136 — otherwise Chrome refuses `--remote-debugging-port` against the default profile). Missing any of the three on a current Chrome is wrong",
+        "Chrome is started via `sandbox.start_process(...)` (non-blocking) — does NOT use `sandbox.run(...)` (which would block until Chrome exits) and does NOT recommend `nohup`/`&` shell tricks for backgrounding (the sandbox daemon already keeps `start_process` alive)",
+        "Chrome is launched on the existing VNC display `:1` as the desktop user `tl-user` (via `sudo -u tl-user env DISPLAY=:1 XAUTHORITY=/home/tl-user/.Xauthority google-chrome ...`) OR with `--headless=new` if the answer explicitly notes the user does not need the VNC view — does NOT attempt to launch as root with no DISPLAY (Chrome will refuse) and does NOT invent display numbers like `:0` or `:99` (the managed image uses `:1`)",
+        "CDP is reached from the laptop via a **local tunnel** — `tl sbx tunnel <sandbox-id> 9222` (CLI) or `await sandbox.createTunnel(9222, { localPort: 9222 })` (TypeScript). Does NOT recommend `sandbox.update(exposed_ports=[9222])` / public URL exposure (the proxy can carry CDP over WebSocket, but the documented and private path is the tunnel). Does NOT invent `sandbox.create_tunnel(...)` as a Python SDK method (the Python SDK does not ship one in 0.5.8 — drive the CLI from a subprocess)",
+        "Playwright attaches via `p.chromium.connect_over_cdp(\"http://127.0.0.1:9222\")` — uses an HTTP URL on `127.0.0.1` (matching the tunnel's local listener), reuses an existing context (e.g. `browser.contexts[0].new_page()`), and does NOT use `p.chromium.launch(...)` (which would start a new local Chrome instead of attaching), `connect()` with a plain WebSocket URL, or invent `playwright.connect(cdp_url=...)`",
+        "Does NOT recommend `chromium-browser` / `chromium` / Firefox — the user explicitly asked for real Google Chrome. Does NOT recommend running Playwright inside the sandbox (the user is on their laptop). Does NOT claim the user must ship a custom Dockerfile to get CDP to work — the `ubuntu-vnc` image plus `apt install google-chrome-stable` is enough"
+      ]
+    },
+    {
+      "id": 20,
+      "name": "harbor-tensorlake-eval-task-resources",
+      "references": [
+        "sandbox_usecases.md#harbor-evals--rl-rollouts"
+      ],
+      "prompt": "I want to run a single Terminal-Bench 2.0 task on Tensorlake using Harbor, with Claude Code as the agent. The task's Dockerfile is heavyweight (PyTorch + CUDA wheels) so I need to bump the sandbox to 4 CPUs / 16 GB RAM / 40 GB disk, and the agent needs to be allowed to call out to the internet for `pip install`. Show me: (a) the install command for Harbor with the Tensorlake provider, (b) the exact `harbor run` invocation, (c) what to put in `task.toml` to get those resources. Also — if a trial gets stuck and I want to poke at it interactively, what's the command?",
+      "expected_output": "Install: `uv pip install \"harbor[tensorlake]\"` (or `pip install \"harbor[tensorlake]\"`). Run: `harbor run --env tensorlake --include-task-name <task> --dataset terminal-bench@2.0 --agent claude-code --model anthropic/claude-sonnet-4-6 --ae ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY` — `--env tensorlake` selects the Tensorlake provider, `--ae KEY=VALUE` forwards a local env var into the per-trial sandbox. Resources go in `task.toml`'s `[environment]` block: `cpus = 4`, `memory_mb = 16384`, `storage_mb = 40960`, `allow_internet = true`. Harbor maps these to Tensorlake as `cpus → cpus`, `memory_mb → memory_mb`, `storage_mb → ephemeral_disk_mb`, `allow_internet → allow_internet_access`. The memory ratio constraint is 1024–8192 MB *per CPU core* (16 GB / 4 CPU = 4 GB per core, fine). Debugging: `harbor env attach <session_id>` opens a shell into the live trial sandbox.",
+      "files": [],
+      "expectations": [
+        "Install uses the Tensorlake extra: `uv pip install \"harbor[tensorlake]\"` or `pip install \"harbor[tensorlake]\"` — does NOT use bare `pip install harbor` (without the extra, the `tensorlake` provider isn't pulled in) and does NOT invent a separate `harbor-tensorlake` package",
+        "`harbor run` includes `--env tensorlake` to select the Tensorlake execution backend, plus the dataset / task / agent / model flags as documented. Does NOT invent `--provider tensorlake`, `--backend tensorlake`, `--executor=tensorlake`, or claim the user has to set an env var like `HARBOR_BACKEND=tensorlake`",
+        "Resources are configured in `task.toml`'s `[environment]` block using the documented field names — `cpus`, `memory_mb`, `storage_mb`, `allow_internet` — and the answer maps them to the Tensorlake-side names: `cpus → cpus`, `memory_mb → memory_mb`, `storage_mb → ephemeral_disk_mb`, `allow_internet → allow_internet_access`. Does NOT recommend invented fields like `disk_mb` (that's the Tensorlake-side name, not Harbor's) or `memory` / `ram` / `disk` / `internet`, and does NOT tell the user to pass these on the `harbor run` CLI",
+        "Memory units are MB, not GB — `memory_mb = 16384` for 16 GB, `storage_mb = 40960` for 40 GB. Does NOT pass `16` and call it gigabytes, and does NOT pass `16384` MiB while labeling it MB inconsistently",
+        "Acknowledges the per-core memory ratio constraint (Tensorlake requires `memory_mb` to be 1024–8192 MB per CPU core) and verifies that 16384 / 4 = 4096 MB per core falls in range. Does NOT silently recommend `cpus = 1, memory_mb = 16384` (which violates the constraint) or claim the constraint doesn't exist",
+        "Forwarding a local env var into the per-trial sandbox uses Harbor's documented flag `--ae KEY=VALUE` (repeatable) — does NOT invent `--env-var KEY=VALUE`, `--secret`, or tell the user to set the env var in `task.toml`",
+        "Debugging path uses `harbor env attach <session_id>` — does NOT invent `harbor sandbox attach`, `harbor exec <id> bash`, `tl sbx ssh <id>` (which would target Tensorlake directly and bypass Harbor's per-trial workspace), or claim the user has to terminate and rerun to inspect a stuck trial"
       ]
     }
   ]

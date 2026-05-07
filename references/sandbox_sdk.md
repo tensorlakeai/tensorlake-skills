@@ -12,8 +12,10 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/images.md
   - https://docs.tensorlake.ai/sandboxes/pty-sessions.md
   - https://docs.tensorlake.ai/sandboxes/docker.md
-SDK version: tensorlake 0.5.5
-Last verified: 2026-04-30
+  - https://docs.tensorlake.ai/sandboxes/async.md
+  - https://docs.tensorlake.ai/sandboxes/tunnels.md
+SDK version: tensorlake 0.5.8
+Last verified: 2026-05-06
 -->
 
 # TensorLake Sandbox SDK Reference
@@ -43,6 +45,7 @@ For state management (snapshots, suspend/resume, ephemeral vs named), see [sandb
     - [Background Processes](#background-processes)
     - [Writing to stdin](#writing-to-stdin)
     - [PTY Sessions](#pty-sessions)
+    - [Async SDK (Python)](#async-sdk-python)
   - [Sandbox Images](#sandbox-images)
     - [Define an Image](#define-an-image)
     - [Build / Register the Image](#build--register-the-image)
@@ -55,6 +58,7 @@ For state management (snapshots, suspend/resume, ephemeral vs named), see [sandb
     - [Public URLs](#public-urls)
     - [Port Exposure](#port-exposure)
     - [Outbound Internet Control](#outbound-internet-control)
+    - [Local Tunnels](#local-tunnels)
   - [Data Models](#data-models)
     - [SandboxInfo](#sandboxinfo)
     - [CommandResult](#commandresult)
@@ -154,7 +158,8 @@ print(result.stdout)
 **TypeScript:**
 
 ```typescript
-const sandbox = await Sandbox.connect("my-agent-env");
+// TypeScript Sandbox.connect takes an options object — not a bare string
+const sandbox = await Sandbox.connect({ sandboxId: "my-agent-env" });
 console.log(sandbox.sandboxId);
 console.log(sandbox.name);
 
@@ -199,7 +204,7 @@ for (const sb of sandboxes) {
 // Filter then terminate — terminate is called on the handle, so connect first
 const stale = sandboxes.filter((sb) => sb.status === "Suspended");
 for (const sb of stale) {
-  const handle = await Sandbox.connect(sb.sandboxId);
+  const handle = await Sandbox.connect({ sandboxId: sb.sandboxId });
   await handle.terminate();
 }
 
@@ -539,6 +544,84 @@ await sandbox.terminate();
 >
 > Typical patterns: agent driving a one-shot command → `wait()` → `kill()` → `terminate()`. Agent that needs to survive a client crash → `disconnect()` (no `kill`, no `terminate`) → reconnect later via `connect_pty(session_id, token)`.
 
+### Async SDK (Python)
+
+Python ships an async-native sandbox handle (`AsyncSandbox`) on top of asyncio. **Every method on the sync `Sandbox` handle has a one-to-one async counterpart on `AsyncSandbox` — same names, same parameters, just `async def` and awaited.** Reach for it when fanning out work across many sandboxes (`asyncio.gather`), when your app is already async (FastAPI, aiohttp, agent loops), or when streaming output from many processes concurrently. If you only ever drive one sandbox at a time, the sync `Sandbox` API is equivalent and simpler.
+
+```python
+from tensorlake.sandbox import AsyncSandbox
+
+# create + connect
+sandbox = await AsyncSandbox.create(cpus=2.0, memory_mb=2048)
+# attach to an existing one
+sandbox = await AsyncSandbox.connect("my-env")
+```
+
+`AsyncSandbox` is also an async context manager — `async with` terminates the sandbox automatically:
+
+```python
+async with await AsyncSandbox.create(cpus=2.0, memory_mb=2048) as sandbox:
+    result = await sandbox.run("python", ["-c", "print('hello')"])
+    print(result.stdout)
+# sandbox terminated here
+```
+
+Fan-out with `asyncio.gather`:
+
+```python
+import asyncio
+from tensorlake.sandbox import AsyncSandbox
+
+async def evaluate(prompt: str) -> str:
+    async with await AsyncSandbox.create(cpus=1.0, memory_mb=1024) as sandbox:
+        result = await sandbox.run("python", ["-c", prompt])
+        return result.stdout
+
+outputs = await asyncio.gather(
+    evaluate("print(2+2)"),
+    evaluate("print(sum(range(100)))"),
+    evaluate("import math; print(math.pi)"),
+)
+```
+
+> **`sandbox_id` on a freshly connected handle.** Unlike sync `Sandbox.sandbox_id`, which transparently fetches sandbox info on first access, the async `AsyncSandbox.sandbox_id` cannot block on a network call. After `AsyncSandbox.connect(...)` call `await sandbox.info()` (or any awaited method that resolves the sandbox, like `status()`) once before reading `sandbox.sandbox_id`.
+
+Background processes mirror the sync API; `follow_output(pid)` blocks until the process exits and returns an iterable of captured events:
+
+```python
+proc = await sandbox.start_process("python", ["-c", "for i in range(5): print(i)"])
+events = await sandbox.follow_output(proc.pid)
+for event in events:
+    print(event.line, end="")
+```
+
+For long-running processes you want to stop yourself, send a signal directly — do not `follow_output` first (it blocks until exit):
+
+```python
+import signal
+proc = await sandbox.start_process("python", ["-m", "http.server", "8080"])
+# ... do work ...
+await sandbox.send_signal(proc.pid, signal.SIGTERM)
+```
+
+File ops, suspend/resume, and checkpoint all have the same shape:
+
+```python
+await sandbox.write_file("/workspace/data.csv", b"name,score\nAlice,95\n")
+content = await sandbox.read_file("/workspace/data.csv")
+
+# suspend/resume require a named sandbox
+sandbox = await AsyncSandbox.create(name="my-env", cpus=1.0)
+await sandbox.suspend()
+await sandbox.resume()
+
+# checkpoint works on any sandbox, including ephemeral
+snapshot = await sandbox.checkpoint()
+restored = await AsyncSandbox.create(snapshot_id=snapshot.snapshot_id)
+```
+
+> **TypeScript is async by default** — there is no separate `AsyncSandbox`; the existing `Sandbox` methods all return Promises.
+
 ## Sandbox Images
 
 A sandbox image is a project-scoped, named snapshot built from a base image plus build steps. Three definition formats — Python DSL, TypeScript DSL, Dockerfile — and three build paths.
@@ -668,7 +751,7 @@ Use these short names directly in `base_image=` / `baseImage:`, in `FROM`, and i
 - `.env(key, value)` — set environment variable
 - `.copy(src, dest)` — copy file from local build context
 - `.add(src, dest)` — add file from local build context
-- `.workdir(path)` — set working directory (TypeScript). For Python, set `WORKDIR` via a Dockerfile if needed.
+- `.workdir(path)` — set working directory (Python and TypeScript)
 
 ### Supported Build Operations
 
@@ -750,8 +833,14 @@ client.unexpose_ports("my-env", [8080])
 ```
 
 ```typescript
-await Sandbox.exposePorts("my-env", [8080], { allowUnauthenticatedAccess: false });
-await Sandbox.unexposePorts("my-env", [8080]);
+// Preferred: call update() on the Sandbox handle
+await sandbox.update({ exposedPorts: [8080], allowUnauthenticatedAccess: false });
+await sandbox.update({ exposedPorts: [] });   // remove all exposed ports
+
+// Or via SandboxClient when you only have an id/name
+const client = new SandboxClient();
+await client.exposePorts("my-env", [8080], { allowUnauthenticatedAccess: false });
+await client.unexposePorts("my-env", [8080]);
 ```
 
 ```bash
@@ -781,6 +870,70 @@ sandbox = Sandbox.create(deny_out=["example.com"])
 ```
 
 `allow_out` rules are evaluated before `deny_out`. Values may be IPs, CIDR ranges, or domain names.
+
+### Local Tunnels
+
+Tunnels forward a local TCP port on your laptop to a port inside a running sandbox over an authenticated WebSocket through the sandbox proxy. Your TensorLake credentials authenticate every connection — the remote port stays private to your account, **no entry in `exposed_ports` required**.
+
+**When to use a tunnel.** The sandbox proxy at `*.sandbox.tensorlake.ai` only speaks HTTP, WebSocket, gRPC, and SSH. Anything else — VNC's RFB protocol, the Postgres wire protocol, MySQL, Redis RESP, MongoDB, custom binary protocols — needs a tunnel because the proxy cannot frame those bytes. You can also use a tunnel for HTTP/WS/gRPC traffic when you'd rather keep the port reachable only at `127.0.0.1` instead of through a public sandbox URL (e.g., driving Chrome's DevTools Protocol from your laptop). Tunnels and `exposed_ports` are independent — a tunnel works even when the port is not exposed.
+
+**CLI** (simplest; works for any language):
+
+```bash
+# remote 5901 → local 15901 (default local port matches remote)
+tl sbx tunnel <sandbox-id-or-name> 5901 --listen-port 15901
+
+# default: local port matches remote
+tl sbx tunnel <sandbox-id-or-name> 9222
+```
+
+The command keeps running and prints connection events. `Ctrl+C` stops the tunnel; the sandbox keeps running. The local listener is per-process — to share one tunnel across two clients, run the CLI once and connect both to the same `localhost:<port>`.
+
+**TypeScript SDK:**
+
+```typescript
+import { Sandbox } from "tensorlake";
+
+const sandbox = await Sandbox.connect({ sandboxId: "<sandbox-id>" });
+const tunnel = await sandbox.createTunnel(5901, { localPort: 15901 });
+const { host, port } = tunnel.address();
+console.log(`tunnel listening on ${host}:${port}`);
+// ... use it ...
+await tunnel.close();
+```
+
+`createTunnel(remotePort, options)` returns a `TcpTunnel`. Useful options: `localHost` (defaults to `127.0.0.1`), `localPort` (pass `0` for an ephemeral port and read it back from `tunnel.address()`), `connectTimeout` (seconds to wait per WebSocket connection, defaults to `10`).
+
+**Python SDK** does not yet ship a native tunnel helper — drive the CLI from a subprocess:
+
+```python
+import subprocess
+
+tunnel = subprocess.Popen(
+    ["tl", "sbx", "tunnel", "<sandbox-id>", "9222", "-l", "9222"],
+)
+try:
+    # use http://127.0.0.1:9222 from your code
+    ...
+finally:
+    tunnel.terminate()
+    tunnel.wait()
+```
+
+**Common patterns:**
+
+| Inside sandbox                     | Local port | Client                                                       |
+|------------------------------------|------------|--------------------------------------------------------------|
+| `5901` (TigerVNC)                  | `15901`    | macOS Screen Sharing, RealVNC, TigerVNC, Remmina             |
+| `9222` (Chrome DevTools Protocol)  | `9222`     | Playwright `connect_over_cdp`, Puppeteer, raw WebSocket CDP  |
+| `5432` (Postgres)                  | `5432`     | `psql`, DBeaver, TablePlus                                   |
+| `3000` (dev server)                | `3000`     | Browser at `http://localhost:3000`                           |
+
+**Troubleshooting:**
+
+- **`Connection refused` from the local end.** The remote service inside the sandbox is not yet listening. Check with `tl sbx exec <id> -- bash -lc 'ss -ltnp'` and retry.
+- **`502 Bad Gateway` during handshake.** The workload has not finished booting; the proxy returns 502 when nothing is listening on the remote port. Wait a few seconds and reconnect.
+- **WebSocket auth failures.** Confirm `tl whoami` shows the right org/project, or that `TENSORLAKE_API_KEY` is set in the shell running the CLI.
 
 ## Data Models
 
@@ -822,13 +975,15 @@ result.exitCode     // number
 
 ### SnapshotInfo
 
-`snapshot_id` / `snapshotId`, `sandbox_id`, `status` (`"Pending" | "Ready" | "Failed"`), `size_bytes`, `created_at`.
+`snapshot_id` / `snapshotId`, `sandbox_id`, `snapshot_type` (`"memory" | "filesystem"` — `SnapshotType` enum), `status` (`SnapshotStatus`: `"in_progress" | "completed" | "failed"`), `size_bytes`, `rootfs_disk_bytes`, `base_image`, `created_at`.
 
 ### Process Status / Mode Enums
 
-- **`SandboxProcessStatus`** — `running`, `exited`, `signaled`
-- **`SandboxProcessStdinMode`** — `closed` (default), `pipe`
-- **`SandboxProcessOutputMode`** — `capture`, `discard`
+Imported from `tensorlake.sandbox.models` (or `tensorlake.sandbox`):
+
+- **`ProcessStatus`** — `running`, `exited`, `signaled`
+- **`StdinMode`** — `closed` (default), `pipe`
+- **`OutputMode`** — `capture`, `discard`
 
 ## CLI Quick Reference
 
