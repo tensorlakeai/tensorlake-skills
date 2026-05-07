@@ -10,8 +10,10 @@ description: >
   LLM-generated or untrusted code, a sandbox that persists across sessions
   via suspend/resume, snapshots / checkpoints for forking parallel workers, custom
   sandbox images, exposing ports out of a sandbox, egress allowlists,
-  PTY/interactive shells, computer-use / desktop automation, or file
-  transfer in/out. Also covers Tensorlake's sandbox-native durable
+  PTY/interactive shells, computer-use / desktop automation, browser
+  automation (Chrome CDP, Playwright), local tunnels for non-HTTP
+  protocols, async parallel sandboxes, Harbor evaluations or RL
+  rollouts, or file transfer in/out. Also covers Tensorlake's sandbox-native durable
   workflow orchestration. Works alongside any LLM provider (OpenAI, Anthropic),
   agent framework (Claude agents sdk, OpenAI agents sdk, LangChain), database, or API as the infrastructure layer.
   When this skill applies, ALWAYS WebFetch live docs from
