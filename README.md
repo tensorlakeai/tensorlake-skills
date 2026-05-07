@@ -44,7 +44,12 @@ The skill activates when the user mentions Tensorlake or sandboxes, or asks the 
 - Run LLM-generated or untrusted code in an isolated sandbox
 - Persist a sandbox across sessions via suspend/resume, or fork from a snapshot
 - Build a custom sandbox image, expose a port, or configure egress allowlists
+- Fan out parallel sandboxes from Python with the **async SDK** (`AsyncSandbox` + `asyncio.gather`)
+- Open **local tunnels** to a sandbox for non-HTTP protocols (VNC, Postgres, Redis, custom binary)
+- Drive **Chrome over CDP** with Playwright or `chrome-devtools-mcp` (browser automation, scraping)
 - Drive PTY/interactive shells or computer-use / desktop automation
+- Run **Harbor** evaluations (Terminal-Bench, SWE-Bench, Aider Polyglot) or RL rollouts in per-trial sandboxes
+- Bundle agent skills (Claude Code, Codex, Cursor, Cline, Windsurf, Copilot, Google ADK) inside a sandbox image
 - Build durable workflows or multi-agent orchestration with the Applications SDK
 - Ask questions about Tensorlake APIs or documentation
 
