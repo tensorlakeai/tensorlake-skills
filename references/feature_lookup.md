@@ -21,6 +21,9 @@ Bundled offline equivalent of [docs.tensorlake.ai/llms.txt](https://docs.tensorl
 - [Computer use / desktop automation](computer_use.md) — XFCE + Firefox, screenshots, mouse/keyboard, noVNC live view
 - [Drive Chrome over CDP](sandbox_usecases.md#drive-chrome-over-cdp) — sandboxed Google Chrome with `--remote-debugging-port`, Playwright `connect_over_cdp`, raw CDP WebSocket, `chrome-devtools-mcp` for Claude Code / Codex
 - [Skills in sandboxes](sandbox_usecases.md) — bundling Claude Code, Codex, Cursor, Cline, Windsurf, GitHub Copilot, Google ADK skills inside images
+- [SSH access](sandbox_sdk.md#ssh) — connect with `ssh`/`scp`/`sftp`/`rsync`, port forwarding (`-L` / `-D` / `-R`), VS Code Remote-SSH and JetBrains Gateway
+- [Sandbox as a dev environment](sandbox_usecases.md#sandbox-as-a-dev-environment) — portable cloud workstation with idle-suspend, resume-by-name, and persistent `~/.vscode-server`
+- [OCI base images](sandbox_sdk.md#base-images) — build from any standard OCI reference (`python:3.12-slim`, `node:22-alpine`, `ghcr.io/...`) plus `tensorlake/*` bases; private-registry auth via `~/.docker/config.json`
 - [Run Docker](sandbox_sdk.md) — Docker-in-sandbox
 
 ### Use cases

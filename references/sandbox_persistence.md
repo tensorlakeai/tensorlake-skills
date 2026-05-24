@@ -2,8 +2,8 @@
 Source:
   - https://docs.tensorlake.ai/sandboxes/lifecycle.md
   - https://docs.tensorlake.ai/sandboxes/snapshots.md
-SDK version: tensorlake 0.5.5
-Last verified: 2026-04-30
+SDK version: tensorlake 0.5.17
+Last verified: 2026-05-23
 -->
 
 # TensorLake Sandbox Persistence
@@ -12,11 +12,12 @@ State-centric reference for keeping sandbox state across time: state machine, ep
 
 For creating, connecting to, and running commands in a sandbox, see [sandbox_sdk.md](sandbox_sdk.md).
 
-Snapshot/suspend/resume are instance methods on the `Sandbox` handle; restore is `Sandbox.create(snapshot_id=...)`. `SandboxClient` still ships for management operations such as list/update/port exposure, but it is deprecated in favor of the direct `Sandbox` handle where available.
+Snapshot/suspend/resume are instance methods on the `Sandbox` handle; restore is `Sandbox.create(snapshot_id=...)`. Rename and other update operations are also instance methods — `sandbox.update(name=...)`. `SandboxClient` still ships for legacy management calls but emits a `DeprecationWarning` on construction; only `client.list()` lacks a direct `Sandbox`-level replacement (use `Sandbox.list()` instead).
 
 ## Table of Contents
 
 - [State Machine](#state-machine)
+- [Resource Limits and Timeouts](#resource-limits-and-timeouts)
 - [Ephemeral vs Named](#ephemeral-vs-named)
 - [Snapshots](#snapshots)
 - [Suspend & Resume](#suspend--resume)
@@ -68,6 +69,32 @@ Ephemeral sandboxes follow the same `create → Pending → Running → Terminat
 | `Suspended`      | Paused. Filesystem, memory, and running processes are preserved. Named only.                         | Snapshot storage only  |
 | `Terminated`     | Final state. Resources released. Cannot be reversed. Triggered by terminate or ephemeral timeout.    | No                     |
 
+## Resource Limits and Timeouts
+
+**Resources** are fixed at create time and cannot be changed afterwards — create a new sandbox if you need different resources.
+
+| Parameter   | Default  | Allowed range                                                            |
+|-------------|----------|--------------------------------------------------------------------------|
+| `cpus`      | `1.0`    | float                                                                    |
+| `memory_mb` | `1024`   | **1024–8192 MB per CPU core**                                            |
+| `disk_mb`   | `10240`  | 10240–102400 MiB (10–100 GiB). Growth-only on restore from a filesystem snapshot or `image=`. |
+
+**Timeouts.** `timeout_secs` is an **idle threshold**, not a wall-clock lifetime. The sandbox stays running as long as proxied traffic (SSH, PTY WebSocket, exposed-port HTTP, or SDK/CLI calls) is in flight; the idle timer resets on activity. Default is `600` seconds (10 minutes) when unset.
+
+Setting `timeout_secs=0` requests the **plan maximum** — it does NOT mean "no timeout". The plan caps:
+
+| Plan                  | Max `timeout_secs` |
+|-----------------------|--------------------|
+| Free (unverified)     | 1 hour (3600)      |
+| Free (verified)       | 2 hours (7200)     |
+| On-Demand (PAYG)      | 24 hours (86400)   |
+
+See [tensorlake.ai/pricing](https://www.tensorlake.ai/pricing) for committed-plan limits.
+
+**Timeout outcome** depends on sandbox type:
+- **Named** — suspend on timeout (preserve state for resume).
+- **Ephemeral** — terminate on timeout (final).
+
 ## Ephemeral vs Named
 
 Persistence requires a **named** sandbox. Ephemeral sandboxes cannot be suspended, resumed, or auto-resumed.
@@ -81,7 +108,7 @@ Persistence requires a **named** sandbox. Ephemeral sandboxes cannot be suspende
 | Reference by          | ID only                            | ID **or** name                              |
 | Use when              | Short-lived, one-off execution     | Multi-step agents, persistent environments  |
 
-An ephemeral sandbox can be promoted to a named sandbox after creation via `SandboxClient().update_sandbox(id, name)` in Python (or the client update helper in TypeScript). After renaming, it becomes eligible for suspend/resume. The CLI equivalent is `tl sbx name <id> <new-name>`.
+An ephemeral sandbox can be promoted to a named sandbox after creation via `sandbox.update(name="my-env")` (returns `Traced[SandboxInfo]`; the original handle is renamed in place and remains usable). The CLI equivalent is `tl sbx name <id> <new-name>`. After renaming, it becomes eligible for suspend/resume. (Legacy: `SandboxClient().update_sandbox(...)` still works but emits a `DeprecationWarning`.)
 
 ## Snapshots
 
@@ -358,7 +385,7 @@ Rule of thumb: **suspend** when you want *this* sandbox back later; **checkpoint
 
 ## Limitations
 
-- **Suspend/resume requires named sandboxes.** Ephemeral sandboxes return an error on suspend. Promote to named first via `SandboxClient().update_sandbox(id, name)` if you need to suspend.
+- **Suspend/resume requires named sandboxes.** Ephemeral sandboxes return an error on suspend. Promote to named first via `sandbox.update(name="my-env")` (or `tl sbx name <id> <new-name>`) if you need to suspend.
 - **Terminated is final.** A terminated sandbox cannot be resumed. Use `sandbox.checkpoint()` beforehand if you need a restore path.
 - **Snapshot restore is to a new sandbox.** Restoring does not mutate the original sandbox; it creates a new one with a new `sandbox_id`.
 - **Restore semantics depend on snapshot type.** *Memory* snapshots restore as-is — image, resources, entrypoint, and secrets all come from the snapshot and cannot be changed. *Filesystem* snapshots (the default) accept `cpus=`, `memory_mb=`, and `disk_mb=` overrides at restore (`disk_mb` is growth-only); image is still locked. If you need a different image, or you have a memory snapshot and need different resources, create a fresh sandbox instead.
@@ -366,4 +393,5 @@ Rule of thumb: **suspend** when you want *this* sandbox back later; **checkpoint
 ## See Also
 
 - [sandbox_sdk.md](sandbox_sdk.md) — create, connect, run commands, file ops, processes, networking, images
-- [sandbox_usecases.md](sandbox_usecases.md) — patterns: skills-in-sandboxes, AI code execution, CI/CD
+- [sandbox_usecases.md](sandbox_usecases.md) — patterns: skills-in-sandboxes, AI code execution, CI/CD, Chrome over CDP, remote dev environment
+- [computer_use.md](computer_use.md) — snapshot a warmed-up `tensorlake/ubuntu-vnc` desktop and fork parallel agent sessions

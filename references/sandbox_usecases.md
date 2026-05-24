@@ -10,8 +10,9 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/gspo-agentic-rl.md
   - https://docs.tensorlake.ai/sandboxes/chrome-cdp.md
   - https://docs.tensorlake.ai/sandboxes/harbor.md
-SDK version: tensorlake 0.5.8
-Last verified: 2026-05-06
+  - https://docs.tensorlake.ai/sandboxes/remote-dev.md
+SDK version: tensorlake 0.5.17
+Last verified: 2026-05-23
 -->
 
 # TensorLake Sandbox Use Cases
@@ -26,6 +27,7 @@ Last verified: 2026-05-06
 - [RL Training with GSPO](#rl-training-with-gspo)
 - [Data Analysis](#data-analysis)
 - [CI/CD Build Pipelines](#cicd-build-pipelines)
+- [Sandbox as a Dev Environment](#sandbox-as-a-dev-environment)
 - [Drive Chrome over CDP](#drive-chrome-over-cdp)
 - [Harbor (evals + RL rollouts)](#harbor-evals--rl-rollouts)
 
@@ -561,16 +563,91 @@ finally:
 - `env` — inject environment variables
 - `working_dir` — set working directory for the command
 
+## Sandbox as a Dev Environment
+
+Use a **named** sandbox as a portable cloud development workstation: SSH in from any machine, work normally, walk away when you're done. The sandbox idle-suspends and stops charging; resume tomorrow under the same name and your shell history, installed packages, in-progress branches, running `tmux` sessions, and `~/.vscode-server` are exactly where you left them. The sandbox id never changes across suspend/resume, so a single `~/.ssh/config` entry works forever.
+
+### One-time setup — register your SSH key
+
+```bash
+tl sbx ssh keys add --name laptop ~/.ssh/id_ed25519.pub
+tl sbx ssh keys ls
+```
+
+Keys are scoped per user across all projects — do this once per laptop.
+
+### Create the dev sandbox
+
+```bash
+# Named sandbox so it can be suspended and resumed
+tl sbx create my-dev --cpus 2 --memory 4096 --disk_mb 25600 --timeout 3600
+
+# Print an SSH config block ready to paste into ~/.ssh/config
+tl sbx describe my-dev
+```
+
+- `--disk_mb` is root FS size in MiB (range 10240–102400; 10–100 GiB). Toolchains, container images, and dataset checkouts fill the disk fastest.
+- `--timeout 3600` gives an hour of idle slack before suspend; `--timeout 0` requests the plan maximum (24h on On-Demand). While you're SSH'd in, the idle timer is paused.
+- Pass `--image my-image` if you've baked your toolchain into a [sandbox image](sandbox_sdk.md#sandbox-images).
+
+### `~/.ssh/config` entry
+
+`tl sbx describe my-dev` prints exactly this; the equivalent manual entry is:
+
+```sshconfig
+Host my-dev
+  HostName sandbox.tensorlake.ai
+  User <sandbox-id>
+  IdentityFile ~/.ssh/id_ed25519
+  IdentitiesOnly yes
+  ServerAliveInterval 30
+  ServerAliveCountMax 3
+```
+
+`Host` is just a local alias. `User` **must** be the sandbox id — that's what the gateway routes on. `IdentitiesOnly yes` matters if you have multiple keys in your agent.
+
+```bash
+ssh my-dev
+# tl-user@tl-sbx:~$
+```
+
+### Open it in VS Code (Remote-SSH)
+
+1. Install the **Remote - SSH** extension (`ms-vscode-remote.remote-ssh`).
+2. **Remote-SSH: Connect to Host…** → `my-dev`.
+3. **File → Open Folder** → `/home/tl-user/workspace`. That path is writable by the default `tl-user` account and persisted across snapshots. `/workspace` is **not** `tl-user`-writable in the default image, and `/tmp/*` is writable but excluded from snapshots.
+4. First connect takes ~30s while VS Code installs its server under `~/.vscode-server`. That directory lives under `/home/tl-user`, so it persists across suspend/resume — subsequent connects are fast.
+
+JetBrains Gateway, Cursor, and other Remote-SSH clients work the same way.
+
+### Day-to-day
+
+- **Long jobs vs. SSH disconnect.** When your SSH session ends and no other proxy traffic is in flight, the idle clock starts and the sandbox eventually suspends. Suspend preserves running processes (a `tmux` job resumes when you do), but it does **not** make progress while suspended. For unattended work that needs to keep running: raise `--timeout`, keep a client connected, or use [Sandbox Processes](sandbox_sdk.md) which is designed for fire-and-forget.
+- **Explicit suspend stops the meter immediately.** Don't wait for the idle timeout:
+
+  ```bash
+  tl sbx suspend my-dev
+  ```
+
+- **Resume tomorrow:**
+
+  ```bash
+  tl sbx resume my-dev
+  ssh my-dev
+  ```
+
+The sandbox id never changes across suspend/resume — `~/.ssh/config` and VS Code Remote-SSH bookmarks keep working indefinitely.
+
 ## Drive Chrome over CDP
 
-Run real Google Chrome inside a sandbox and drive it from your laptop with any DevTools-Protocol client (Playwright, Puppeteer, `chrome-remote-interface`, raw WebSocket) — no headless container, no screenshot polling, no public port. Built on the [`ubuntu-vnc`](computer_use.md) image plus a [Local Tunnel](sandbox_sdk.md#local-tunnels) carrying CDP traffic to `127.0.0.1`. The CDP path and the [Computer Use](computer_use.md) desktop path compose: keep the agent loop on CDP and attach a human reviewer over VNC.
+Run real Google Chrome inside a sandbox and drive it from your laptop with any DevTools-Protocol client (Playwright, Puppeteer, `chrome-remote-interface`, raw WebSocket) — no headless container, no screenshot polling, no public port. Built on the [`tensorlake/ubuntu-vnc`](computer_use.md) image plus a [Local Tunnel](sandbox_sdk.md#local-tunnels) carrying CDP traffic to `127.0.0.1`. The CDP path and the [Computer Use](computer_use.md) desktop path compose: keep the agent loop on CDP and attach a human reviewer over VNC.
 
 ### Workflow
 
 1. **Launch the sandbox** with the `ubuntu-vnc` image (4 CPU / 4 GiB is a comfortable default for one Chrome session). The desktop password for the managed image is `tensorlake`.
 
    ```bash
-   tl sbx create -i ubuntu-vnc -c 4 -m 4096 chrome-cdp
+   tl sbx create -i tensorlake/ubuntu-vnc -c 4 -m 4096 chrome-cdp
    ```
 
 2. **Start Chrome with CDP enabled** on the existing VNC display (`:1`) as the desktop user (`tl-user`). Two flags are required:

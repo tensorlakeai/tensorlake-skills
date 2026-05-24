@@ -14,17 +14,17 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/docker.md
   - https://docs.tensorlake.ai/sandboxes/async.md
   - https://docs.tensorlake.ai/sandboxes/tunnels.md
-SDK version: tensorlake 0.5.8
-Last verified: 2026-05-06
+SDK version: tensorlake 0.5.17
+Last verified: 2026-05-23
 -->
 
 # TensorLake Sandbox SDK Reference
 
-TensorLake Sandboxes are MicroVMs backed by Firecracker and CloudHypervisor. The `ubuntu-minimal` base image starts up in a few hundred milliseconds; `ubuntu-systemd` takes around 1 second to boot. The platform is HIPAA and SOC 2 Type II compliant, supports EU data residency, and offers zero data retention.
+TensorLake Sandboxes are MicroVMs backed by Firecracker and CloudHypervisor. The `tensorlake/ubuntu-minimal` base image starts up in a few hundred milliseconds; `tensorlake/ubuntu-systemd` takes around 1 second to boot. The platform is HIPAA and SOC 2 Type II compliant, supports EU data residency, and offers zero data retention.
 
-For state management (snapshots, suspend/resume, ephemeral vs named), see [sandbox_persistence.md](sandbox_persistence.md). For desktop automation / computer-use (the `ubuntu-vnc` image, `sandbox.connect_desktop()`, screenshot and keyboard/mouse APIs, noVNC bridge), see [computer_use.md](computer_use.md).
+For state management (snapshots, suspend/resume, ephemeral vs named), see [sandbox_persistence.md](sandbox_persistence.md). For desktop automation / computer-use (the `tensorlake/ubuntu-vnc` image, `sandbox.connect_desktop()`, screenshot and keyboard/mouse APIs, noVNC bridge), see [computer_use.md](computer_use.md). For SSH access and using a sandbox as a remote dev environment, see [sandbox_usecases.md](sandbox_usecases.md#sandbox-as-a-dev-environment).
 
-> `Sandbox` is the preferred handle for create/connect/run/suspend/resume/checkpoint and also for **rename and port exposure** via `sandbox.update(name=..., exposed_ports=..., allow_unauthenticated_access=...)`. `SandboxClient` still ships and emits a `DeprecationWarning` on construction; only `client.list()` lacks a direct `Sandbox`-level replacement. `Sandbox.name`, `Sandbox.status`, and `Sandbox.sandbox_id` are properties (no parens). `sandbox.status` returns a `SandboxStatus` enum (`SandboxStatus.RUNNING`, `.SUSPENDED`, etc.) — use `sandbox.status.value` for the lowercase string form. Snapshot creation is `sandbox.checkpoint()`; restore is `Sandbox.create(snapshot_id=...)`.
+> `Sandbox` is the preferred handle for create/connect/run/suspend/resume/checkpoint, list (`Sandbox.list()`), info (`sandbox.info()`), and **rename and port exposure** via `sandbox.update(name=..., exposed_ports=..., allow_unauthenticated_access=...)`. `SandboxClient` still ships for legacy management calls but emits a `DeprecationWarning` on construction — every operation now has a `Sandbox`-level equivalent. `Sandbox.name` and `Sandbox.sandbox_id` are properties (no parens) in Python; `Sandbox.status` is a Python property returning a `SandboxStatus` enum (`SandboxStatus.RUNNING`, `.SUSPENDED`, etc. — use `sandbox.status.value` for the lowercase string form). In TypeScript, `sandboxId` and `name` are getters but **`status` is an async method**: `await sandbox.status()`. Snapshot creation is `sandbox.checkpoint()`; restore is `Sandbox.create(snapshot_id=...)`.
 
 ## Table of Contents
 
@@ -34,7 +34,8 @@ For state management (snapshots, suspend/resume, ephemeral vs named), see [sandb
   - [Managing Sandboxes](#managing-sandboxes)
     - [Create a Sandbox](#create-a-sandbox)
     - [Connect to an Existing Sandbox](#connect-to-an-existing-sandbox)
-    - [List and Rename](#list-and-rename)
+    - [List, Inspect, Rename](#list-inspect-rename)
+    - [Resource Limits and Timeouts](#resource-limits-and-timeouts)
   - [Working in a Sandbox](#working-in-a-sandbox)
     - [Suspend, Resume, Terminate](#suspend-resume-terminate)
     - [Checkpoint and Restore](#checkpoint-and-restore)
@@ -45,6 +46,7 @@ For state management (snapshots, suspend/resume, ephemeral vs named), see [sandb
     - [Background Processes](#background-processes)
     - [Writing to stdin](#writing-to-stdin)
     - [PTY Sessions](#pty-sessions)
+    - [SSH](#ssh)
     - [Async SDK (Python)](#async-sdk-python)
   - [Sandbox Images](#sandbox-images)
     - [Define an Image](#define-an-image)
@@ -160,62 +162,84 @@ print(result.stdout)
 ```typescript
 // TypeScript Sandbox.connect takes an options object — not a bare string
 const sandbox = await Sandbox.connect({ sandboxId: "my-agent-env" });
+
 console.log(sandbox.sandboxId);
 console.log(sandbox.name);
+console.log(await sandbox.status());          // async method in TS — not a getter
 
 const result = await sandbox.run("python", { args: ["main.py"] });
 console.log(result.stdout);
 ```
 
-### List and Rename
+### List, Inspect, Rename
 
-Rename and port-exposure live on the `Sandbox` handle via `sandbox.update(...)`. `SandboxClient` is still required for listing sandboxes (no `Sandbox`-level equivalent) and emits a `DeprecationWarning` on construction.
+Listing, inspecting, renaming, and port-exposure all live on `Sandbox` directly. `SandboxClient` is now fully deprecated — every operation has a `Sandbox`-level equivalent.
 
 **Python:**
 
 ```python
-from tensorlake.sandbox import Sandbox, SandboxClient
+from tensorlake.sandbox import Sandbox
 
-# Rename / promote ephemeral → named, or change exposed ports — preferred form
-info = sandbox.update(name="my-env")                            # -> Traced[SandboxInfo]
-info = sandbox.update(exposed_ports=[8080], allow_unauthenticated_access=False)
-print(info.value.name, info.value.exposed_ports)
-
-# Listing still requires SandboxClient
-client = SandboxClient()
-for sb in client.list():                                        # -> iterator[SandboxInfo]
+# List all sandboxes in the namespace
+for sb in Sandbox.list():                        # -> list[SandboxInfo]
     print(sb.sandbox_id, sb.status)
+
+# Inspect a single sandbox's metadata (image, resources, timeouts, …)
+info = sandbox.info()                            # -> SandboxInfo
+print(info.image, info.resources.cpus, info.resources.memory_mb)
+
+# Rename / promote ephemeral → named, or change exposed ports
+info = sandbox.update(name="my-env")             # -> Traced[SandboxInfo]
+sandbox.update(exposed_ports=[8080], allow_unauthenticated_access=False)
+print(info.value.name, info.value.exposed_ports)
 ```
 
-> If you only have a `sandbox_id`, bridge to the handle: `Sandbox.connect("sbx-123").update(name="my-env")`. The legacy `client.update_sandbox("sbx-123", "my-env")` form still works but is deprecated.
+> If you only have a `sandbox_id`, bridge to the handle: `Sandbox.connect("sbx-123").update(name="my-env")`. The legacy `SandboxClient().update_sandbox("sbx-123", "my-env")` form still works but is deprecated.
 
 **TypeScript:**
 
 ```typescript
-import { Sandbox, SandboxClient } from "tensorlake";
+import { Sandbox } from "tensorlake";
 
-const client = new SandboxClient();
-const sandboxes = await client.list();
+// List
+const sandboxes = await Sandbox.list();
 for (const sb of sandboxes) {
-  // status values are capitalized strings: "Pending" | "Running" | "Suspending" | "Suspended" | "Snapshotting" | "Terminated"
+  // sb.status is a SandboxStatus enum whose values are lowercase strings:
+  // "pending" | "running" | "snapshotting" | "suspending" | "suspended" | "terminated"
   console.log(sb.sandboxId, sb.name, sb.status, sb.createdAt);
 }
 
-// Filter then terminate — terminate is called on the handle, so connect first
-const stale = sandboxes.filter((sb) => sb.status === "Suspended");
+// Inspect
+const info = await sandbox.info();
+console.log(info.image, info.resources.cpus, info.resources.memoryMb);
+
+// Rename / port exposure
+await sandbox.update({ name: "my-env" });
+await sandbox.update({ exposedPorts: [8080], allowUnauthenticatedAccess: false });
+
+// Filter then terminate — terminate is called on the handle
+import { SandboxStatus } from "tensorlake";
+const stale = sandboxes.filter((sb) => sb.status === SandboxStatus.SUSPENDED);
 for (const sb of stale) {
   const handle = await Sandbox.connect({ sandboxId: sb.sandboxId });
   await handle.terminate();
 }
-
-// Rename via the client (legacy but still supported)
-const renamed = await client.update("sbx-123", { name: "my-env" });
-console.log(renamed.name);
 ```
 
-> Termination is called on the handle (`sandbox.terminate()` / `await sandbox.terminate()`), not on the `Sandbox` class or `SandboxClient`. There is **no `sandbox.destroy()`** — that name is a common hallucination from other SDKs (Playwright, Selenium, etc.); the only termination method is `sandbox.terminate()`. There is also no `client.delete(id)` — get a handle via `Sandbox.connect(...)` first if you only have an identifier. The `status` field on `SandboxInfo` is the capitalized string form (`"Suspended"`, not `"suspended"`); the lowercase form only appears as `sandbox.status.value` on the Python `SandboxStatus` enum.
+> Termination is called on the handle (`sandbox.terminate()` / `await sandbox.terminate()`), not on the `Sandbox` class. There is **no `sandbox.destroy()`** — that name is a common hallucination from other SDKs (Playwright, Selenium, etc.); the only termination method is `sandbox.terminate()`. The `status` field on `SandboxInfo` is a `SandboxStatus` enum whose string values are lowercase (`"suspended"`, `"running"`, …) in both Python and TypeScript — compare against `SandboxStatus.SUSPENDED` (or the literal `"suspended"`) rather than `"Suspended"`. In Python, `sandbox.status.value` gives the same lowercase string.
 
 Port exposure is also a `sandbox.update(...)` operation — see [Networking → Port Exposure](#port-exposure).
+
+### Resource Limits and Timeouts
+
+| Parameter   | Default  | Allowed range                                                              |
+|-------------|----------|----------------------------------------------------------------------------|
+| `cpus`      | `1.0`    | float                                                                      |
+| `memory_mb` | `1024`   | **1024–8192 MB per CPU core**                                              |
+| `disk_mb`   | `10240`  | 10240–102400 MiB (10–100 GiB). Growth-only on restore from a filesystem snapshot or `image=`. |
+| `timeout_secs` | `600`  | idle threshold; **plan max**: Free (unverified) 1h, Free (verified) 2h, On-Demand 24h. `0` requests plan max. |
+
+`timeout_secs` is an **idle threshold**, not a wall-clock lifetime — the sandbox stays running as long as any proxied traffic (SSH, PTY WebSocket, exposed-port HTTP, SDK/CLI calls) is in flight. `timeout_secs=0` requests the **plan maximum**, not "no timeout". For named sandboxes the timeout triggers a suspend; for ephemeral, a terminate. See [sandbox_persistence.md](sandbox_persistence.md#resource-limits-and-timeouts).
 
 ## Working in a Sandbox
 
@@ -544,6 +568,63 @@ await sandbox.terminate();
 >
 > Typical patterns: agent driving a one-shot command → `wait()` → `kill()` → `terminate()`. Agent that needs to survive a client crash → `disconnect()` (no `kill`, no `terminate`) → reconnect later via `connect_pty(session_id, token)`.
 
+### SSH
+
+The sandbox proxy exposes a standard SSH endpoint at `sandbox.tensorlake.ai`. Use the **sandbox id as the SSH username**; your registered SSH key authenticates the connection. You land in `/home/tl-user` as the `tl-user` POSIX account (member of `sudo`); the in-sandbox hostname is `tl-sbx`.
+
+**One-time setup — register your key** (per laptop, not per sandbox):
+
+```bash
+tl sbx ssh keys add --name laptop ~/.ssh/id_ed25519.pub
+tl sbx ssh keys ls
+```
+
+> **`tl sbx ssh keys` requires user-level auth.** It does not work with `TENSORLAKE_API_KEY` (which takes precedence over `tl login`). Unset it for the registration step — `env -u TENSORLAKE_API_KEY tl sbx ssh keys add ...` — or use a fresh shell. After registration you can put `TENSORLAKE_API_KEY` back; SSH itself uses the registered key, not the API key.
+
+**Connect:**
+
+```bash
+ssh <sandbox-id>@sandbox.tensorlake.ai
+```
+
+To target a specific port (default is the SSH server on `22`), prefix the username with the port: `ssh 8080-<sandbox-id>@sandbox.tensorlake.ai`.
+
+**File transfer** — `scp`, `sftp`, and `rsync` ride the same connection:
+
+```bash
+scp ./script.py <sandbox-id>@sandbox.tensorlake.ai:/workspace/
+rsync -avz ./src/ <sandbox-id>@sandbox.tensorlake.ai:/workspace/src/
+sftp <sandbox-id>@sandbox.tensorlake.ai
+```
+
+**Port forwarding** — all four modes work (TCP and UNIX-socket, both directions):
+
+```bash
+# Local forward (-L): reach a service inside the sandbox from your laptop
+ssh -L 8888:localhost:8000 <sandbox-id>@sandbox.tensorlake.ai
+
+# Dynamic SOCKS (-D): route arbitrary traffic through the sandbox's network namespace
+ssh -D 1080 -N -f <sandbox-id>@sandbox.tensorlake.ai
+
+# Remote forward (-R): let processes inside the sandbox reach a service on your laptop
+ssh -R 9000:localhost:9000 <sandbox-id>@sandbox.tensorlake.ai
+```
+
+**`~/.ssh/config` and VS Code Remote-SSH.** `tl sbx describe <sandbox-id-or-name>` prints an `SSH Config:` block you can paste into `~/.ssh/config`. The equivalent manual entry:
+
+```sshconfig
+Host my-sandbox
+  HostName sandbox.tensorlake.ai
+  User <sandbox-id>
+  IdentityFile ~/.ssh/id_ed25519
+  IdentitiesOnly yes
+  ServerAliveInterval 30
+```
+
+VS Code Remote-SSH, JetBrains Gateway, Cursor — all work the same way. Open `/home/tl-user/workspace` (writable by `tl-user`, persisted across snapshots). `/workspace` is **not** `tl-user`-writable, and `/tmp/*` is writable but excluded from snapshots. While Remote-SSH is connected, the open session counts as proxy traffic and prevents idle-suspend.
+
+For the full "sandbox as portable dev workstation" workflow, see [sandbox_usecases.md → Sandbox as a Dev Environment](sandbox_usecases.md#sandbox-as-a-dev-environment).
+
 ### Async SDK (Python)
 
 Python ships an async-native sandbox handle (`AsyncSandbox`) on top of asyncio. **Every method on the sync `Sandbox` handle has a one-to-one async counterpart on `AsyncSandbox` — same names, same parameters, just `async def` and awaited.** Reach for it when fanning out work across many sandboxes (`asyncio.gather`), when your app is already async (FastAPI, aiohttp, agent loops), or when streaming output from many processes concurrently. If you only ever drive one sandbox at a time, the sync `Sandbox` API is equivalent and simpler.
@@ -736,14 +817,30 @@ Before building, run `tl login` and `tl init` (or `npx tl init`) to select the t
 
 ### Base Images
 
-| Base Image          | Description                                                                                              |
-|---------------------|----------------------------------------------------------------------------------------------------------|
-| `ubuntu-minimal`    | Default. Minimal Ubuntu, no systemd, boots in hundreds of ms.                                            |
-| `ubuntu-systemd`    | Ubuntu with systemd, supports Docker/K8s inside the sandbox.                                             |
-| `ubuntu-vnc`        | Desktop-enabled (XFCE + TigerVNC + Firefox) — use with `sandbox.connect_desktop()` for computer-use.     |
-| `debian-minimal`    | Minimal Debian 13.                                                                                       |
+| Base Image                    | Description                                                                                              |
+|-------------------------------|----------------------------------------------------------------------------------------------------------|
+| `tensorlake/ubuntu-minimal`   | Default. Minimal Ubuntu, no systemd, boots in hundreds of ms.                                            |
+| `tensorlake/ubuntu-systemd`   | Ubuntu with systemd, supports Docker/K8s inside the sandbox.                                             |
+| `tensorlake/ubuntu-vnc`       | Desktop-enabled (XFCE + TigerVNC + Firefox) — use with `sandbox.connect_desktop()` for computer-use.     |
+| `tensorlake/debian-minimal`   | Minimal Debian 13.                                                                                       |
 
-Use these short names directly in `base_image=` / `baseImage:`, in `FROM`, and in `image=` when launching a sandbox from a base image (no `tensorlake/` prefix).
+Use the fully-qualified names (`tensorlake/...`) in `base_image=` / `baseImage:`, in `FROM`, and in `image=` when launching from a base image.
+
+**OCI base images.** You are not limited to `tensorlake/*` bases. The build base can be any standard OCI image reference — `python:3.12-slim`, `debian:bookworm-slim`, `node:22-alpine`, `ghcr.io/...`, `public.ecr.aws/...`, etc. The first build from a new OCI base takes longer because Tensorlake fetches and prepares the upstream image; subsequent sandbox launches use the registered snapshot.
+
+```dockerfile
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y curl
+RUN python3 -m pip install pandas pyarrow duckdb
+WORKDIR /workspace
+```
+
+```bash
+tl sbx image create ./Dockerfile --registered-name py-data-tools
+```
+
+**Private registries.** Credentials are read from `~/.docker/config.json` (or `$DOCKER_CONFIG/config.json`). Any registry that works with `docker login` works here — Docker Hub, GHCR, ECR, GCR, Quay, self-hosted. In CI, make sure the runner has a populated Docker config before running `tl sbx image create`.
 
 ### Image Builder Methods (chainable)
 
