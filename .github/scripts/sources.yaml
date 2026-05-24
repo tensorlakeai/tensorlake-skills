@@ -32,21 +32,21 @@ sandbox_sdk.md:
     - https://docs.tensorlake.ai/sandboxes/docker.md
     - https://docs.tensorlake.ai/sandboxes/async.md
     - https://docs.tensorlake.ai/sandboxes/tunnels.md
-  sdk_version: "0.5.8"
-  last_verified: "2026-05-06"
+  sdk_version: "0.5.17"
+  last_verified: "2026-05-23"
 
 computer_use.md:
   sources:
     - https://docs.tensorlake.ai/sandboxes/computer-use.md
-  sdk_version: "0.5.5"
-  last_verified: "2026-04-30"
+  sdk_version: "0.5.17"
+  last_verified: "2026-05-23"
 
 sandbox_persistence.md:
   sources:
     - https://docs.tensorlake.ai/sandboxes/lifecycle.md
     - https://docs.tensorlake.ai/sandboxes/snapshots.md
-  sdk_version: "0.5.5"
-  last_verified: "2026-04-30"
+  sdk_version: "0.5.17"
+  last_verified: "2026-05-23"
 
 applications_sdk.md:
   sources:
@@ -118,8 +118,9 @@ sandbox_usecases.md:
     - https://docs.tensorlake.ai/sandboxes/gspo-agentic-rl.md
     - https://docs.tensorlake.ai/sandboxes/chrome-cdp.md
     - https://docs.tensorlake.ai/sandboxes/harbor.md
-  sdk_version: "0.5.8"
-  last_verified: "2026-05-06"
+    - https://docs.tensorlake.ai/sandboxes/remote-dev.md
+  sdk_version: "0.5.17"
+  last_verified: "2026-05-23"
 
 troubleshooting.md:
   sources:

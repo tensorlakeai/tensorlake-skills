@@ -48,6 +48,9 @@ The skill activates when the user mentions Tensorlake or sandboxes, or asks the 
 - Open **local tunnels** to a sandbox for non-HTTP protocols (VNC, Postgres, Redis, custom binary)
 - Drive **Chrome over CDP** with Playwright or `chrome-devtools-mcp` (browser automation, scraping)
 - Drive PTY/interactive shells or computer-use / desktop automation
+- **SSH** into a sandbox, transfer files via `scp`/`sftp`/`rsync`, or set up port forwarding (`-L` / `-D` / `-R`)
+- Use a named sandbox as a **remote dev environment** (VS Code Remote-SSH, JetBrains Gateway, Cursor) with idle-suspend and resume-by-name
+- Build sandbox images from **OCI base images** (`python:3.12-slim`, `node:22-alpine`, `ghcr.io/...`) in addition to `tensorlake/*` bases
 - Run **Harbor** evaluations (Terminal-Bench, SWE-Bench, Aider Polyglot) or RL rollouts in per-trial sandboxes
 - Bundle agent skills (Claude Code, Codex, Cursor, Cline, Windsurf, Copilot, Google ADK) inside a sandbox image
 - Build durable workflows or multi-agent orchestration with the Applications SDK
@@ -177,8 +180,8 @@ Each reference file has a source header that tracks which doc pages it was built
 Source:
   - https://docs.tensorlake.ai/sandboxes/lifecycle.md
   - https://docs.tensorlake.ai/sandboxes/commands.md
-SDK version: tensorlake 0.5.8
-Last verified: 2026-05-06
+SDK version: tensorlake 0.5.17
+Last verified: 2026-05-23
 -->
 ```
 
