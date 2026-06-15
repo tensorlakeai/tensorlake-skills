@@ -21,6 +21,7 @@ Bundled offline equivalent of [docs.tensorlake.ai/llms.txt](https://docs.tensorl
 - [Computer use / desktop automation](computer_use.md) — XFCE + Firefox, screenshots, mouse/keyboard, noVNC live view
 - [Drive Chrome over CDP](sandbox_usecases.md#drive-chrome-over-cdp) — sandboxed Google Chrome with `--remote-debugging-port`, Playwright `connect_over_cdp`, raw CDP WebSocket, `chrome-devtools-mcp` for Claude Code / Codex
 - [Skills in sandboxes](sandbox_usecases.md) — bundling Claude Code, Codex, Cursor, Cline, Windsurf, GitHub Copilot, Google ADK skills inside images
+- [Claude managed agents](sandbox_usecases.md#claude-managed-agents) — run Claude Agent SDK / managed agents on sandboxes; orchestrator modes, recreate-vs-resume for long sessions, per-command env injection
 - [SSH access](sandbox_sdk.md#ssh) — connect with `ssh`/`scp`/`sftp`/`rsync`, port forwarding (`-L` / `-D` / `-R`), VS Code Remote-SSH and JetBrains Gateway
 - [Sandbox as a dev environment](sandbox_usecases.md#sandbox-as-a-dev-environment) — portable cloud workstation with idle-suspend, resume-by-name, and persistent `~/.vscode-server`
 - [OCI base images](sandbox_sdk.md#base-images) — build from any standard OCI reference (`python:3.12-slim`, `node:22-alpine`, `ghcr.io/...`) plus `tensorlake/*` bases; private-registry auth via `~/.docker/config.json`
@@ -30,6 +31,7 @@ Bundled offline equivalent of [docs.tensorlake.ai/llms.txt](https://docs.tensorl
 
 - [Tool calls / sandbox-as-tool](sandbox_usecases.md#ai-code-execution) — LLM code-execution tool, executing untrusted/LLM-generated code with network policy
 - [Agentic swarm intelligence](sandbox_usecases.md) — fan-out parallel specialist agents
+- [Agentic Dungeons & Dragons](sandbox_usecases.md#agentic-dungeons--dragons) — branch→map→reduce multi-agent demo running untrusted dice scripts in isolated sandboxes
 - [RL training (GSPO)](sandbox_usecases.md) — fine-tune on code generation with sandbox reward oracle
 - [RL reproducible environments](sandbox_usecases.md) — deterministic isolated rollouts
 - [Agentic autoresearch loop](sandbox_usecases.md) — overnight ML script self-improvement with parallel sandbox races

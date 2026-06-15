@@ -6,7 +6,6 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/lifecycle.md
   - https://docs.tensorlake.ai/sandboxes/commands.md
   - https://docs.tensorlake.ai/sandboxes/file-operations.md
-  - https://docs.tensorlake.ai/sandboxes/processes.md
   - https://docs.tensorlake.ai/sandboxes/environment-variables.md
   - https://docs.tensorlake.ai/sandboxes/networking.md
   - https://docs.tensorlake.ai/sandboxes/images.md
@@ -14,8 +13,8 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/docker.md
   - https://docs.tensorlake.ai/sandboxes/async.md
   - https://docs.tensorlake.ai/sandboxes/tunnels.md
-SDK version: tensorlake 0.5.17
-Last verified: 2026-05-23
+SDK version: tensorlake 0.5.44
+Last verified: 2026-06-16
 -->
 
 # TensorLake Sandbox SDK Reference
@@ -44,6 +43,7 @@ For state management (snapshots, suspend/resume, ephemeral vs named), see [sandb
     - [File Operations](#file-operations)
     - [Environment Variables](#environment-variables)
     - [Background Processes](#background-processes)
+    - [Managed Processes](#managed-processes)
     - [Writing to stdin](#writing-to-stdin)
     - [PTY Sessions](#pty-sessions)
     - [SSH](#ssh)
@@ -51,6 +51,8 @@ For state management (snapshots, suspend/resume, ephemeral vs named), see [sandb
   - [Sandbox Images](#sandbox-images)
     - [Define an Image](#define-an-image)
     - [Build / Register the Image](#build--register-the-image)
+    - [Import an Image from a Registry](#import-an-image-from-a-registry)
+    - [Public Images](#public-images)
     - [Base Images](#base-images)
     - [Image Builder Methods (chainable)](#image-builder-methods-chainable)
     - [Supported Build Operations](#supported-build-operations)
@@ -328,7 +330,7 @@ result.stdout      # str
 result.stderr      # str
 ```
 
-> **Canonical forms — don't invent variants.** For LLM tool-use, the idiom is `sandbox.run("python", ["-c", code])`. There is no `sandbox.exec()`, `sandbox.python()`, `sandbox.eval()`, or `sandbox.repl()`. The return object exposes exactly `stdout`, `stderr`, `exit_code` (Python) / `stdout`, `stderr`, `exitCode` (TypeScript) — don't reference `.output`, `.result`, `.logs`, or streaming fields like `.stream` / `.lines` on the result. **The Python field is `exit_code`, NOT `returncode`** — `CommandResult` is a Pydantic model with no `subprocess.CompletedProcess`-style alias, so `result.returncode` raises `AttributeError`. For live stdout from a long-running process, use `start_process` + `follow_output` (see [Process Management](#process-management)), not a fabricated field on `run()`.
+> **Canonical forms — don't invent variants.** For LLM tool-use, the idiom is `sandbox.run("python", ["-c", code])`. There is no `sandbox.exec()`, `sandbox.python()`, `sandbox.eval()`, or `sandbox.repl()`. The return object exposes exactly `stdout`, `stderr`, `exit_code` (Python) / `stdout`, `stderr`, `exitCode` (TypeScript) — don't reference `.output`, `.result`, `.logs`, or streaming fields like `.stream` / `.lines` on the result. **The Python field is `exit_code`, NOT `returncode`** — `CommandResult` is a Pydantic model with no `subprocess.CompletedProcess`-style alias, so `result.returncode` raises `AttributeError`. For live stdout from a long-running process, use `start_process` + `follow_output` (see [Background Processes](#background-processes)), not a fabricated field on `run()`.
 
 **TypeScript:**
 
@@ -360,9 +362,10 @@ await sandbox.run("bash", { args: ["-lc", "ls -la /workspace | grep '.py' | wc -
 
 ```python
 sandbox.write_file("/workspace/data.csv", b"name,score\nAlice,95")
-data = sandbox.read_file("/workspace/data.csv").value    # -> bytes (unwrap Traced)
+data = bytes(sandbox.read_file("/workspace/data.csv"))   # read_file returns bytes-like; wrap with bytes(...)
 print(data.decode())
-entries = sandbox.list_directory("/workspace").value.entries  # entries[].name, entries[].size
+for entry in sandbox.list_directory("/workspace").entries:  # entries[].name, .is_dir, .size
+    print(entry.name, entry.is_dir, entry.size)
 sandbox.delete_file("/workspace/data.csv")
 ```
 
@@ -515,6 +518,72 @@ REST equivalents:
 - Send signal: `POST /api/v1/processes/<pid>/signal` (`{"signal": 15}`)
 - Kill process: `DELETE /api/v1/processes/<pid>`
 
+### Managed Processes
+
+A background process opts into supervision (auto-restart on crash or failed health check) when you pass a `name`, a `restart` policy, or a `health_check` to `start_process`. Managed processes share the same process API as plain background commands.
+
+**Python:**
+
+```python
+from tensorlake.sandbox import (
+    ProcessHealthCheck,
+    ProcessHealthCheckType,
+    RestartPolicy,
+    RestartPolicyConfig,
+    Sandbox,
+)
+
+proc = sandbox.start_process(
+    "python",
+    args=["-m", "http.server", "8080"],
+    user="root",                # username, UID string, "uid:gid", or {"uid":..,"gid":..}; default is tl-user
+    name="dev-server",
+    restart=RestartPolicyConfig(
+        policy=RestartPolicy.ALWAYS,   # NEVER | ON_FAILURE | ALWAYS
+        max_restarts=10,
+        initial_backoff_ms=500,
+        max_backoff_ms=30_000,
+    ),
+    health_check=ProcessHealthCheck(
+        type=ProcessHealthCheckType.HTTP,  # HTTP (local port + optional path) or TCP (local port)
+        port=8080,
+        path="/",
+        interval_ms=1_000,
+        failure_threshold=3,
+    ),
+)
+print(proc.managed.status, proc.managed.health_status)
+
+current = sandbox.get_process(proc.pid)
+restarted = sandbox.restart_process(proc.pid)   # manual supervised restart
+```
+
+**TypeScript:**
+
+```typescript
+const proc = await sandbox.startProcess("python", {
+  args: ["-m", "http.server", "8080"],
+  user: "root",
+  name: "dev-server",
+  restart: { policy: "always", maxRestarts: 10, initialBackoffMs: 500, maxBackoffMs: 30_000 },
+  healthCheck: { type: "http", port: 8080, path: "/", intervalMs: 1_000, failureThreshold: 3 },
+});
+console.log(proc.managed?.status, proc.managed?.healthStatus);
+
+const current = await sandbox.getProcess(proc.pid);
+const restarted = await sandbox.restartProcess(proc.pid);
+```
+
+**CLI:** managed-process flags require `--detach` (they start a background process). For blocking one-shot runs, use plain `tl sbx exec` / `sandbox.run(...)`.
+
+```bash
+tl sbx exec <id> --detach --name dev-server --restart always --health-http 8080 \
+  python -m http.server 8080
+tl sbx ps <id> <pid> --json         # inspect the managed process
+tl sbx restart <id> <pid>           # restart through the supervisor
+tl sbx kill <id> <pid>              # stop and remove from supervision
+```
+
 ### PTY Sessions
 
 ```python
@@ -623,6 +692,8 @@ Host my-sandbox
 
 VS Code Remote-SSH, JetBrains Gateway, Cursor — all work the same way. Open `/home/tl-user/workspace` (writable by `tl-user`, persisted across snapshots). `/workspace` is **not** `tl-user`-writable, and `/tmp/*` is writable but excluded from snapshots. While Remote-SSH is connected, the open session counts as proxy traffic and prevents idle-suspend.
 
+`tmux` and `screen` work normally inside the sandbox for sessions that survive an `ssh` disconnect. On auth failure the proxy disconnects with a specific message — key not registered (run `tl sbx ssh keys add`), sandbox not in any of your projects (verify with `tl sbx ls -r`), or sandbox not `running` (resume it). If your client offers multiple keys, constrain it with `IdentitiesOnly yes` / `IdentityFile` to avoid `Permission denied (publickey)`.
+
 For the full "sandbox as portable dev workstation" workflow, see [sandbox_usecases.md → Sandbox as a Dev Environment](sandbox_usecases.md#sandbox-as-a-dev-environment).
 
 ### Async SDK (Python)
@@ -715,15 +786,16 @@ A sandbox image is a project-scoped, named snapshot built from a base image plus
 from tensorlake import Image
 
 image = (
-    Image(name="data-tools-image", base_image="ubuntu-systemd")
+    Image(name="data-tools-image", base_image="tensorlake/ubuntu-systemd")
     .copy("requirements.txt", "/tmp/requirements.txt")
     .run("apt-get update && apt-get install -y python3 python3-pip")
     .run("python3 -m pip install --break-system-packages -r /tmp/requirements.txt")
     .run("mkdir -p /workspace/cache")
     .env("APP_ENV", "prod")
+    .workdir("/workspace")
 )
 
-image.build()
+image.build(registered_name="data-tools-image")
 ```
 
 **TypeScript:**
@@ -733,7 +805,7 @@ import { Image } from "tensorlake";
 
 const image = new Image({
   name: "data-tools-image",
-  baseImage: "ubuntu-systemd",
+  baseImage: "tensorlake/ubuntu-systemd",
 })
   .copy("requirements.txt", "/tmp/requirements.txt")
   .run("apt-get update && apt-get install -y python3 python3-pip")
@@ -742,13 +814,13 @@ const image = new Image({
   .env("APP_ENV", "prod")
   .workdir("/workspace");
 
-await image.build();
+await image.build({ registeredName: "data-tools-image", contextDir: "." });
 ```
 
 **Dockerfile:**
 
 ```dockerfile
-FROM ubuntu-systemd
+FROM tensorlake/ubuntu-systemd
 
 RUN apt-get update && apt-get install -y python3 python3-pip
 COPY requirements.txt /tmp/requirements.txt
@@ -767,11 +839,11 @@ from tensorlake import Image
 from tensorlake.sandbox import Sandbox
 
 image = (
-    Image(name="etl-tools", base_image="ubuntu-minimal")
+    Image(name="etl-tools", base_image="tensorlake/ubuntu-minimal")
     .run("apt-get update && apt-get install -y python3 python3-pip")
     .run("python3 -m pip install --break-system-packages pandas pyarrow duckdb")
 )
-image.build()
+image.build(registered_name="etl-tools")
 
 sandbox = Sandbox.create(image="etl-tools", cpus=4.0, memory_mb=8192)
 result = sandbox.run("python3", ["-c", "import pandas, pyarrow, duckdb; print('ok')"])
@@ -780,24 +852,33 @@ print(result.stdout, result.exit_code)
 
 ### Build / Register the Image
 
-Build-time resources default to `cpus=2.0`, `memory_mb=4096`, `disk_mb=10240` (10 GiB) and are passed to the build call (not the `Image(...)` constructor):
+Build defaults are `cpus=2.0`, `memory_mb=4096`, and a generated root disk of `10240` MiB (10 GiB). Resources are passed to the build call (not the `Image(...)` constructor). `disk_mb` / `diskMb` sets the root disk of sandboxes created from the registered image; `builder_disk_mb` / `builderDiskMb` only sizes the temporary builder sandbox.
 
 **Python:**
 
 ```python
-image.build()                                   # use defaults
+image.build(registered_name="data-tools-image")        # use defaults
 
 image.build(
+    registered_name="data-tools-image",
     cpus=4.0,
     memory_mb=4096,
-    disk_mb=25600,                              # 25 GiB build/root disk
+    disk_mb=25600,                              # 25 GiB root disk for launched sandboxes
+    builder_disk_mb=32768,                      # 32 GiB disk for the builder sandbox only
 )
 ```
 
 **TypeScript:**
 
 ```typescript
-await image.build();
+await image.build({
+  registeredName: "data-tools-image",
+  cpus: 4.0,
+  memoryMb: 4096,
+  diskMb: 25600,
+  builderDiskMb: 32768,
+  contextDir: ".",        // resolves relative copy()/add() sources in SDK builds
+});
 ```
 
 **CLI (Dockerfile only):**
@@ -806,14 +887,70 @@ await image.build();
 tl sbx image create ./Dockerfile --registered-name data-tools-image
 tl sbx image create ./Dockerfile \
   --registered-name data-tools-image \
-  --cpus 4 --memory 4096 --disk_mb 25600
+  --cpus 4 --memory 4096 --disk_mb 25600 --builder_disk_mb 32768
 ```
 
-The positional argument is a Dockerfile path. The `-n/--registered-name` flag sets the registered name; if omitted, it defaults to the parent directory when the file is named `Dockerfile`, otherwise the file stem. Names must be unique within a project.
+The positional argument is a Dockerfile path. The `-n/--registered-name` flag sets the registered name; if omitted, it defaults to the parent directory when the file is named `Dockerfile`, otherwise the file stem. Names must be unique within a project. Dockerfile builds use the Dockerfile's parent directory as the build context.
 
 > **Disk size carries over to launched sandboxes.** Use a larger build-time `disk_mb` when you want to bake big dependencies into the image without forcing every consumer to override `disk_mb` at `Sandbox.create()` time. CPU and memory are *not* inherited — they fall back to `Sandbox.create()`'s own `cpus` / `memory_mb` (defaults `1.0` / `1024`) unless explicitly set at launch.
 
 Before building, run `tl login` and `tl init` (or `npx tl init`) to select the target project.
+
+**Register an existing snapshot as an image.** If you already have a `Completed` filesystem snapshot (with a durable `snapshot_uri`), name it without rebuilding:
+
+```bash
+tl sbx image register data-tools-image snap_01HX... --dockerfile ./Dockerfile
+```
+
+The first positional is the image name, the second the snapshot ID; `--dockerfile` is stored alongside for `tl sbx image describe`. Add `--public` to make it namespace-resolvable.
+
+`tl sbx image ls` lists every image registered in the current project; `tl sbx image describe <name-or-template-id>` shows the Dockerfile, snapshot ID, and image size.
+
+### Import an Image from a Registry
+
+To use an existing registry image as a sandbox image *as-is* — no Dockerfile, no build steps — import it directly. Tensorlake pulls the referenced image's layers straight into the sandbox root filesystem (bypassing the Docker daemon); the reference is always pulled fresh. If you need to layer extra packages or files on top, write a Dockerfile with it as a `FROM` base instead (see [Base Images → OCI base images](#base-images)).
+
+```bash
+tl sbx image import pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime --registered-name pytorch-runtime
+```
+
+```python
+from tensorlake import import_sandbox_image
+
+import_sandbox_image(
+    "pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime",
+    registered_name="pytorch-runtime",
+)
+```
+
+```typescript
+import { importSandboxImage } from "tensorlake";
+
+await importSandboxImage(
+  "pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime",
+  { registeredName: "pytorch-runtime" },
+);
+```
+
+If you omit the registered name, it defaults to the reference's last path segment with any tag/digest stripped (`pytorch/pytorch:2.4.1` → `pytorch`). Imports honor the same `docker login` credentials, CPU/memory/disk options, and `--public` / `is_public` visibility as builds.
+
+> You can't launch a sandbox directly from a raw Docker/registry reference — it must be registered as a Tensorlake image first. `tl sbx image import` is the one-step way to do that for an unmodified image.
+
+### Public Images
+
+A registered image is namespace-scoped by default. Pass `--public` (CLI), `is_public=True` (Python), or `isPublic: true` (TypeScript) to make the image name resolvable from any namespace — this is how the `tensorlake/*` base images work. Public names must be globally unique for the registry; collisions are rejected at creation time.
+
+```bash
+tl sbx image create ./Dockerfile --registered-name shared-base --public
+```
+
+```python
+image.build(registered_name="shared-base", is_public=True)
+```
+
+```typescript
+await image.build({ registeredName: "shared-base", isPublic: true, contextDir: "." });
+```
 
 ### Base Images
 
@@ -852,7 +989,13 @@ tl sbx image create ./Dockerfile --registered-name py-data-tools
 
 ### Supported Build Operations
 
-Materialized into the snapshot: `RUN`, `WORKDIR`, `ENV`, `COPY`, `ADD`. Preserved as metadata only (not executed): `CMD`, `ENTRYPOINT`, `EXPOSE`, `HEALTHCHECK`, `LABEL`, `STOPSIGNAL`, `VOLUME`. Not supported: `ARG`, `ONBUILD`, `SHELL`, `USER`, multi-stage Dockerfiles, remote `COPY`/`ADD` sources.
+Sandbox image builds support most standard Dockerfile commands, with these limitations:
+
+- `$VAR` / environment-variable substitution does **not** work in `FROM` lines.
+- `ONBUILD` instructions are ignored and do not run during child image builds.
+- These commands build fine but have **no effect when running sandboxes** from the image (metadata only): `ONBUILD`, `SHELL`, `EXPOSE`, `HEALTHCHECK`, `LABEL`, `STOPSIGNAL`, `VOLUME`.
+
+`RUN`, `WORKDIR`, `ENV`, `COPY`, and `ADD` are materialized into the snapshot. (Note: process-level `user=` selection at `start_process` is the supported way to run as a non-default user — see [Managed Processes](#managed-processes).)
 
 ### Launching Sandboxes from Custom Images
 
@@ -1041,14 +1184,16 @@ finally:
 | `sandbox_id` / `sandboxId`     | `str`                    | Server-assigned UUID                                 |
 | `name`                         | `str \| None`            | Name, or `None` for ephemeral                        |
 | `namespace`                    | `str`                    | Namespace                                            |
-| `status`                       | `str`                    | `"Pending" \| "Running" \| "Suspending" \| "Suspended" \| "Snapshotting" \| "Terminated"` |
-| `image`                        | `str`                    | Container image used                                 |
-| `resources`                    | `ContainerResourcesInfo` | `.cpus`, `.memory_mb`, `.disk_mb` (camelCase in TS)  |
-| `secret_names`                 | `list[str]`              | Injected secret names                                |
-| `timeout_secs`                 | `int`                    | Timeout in seconds                                   |
-| `exposed_ports`                | `list[int]`              | User ports routed by the proxy                       |
+| `status`                       | `SandboxStatus`          | Lowercase enum values: `"pending" \| "running" \| "snapshotting" \| "suspending" \| "suspended" \| "terminated"` |
+| `image`                        | `str \| None`            | Container image used                                 |
+| `resources`                    | `ContainerResourcesInfo` | `.cpus`, `.memory_mb` (camelCase in TS)              |
+| `timeout_secs`                 | `int \| None`            | Timeout in seconds                                   |
+| `exposed_ports`                | `list[int] \| None`      | User ports routed by the proxy                       |
 | `allow_unauthenticated_access` | `bool`                   | Whether exposed user ports skip TensorLake auth      |
-| `entrypoint`                   | `list[str]`              | Custom entrypoint command                            |
+| `ingress_endpoint`             | `str \| None`            | Base ingress origin for the sandbox's current placement |
+| `sandbox_url`                  | `str \| None`            | Management URL (port `9501`) derived from `ingress_endpoint` |
+| `entrypoint`                   | `list[str] \| None`      | Custom entrypoint command                            |
+| `network`                      | `NetworkConfig \| None`  | Outbound config (`allow_internet_access`, `allow_out`, `deny_out`) |
 | `created_at`                   | `datetime \| None`       | Creation timestamp                                   |
 | `terminated_at`                | `datetime \| None`       | Termination timestamp                                |
 
@@ -1089,9 +1234,16 @@ tl sbx create                            # Create ephemeral sandbox
 tl sbx create my-env                     # Create named sandbox
 tl sbx create --image data-tools-image --cpus 2 --memory 2048 --timeout 600
 tl sbx ls                                # List active sandboxes
+tl sbx ls --running                      # Running sandboxes only
 tl sbx ls --all                          # Include suspended/terminated
+tl sbx ls -r                             # Running sandboxes in active project (for SSH troubleshooting)
 tl sbx exec <id> <command>               # Execute command
+tl sbx exec <id> --detach --name N --restart always --health-http 8080 <cmd>  # Managed process
 tl sbx run <command>                     # Create, run, teardown
+tl sbx run --keep <command>              # One-shot run but keep the sandbox afterwards
+tl sbx ps <id> <pid> --json              # Inspect a managed process
+tl sbx restart <id> <pid>                # Restart a managed process via supervisor
+tl sbx kill <id> <pid>                   # Stop + remove a managed process from supervision
 tl sbx ssh <id>                          # Interactive shell
 tl sbx cp file.txt <id>:/path            # Upload file (file-only, no dirs)
 tl sbx cp <id>:/path ./local             # Download file
@@ -1104,6 +1256,9 @@ tl sbx resume <id>                       # Resume named sandbox
 tl sbx terminate <id>                    # Terminate sandbox (by name or ID)
 tl sbx name <id> <new-name>              # Rename or promote ephemeral → named
 tl sbx image create Dockerfile --registered-name NAME   # Build image from Dockerfile
+tl sbx image import REF --registered-name NAME          # Register a registry image as-is (no Dockerfile)
+tl sbx image register NAME <snapshot-id> --dockerfile ./Dockerfile  # Name an existing snapshot
+tl sbx image ls                          # List images registered in the project
 tl sbx image describe NAME               # Show registered Dockerfile + metadata
 tl sbx port expose <id> 8080             # Expose port (sets allow_unauthenticated_access=true)
 tl sbx port ls <id>

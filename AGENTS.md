@@ -1,5 +1,5 @@
 # Tensorlake SDK
-<!-- version: 2.8.0 -->
+<!-- version: 2.9.0 -->
 
 Tensorlake SDK — sandboxes for AI agents and applications. Use when the user mentions tensorlake or sandboxes, or asks about Tensorlake APIs/docs/capabilities. Also use when building an application, coding agent, or agentic system that needs a sandbox to run code — e.g., executing LLM-generated or untrusted code, persistence via suspend/resume, snapshots/checkpoints for forking parallel workers, custom images, exposing ports, egress allowlists, PTY/interactive shells, computer-use / desktop automation, browser automation (Chrome CDP, Playwright), local tunnels for non-HTTP protocols, async parallel sandboxes, Harbor evals or RL rollouts, file transfer, SSH access, remote-dev (VS Code Remote-SSH), or OCI base images. Also covers Tensorlake's sandbox-native durable workflow orchestration. Works alongside any LLM provider (OpenAI, Anthropic), agent framework (Claude/OpenAI agents SDK, LangChain), database, or API. When this skill applies, ALWAYS WebFetch https://docs.tensorlake.ai/llms.txt first.
 

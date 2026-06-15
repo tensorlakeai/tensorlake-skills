@@ -1,8 +1,8 @@
 <!--
 Source:
   - https://docs.tensorlake.ai/sandboxes/computer-use.md
-SDK version: tensorlake 0.5.17
-Last verified: 2026-05-23
+SDK version: tensorlake 0.5.44
+Last verified: 2026-06-16
 -->
 
 # Computer Use (Desktop Automation)
