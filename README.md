@@ -180,8 +180,8 @@ Each reference file has a source header that tracks which doc pages it was built
 Source:
   - https://docs.tensorlake.ai/sandboxes/lifecycle.md
   - https://docs.tensorlake.ai/sandboxes/commands.md
-SDK version: tensorlake 0.5.17
-Last verified: 2026-05-23
+SDK version: tensorlake 0.5.44
+Last verified: 2026-06-16
 -->
 ```
 

@@ -23,8 +23,8 @@ Source:
   - https://docs.tensorlake.ai/applications/sandboxes.md
   - https://docs.tensorlake.ai/applications/guides/streaming-progress.md
   - https://docs.tensorlake.ai/applications/guides/logging.md
-SDK version: tensorlake 0.5.0
-Last verified: 2026-04-24
+SDK version: tensorlake 0.5.44
+Last verified: 2026-06-16
 -->
 
 # TensorLake Applications SDK Reference
@@ -59,7 +59,7 @@ from tensorlake.applications import (
     get_remote_request,
     Future, RETURN_WHEN,
     RequestContext, Request, File, Image, Retries,
-    ReplayMode, RequestError,
+    ReplayMode, RequestError, Logger,
 )
 ```
 
@@ -72,8 +72,8 @@ Entry point decorator. Must wrap a function also decorated with `@function()`.
 ```python
 @application(
     tags: dict[str, str] = {},
-    retries: Retries | None = None,
-    region: str | None = None,               # "us-east-1" or "eu-west-1"
+    retries: Retries | None = None,          # Default for all functions; no retries by default
+    region: str | None = None,               # "us-east-1" or "eu-west-1"; default any region
 )
 ```
 
@@ -116,6 +116,9 @@ class MyProcessor:
     @function(gpu="T4")
     def process(self, data: str) -> str:
         return self.model.predict(data)
+
+# Call a class-method application by name:
+# run_remote_application("MyProcessor.process", data="...")
 ```
 
 ## Calling Functions
@@ -228,8 +231,11 @@ output = request.output()
 ```
 
 ```bash
+# Scaffold a new application (creates hello_world/hello_world.py)
+tl app new hello_world
+
 # Deploy before running remotely
-tl deploy path/to/app.py
+tl app deploy path/to/app.py
 ```
 
 ## Durable Execution
@@ -266,12 +272,19 @@ ctx.state.set(key, value)
 ctx.state.get(key, default=None)
 
 # Metrics
-ctx.metrics.timer(name, value)
-ctx.metrics.counter(name, value)
+ctx.metrics.timer(name, value)         # duration in seconds
+ctx.metrics.counter(name, value=1)     # counters start at 0
 
 # Progress reporting (also resets timeout)
-ctx.progress.update(current=10, total=100, message="Processing...")
+ctx.progress.update(
+    current,                           # int | float (step or percentage)
+    total,                             # int | float (total steps, or 100 for percent)
+    message=None,                      # optional str
+    attributes=None,                   # optional dict[str, str] metadata
+)
 ```
+
+Poll progress at `GET /applications/{app}/requests/{request_id}/progress`.
 
 ## Image Builder
 
@@ -303,6 +316,10 @@ file.content       # bytes
 file.content_type  # str
 ```
 
+A `File` arg/return bypasses JSON/pickle and is passed as raw bytes. As an application
+input/output, the HTTP body is the raw bytes and content type. Files up to 5 TB are
+supported (loaded fully into memory; no lazy loading yet).
+
 ## Retries
 
 ```python
@@ -328,29 +345,44 @@ def agent(prompt: str) -> str: ...
 ```
 
 - `warm_containers`: Pre-warmed containers for zero cold-start latency
-- `max_containers`: Upper limit; excess requests queued FIFO
+- `max_containers`: Upper limit; excess requests queued FIFO (no separate queue infra needed)
 - `concurrency`: Concurrent requests per container
 - Default (no params): scales dynamically from zero, no upper limit
+- **Rate-limit external APIs**: total concurrent calls = `max_containers` × `concurrency`
 
 ## Cron Scheduler
 
-Schedule periodic application runs via REST API:
+Schedule recurring invocations of a deployed application via REST API (or the UI).
+Schedule starts immediately on creation.
 
 ```python
 import requests, base64, json
 
-payload = {"cron_expression": "0 * * * *"}
+payload = {"cron_expression": "0 * * * *"}   # 5-field cron; "* * * * *" = every minute
 input_data = json.dumps({"report_type": "daily"}).encode()
-payload["input_base64"] = base64.b64encode(input_data).decode()
+payload["input_base64"] = base64.b64encode(input_data).decode()  # optional, max 1 MiB decoded
 
-response = requests.post(
+# Create
+resp = requests.post(
     f"https://api.tensorlake.ai/applications/{application}/cron-schedules",
     json=payload,
     headers={"Authorization": "Bearer TENSORLAKE_API_KEY"},
 )
+schedule_id = resp.json()["schedule_id"]   # save it; needed to delete
+
+# List  -> {"schedules": [{id, application_name, cron_expression, next_fire_time_ms,
+#                          last_fired_at_ms, created_at, enabled}, ...]}
+requests.get(f"https://api.tensorlake.ai/applications/{application}/cron-schedules", headers=...)
+
+# Delete (permanent; to modify, delete + recreate)
+requests.delete(
+    f"https://api.tensorlake.ai/applications/{application}/cron-schedules/{schedule_id}",
+    headers=...,
+)
 ```
 
-Minimum interval: 60 seconds. Max 100 schedules per application.
+Minimum interval: 60 seconds (sub-minute expressions rejected with 400). Max 100 schedules
+per application. Max input payload 1 MiB decoded.
 
 ## Exceptions
 
@@ -374,15 +406,23 @@ def my_func() -> str:
     key = os.environ["OPENAI_API_KEY"]
 ```
 
-Redeploy applications after updating secrets. AES-256-GCM encryption, in-memory decryption only during execution.
+Redeploy applications after adding/updating a secret for new values to take effect.
+Envelope encryption (AES-256-GCM): a per-project DEK wrapped by a KEK in AWS KMS;
+decrypted in-memory only on dataplane machines running the function, over mTLS.
 
 ## Observability
 
-Every `@function()` call is automatically traced. The dashboard shows function call sequence, timing (including cold starts), dependency visualization, and status. Use standard Python `logging` module; logs are captured automatically.
+Every `@function()` call is automatically traced. The dashboard shows function call sequence, timing (including cold starts), dependency visualization, and status. Use standard Python `print()`/`logging` (captured automatically, default level INFO), or the built-in structured logger:
 
 ```python
 from tensorlake.applications import Logger
 
 logger = Logger.get_logger(module="my_app")
-logger.info("starting run", log_attributes={"request_id": "req-123"})
+logger.info("User logged in", user_id=123)     # structlog-style kwargs
+logger.error("An error occurred", exc_info=True)
+logger = logger.bind(request_id="req-123")      # bind context to all subsequent logs
 ```
+
+Levels TRACE(1)..ERROR(5). `structlog` (JSON renderer) also supported. Logs retained 7 days
+(extendable to 30 days / 1 year). Query via `GET /applications/{app}/logs` with filters
+(`requestId`, `function`, `level`, `gate=and|or`, `head`/`tail`, `nextToken`).

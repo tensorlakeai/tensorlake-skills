@@ -19,7 +19,7 @@ description: >
   https://docs.tensorlake.ai/llms.txt first.
 metadata:
   author: tensorlake
-  version: 2.8.0
+  version: 2.9.0
 ---
 
 # What can you do with Tensorlake SDK

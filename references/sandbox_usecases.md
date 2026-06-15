@@ -2,17 +2,19 @@
 Source:
   - https://docs.tensorlake.ai/sandboxes/skills-in-sandboxes.md
   - https://docs.tensorlake.ai/sandboxes/tool-calls.md
+  - https://docs.tensorlake.ai/sandboxes/claude-managed-agents.md
   - https://docs.tensorlake.ai/sandboxes/data-analysis.md
   - https://docs.tensorlake.ai/sandboxes/cicd-build.md
   - https://docs.tensorlake.ai/sandboxes/agentic-autoresearch.md
   - https://docs.tensorlake.ai/sandboxes/agentic-rl-reproducible-env.md
   - https://docs.tensorlake.ai/sandboxes/agentic-swarm-intelligence.md
+  - https://docs.tensorlake.ai/sandboxes/agentic-d&g.md
   - https://docs.tensorlake.ai/sandboxes/gspo-agentic-rl.md
   - https://docs.tensorlake.ai/sandboxes/chrome-cdp.md
   - https://docs.tensorlake.ai/sandboxes/harbor.md
   - https://docs.tensorlake.ai/sandboxes/remote-dev.md
-SDK version: tensorlake 0.5.17
-Last verified: 2026-05-23
+SDK version: tensorlake 0.5.44
+Last verified: 2026-06-16
 -->
 
 # TensorLake Sandbox Use Cases
@@ -21,7 +23,9 @@ Last verified: 2026-05-23
 
 - [Skills in Sandboxes](#skills-in-sandboxes)
 - [AI Code Execution](#ai-code-execution)
+- [Claude Managed Agents](#claude-managed-agents)
 - [Agentic Swarm Intelligence](#agentic-swarm-intelligence)
+- [Agentic Dungeons & Dragons](#agentic-dungeons--dragons)
 - [Agentic Autoresearch Loop](#agentic-autoresearch-loop)
 - [RL Reproducible Environments](#rl-reproducible-environments)
 - [RL Training with GSPO](#rl-training-with-gspo)
@@ -234,6 +238,50 @@ Do not work around the fresh-process model by building a persistent interpreter:
 
 ---
 
+## Claude Managed Agents
+
+Run Anthropic's [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview) agent loop on Anthropic's infrastructure while every tool call executes inside a Tensorlake sandbox you own. Reference integration: [`claude-managed-agents-tensorlake-sandbox`](https://github.com/tensorlakeai/claude-managed-agents-tensorlake-sandbox) (`examples/managed-agent`).
+
+### Brain vs. hands
+
+A Managed Agent splits into two halves. **Claude is the brain** — the LLM, the agent loop, session state, and the work queue live on Anthropic's infrastructure; it decides *which* tool to call but never executes one. **The sandbox is the hands** — every `bash`, `read`, `write`, `edit`, `glob`, `grep` call runs inside an execution environment you control. A Claude *Environment* with hosting type **Self-hosted** enqueues a work item per session run instead of running tools itself; your **orchestrator** drains that queue and turns each session into a Tensorlake sandbox running a thin worker that attaches back to Anthropic and executes tool calls for the life of the session.
+
+### Why Tensorlake fits the "hands" role
+
+- **Sub-second wake.** An agent loop is a tight decide→execute→decide cycle — many short tool calls separated by model think-time. A suspended sandbox resumes from its memory snapshot in **~0.6s** (a restore, not a cold boot), so the hands are ready the instant the brain calls a tool, without keeping a sandbox warm between turns.
+- **Snapshots & fork-from-snapshot.** `sandbox.checkpoint()` then `Sandbox.create(snapshot_id=...)` × N forks N children from one known-good state — the basis for best-of-N tool execution and [parallel sub-agents](sandbox_sdk.md#snapshots).
+- **Suspend / resume.** Named sandboxes suspend when idle and resume with state intact (see [Sandbox as a Dev Environment](#sandbox-as-a-dev-environment) for the same primitive applied to a workstation).
+- **Public port exposure.** `expose_ports(...)` serves a process at `https://{port}-{id}.sandbox.tensorlake.ai` with TLS terminated by Tensorlake's proxy — no reverse proxy of your own (see [Local Tunnels and exposed ports](sandbox_sdk.md#local-tunnels)).
+
+### Three orchestrator modes
+
+The orchestrator logic is identical in all three (`orchestrator_lib.py`: get-or-create a sandbox per session, drain the queue). Only *where it runs* differs. **Run exactly one orchestrator per `ANTHROPIC_ENVIRONMENT_ID`.**
+
+| Mode | Where it runs | Spawn latency | Needs |
+|---|---|---|---|
+| **Webhook-in-sandbox** (recommended) | Inside a Tensorlake sandbox, port exposed publicly | Sub-second, scale-to-zero | Nothing running on your side — wakes on request |
+| **Polling** | Your machine / server | Seconds | A long-running host process |
+| **Webhook** | Your machine / server | ~Instant | A public HTTPS endpoint + TLS |
+
+In webhook-in-sandbox mode the FastAPI receiver runs *inside* a sandbox with port 5051 exposed publicly; Anthropic pushes webhooks straight to Tensorlake (no host process, no TLS of yours). The sandbox has a short idle timeout, so with no inbound traffic it suspends (memory + the running uvicorn process preserved) and the next webhook resumes it automatically. Outbound polling from inside the sandbox does *not* keep it awake. The result is push latency with nothing running or billed while idle.
+
+### Long-running sessions: recreate vs. resume
+
+The same suspend/resume primitive applies one layer down, to the **per-session** sandbox. At `SANDBOX_TIMEOUT_SECONDS` an idle session sandbox auto-suspends. On the next burst, `_find_live_sandbox` in `orchestrator_lib.py` treats a suspended sandbox as not-live and **recreates from base** (clean slate, but loses session working state — re-clone, re-install, redo setup). Set `RESUME_SUSPENDED_SESSIONS=true` to instead **resume the suspended sandbox** (sub-second memory-snapshot restore with `/workspace`, deps, and warm caches intact). Recreate suits independent, cheap-to-setup bursts; resume suits a session whose accumulated state *is* the work. Idle cost is zero either way.
+
+### Injecting credentials and naming
+
+Two SDK facts shape the orchestrator:
+
+- **Inject env vars per command, not on create.** Pass every credential and per-session var (`ANTHROPIC_ENVIRONMENT_KEY`, plus the session, work, and environment IDs) via `start_process(env={...})`, which merges on top of the sandbox base environment.
+- **Sandbox names must be slugs** — lowercase letters, digits, and hyphens only. Slugify a session id to derive a name (e.g. `agent-<slug>`).
+
+### Setup shape
+
+The repo README is the source of truth; the four stages are: (1) **Configure** — `uv sync`, copy the `.env` / `.env.local` examples; (2) **Tensorlake** — set `TENSORLAKE_API_KEY`, `uv run tl login`, `make build` the per-session image (keep the SDK key and `tl login` on the *same* project); (3) **Claude Platform** (Console-only, non-default workspace) — `make agent`, create a **Self-hosted** Environment, generate its environment key; (4) **Orchestrator** — pick a mode (for webhook-in-sandbox: `make build-webhook`, register the printed URL as a `Session lifecycle → Run started` webhook with its signing secret in `ANTHROPIC_WEBHOOK_SIGNING_KEY`, *then* `make webhook-sandbox` since the secret is baked in at launch). Drive a session with `make session PROMPT="..."`; success streams `running` / `thinking` / `→ write` / `→ read` ending in `· done`. Common failure modes: import-order 401 (load credentials before importing the SDK), mismatched Tensorlake projects, `workers_polling: 0` in webhook modes.
+
+---
+
 ## Agentic Swarm Intelligence
 
 Map-reduce over LLM agents: each worker generates perspective-specific code, executes it in its own sandbox, and a lead agent aggregates the worker reports.
@@ -293,6 +341,24 @@ const reports = await Promise.all(taskIds.map(scoutAgent));
 ### Latency optimization
 
 Pre-create a snapshot with the common deps (numpy, pandas, etc.) and boot each scout from `snapshot_id=` instead of pip-installing per call.
+
+---
+
+## Agentic Dungeons & Dragons
+
+A fun, self-contained demo of the same map-reduce pattern as [Agentic Swarm Intelligence](#agentic-swarm-intelligence): a terminal D&D game where parallel "Scene Agents" draft branch outcomes and a "Dungeon Master" agent reduces them into the next story beat.
+
+### Loop
+
+1. **Branch** — for a player choice, enumerate a few candidate actions (e.g. *Fight*, *Flee*, *Negotiate*).
+2. **Map** — one `scene_agent` per branch runs in parallel, each in its own sandbox. The agent asks an LLM (GPT-4o in the example) to emit a Python script that rolls a D20, decides success/failure, and prints a single JSON object (`narrative`, `consequences`, `image_prompt`, `ascii_art`). The script executes in the sandbox; its stdout is parsed back into a `SceneDraft`.
+3. **Reduce** — the `dungeon_master` agent receives all drafts, selects the one matching the player's *actual* choice, applies its consequences to player state (HP, inventory), and prompts the LLM for the next narrative beat plus three new choices.
+
+`ThreadPoolExecutor.map(scene_agent, ...)` drives concurrency host-side; the sandboxes run in parallel on the server. Each branch is a clean `LLM → sandbox → JSON draft` stage, mirrored in both the Python and TypeScript starters.
+
+### Why sandboxes here
+
+LLM-generated dice/outcome scripts are untrusted code — each runs in an isolated sandbox (`allow_internet_access=False`, `timeout_secs=600`), so a malformed or runaway script can't touch the host or sibling branches. To cut per-turn latency when branches need libraries (e.g. `numpy` for richer mechanics), pre-bake deps into a snapshot and boot each `scene_agent` from `Sandbox.create(snapshot_id=...)` instead of `pip install`-ing every turn.
 
 ---
 
