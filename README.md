@@ -118,10 +118,10 @@ tensorlake-skills/
     ├── sandbox_sdk.md            # Sandbox API reference
     ├── sandbox_persistence.md    # Sandbox state: snapshots, suspend/resume, state machine
     ├── computer_use.md           # Desktop automation: XFCE + Firefox, screenshots, mouse/keyboard, noVNC
-    ├── integrations.md           # Integration patterns (LangChain, OpenAI, ChromaDB, Qdrant, etc.)
-    ├── platform.md               # Webhooks, auth, access control, EU data residency
-    ├── sandbox_usecases.md       # Skills-in-sandboxes, AI code execution, data analysis, CI/CD
-    └── troubleshooting.md        # Common issues, production integration, benchmarks
+    ├── volumes_and_git.md        # Cloud Volumes (tl fs) and managed Git repositories (tl git)
+    ├── platform.md               # Auth, access control, lifecycle webhooks, EU endpoints, security, SSO
+    ├── sandbox_usecases.md       # Skills-in-sandboxes, tool calls, agent integrations, evals, CI/CD
+    └── troubleshooting.md        # Common issues, sandbox pitfalls, agent patterns, runtime architecture
 ```
 
 ## Versioning
@@ -235,7 +235,7 @@ No — installing the skill is just adding a file. You'll need a `TENSORLAKE_API
 
 ### What happens if `docs.tensorlake.ai` is unreachable?
 
-The skill falls back to bundled snapshots in `references/`. They lag the live docs (intentionally — they're not the source of truth) but cover the major API surface: sandboxes, applications/workflows, persistence, computer use, integrations, and platform features.
+The skill falls back to bundled snapshots in `references/`. They lag the live docs (intentionally — they're not the source of truth) but cover the major API surface: sandboxes, applications/orchestration, persistence, Cloud Volumes and Git repositories, computer use, and platform features.
 
 ### How often is this updated?
 

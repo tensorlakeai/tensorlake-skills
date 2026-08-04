@@ -287,7 +287,7 @@ MODULE_OWNERS = {
     "sandbox_sdk.md": ("tensorlake.sandbox",),
     "sandbox_usecases.md": ("tensorlake.sandbox",),
     "sandbox_persistence.md": ("tensorlake.sandbox",),
-    "integrations.md": (),
+    "volumes_and_git.md": ("tensorlake.filesystem",),
     "platform.md": (),
     "troubleshooting.md": (),
 }
@@ -423,20 +423,11 @@ REFERENCE_RULES = {
         owned_modules=MODULE_OWNERS["sandbox_usecases.md"],
         deny_tokens=frozenset({"analysis", "market"}),
     ),
-    "integrations.md": RefRule(
-        enabled_kinds=frozenset({IMPORTS, METHODS, CLI}),
-        deny_tokens=frozenset(
-            {
-                "max_tokens",
-                "temperature",
-                "tool_choice",
-                "response_format",
-                "permission_mode",
-                "user_id",
-            }
-        ),
-        suppress_removals=frozenset(CONFIDENCE_ORDER),
-        allowed_cli_prefixes=("sbx_", "deploy", "parse"),
+    "volumes_and_git.md": RefRule(
+        enabled_kinds=frozenset({IMPORTS, METHODS, CLI, OPTIONS, PROSE}),
+        owned_modules=MODULE_OWNERS["volumes_and_git.md"],
+        deny_tokens=frozenset({"base", "target", "source", "commit", "branch", "session"}),
+        allowed_cli_prefixes=("fs_", "git_", "login"),
     ),
     "platform.md": RefRule(
         enabled_kinds=frozenset({CLI, OPTIONS, JSON_FIELDS, PROSE}),
@@ -462,11 +453,12 @@ ROUTE_RULES = [
     ("/sandboxes/data-analysis", "sandbox_usecases.md"),
     ("/sandboxes/cicd-build", "sandbox_usecases.md"),
     ("/applications/production/", "troubleshooting.md"),
-    ("/document-ingestion/production/", "troubleshooting.md"),
     ("/applications/overview", "troubleshooting.md"),
+    ("/applications/architecture", "troubleshooting.md"),
     ("/sandboxes/", "sandbox_sdk.md"),
     ("/applications/", "applications_sdk.md"),
-    ("/integrations/", "integrations.md"),
+    ("/filesystems/", "volumes_and_git.md"),
+    ("/git/", "volumes_and_git.md"),
     ("/platform/", "platform.md"),
 ]
 

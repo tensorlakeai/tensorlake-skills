@@ -1,13 +1,13 @@
 <!--
 Source:
   - https://docs.tensorlake.ai/sandboxes/computer-use.md
-SDK version: tensorlake 0.5.44
-Last verified: 2026-06-16
+SDK version: tensorlake 0.5.97
+Last verified: 2026-08-04
 -->
 
 # Computer Use (Desktop Automation)
 
-Use the `tensorlake/ubuntu-vnc` image to get a desktop-enabled sandbox with XFCE, TigerVNC, and Firefox pre-installed. Desktop connections are proxied through an authenticated endpoint — no port exposure required.
+Use the `tensorlake/ubuntu-vnc` image to get a desktop-enabled sandbox with XFCE, TigerVNC, and Firefox pre-installed. It is derived from `tensorlake/ubuntu-systemd` and is available where desktop automation is enabled for your project. Desktop connections are proxied through an authenticated endpoint — no port exposure required.
 
 For sandbox creation, lifecycle, and the rest of the SDK surface, see [sandbox_sdk.md](sandbox_sdk.md). For browser automation against the in-sandbox Chrome via the Chrome DevTools Protocol, see [sandbox_usecases.md](sandbox_usecases.md#drive-chrome-over-cdp). For warm-desktop forking, see [sandbox_persistence.md](sandbox_persistence.md).
 

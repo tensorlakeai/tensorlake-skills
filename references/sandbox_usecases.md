@@ -3,6 +3,9 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/skills-in-sandboxes.md
   - https://docs.tensorlake.ai/sandboxes/tool-calls.md
   - https://docs.tensorlake.ai/sandboxes/claude-managed-agents.md
+  - https://docs.tensorlake.ai/sandboxes/opencode.md
+  - https://docs.tensorlake.ai/sandboxes/crabbox.md
+  - https://docs.tensorlake.ai/sandboxes/devin-outposts.md
   - https://docs.tensorlake.ai/sandboxes/data-analysis.md
   - https://docs.tensorlake.ai/sandboxes/cicd-build.md
   - https://docs.tensorlake.ai/sandboxes/agentic-autoresearch.md
@@ -13,8 +16,8 @@ Source:
   - https://docs.tensorlake.ai/sandboxes/chrome-cdp.md
   - https://docs.tensorlake.ai/sandboxes/harbor.md
   - https://docs.tensorlake.ai/sandboxes/remote-dev.md
-SDK version: tensorlake 0.5.44
-Last verified: 2026-06-16
+SDK version: tensorlake 0.5.97
+Last verified: 2026-08-04
 -->
 
 # TensorLake Sandbox Use Cases
@@ -24,6 +27,9 @@ Last verified: 2026-06-16
 - [Skills in Sandboxes](#skills-in-sandboxes)
 - [AI Code Execution](#ai-code-execution)
 - [Claude Managed Agents](#claude-managed-agents)
+- [OpenCode](#opencode)
+- [Crabbox (test suites)](#crabbox-test-suites)
+- [Devin Outposts](#devin-outposts)
 - [Agentic Swarm Intelligence](#agentic-swarm-intelligence)
 - [Agentic Dungeons & Dragons](#agentic-dungeons--dragons)
 - [Agentic Autoresearch Loop](#agentic-autoresearch-loop)
@@ -61,7 +67,7 @@ Install agent skill files into sandbox images so coding agents (Claude Code, Cod
 from tensorlake import Image
 
 image = (
-    Image(name="with-skills", base_image="ubuntu-systemd")
+    Image(name="with-skills", base_image="tensorlake/ubuntu-systemd")
     .run("apt-get update && apt-get install -y nodejs npm python3 python3-pip")
     .run("npm install -g skills")
     .run("skills add tensorlakeai/tensorlake-skills --all -y --copy")
@@ -76,7 +82,7 @@ import { Image } from "tensorlake";
 
 const image = new Image({
   name: "with-skills",
-  baseImage: "ubuntu-systemd",
+  baseImage: "tensorlake/ubuntu-systemd",
 })
   .run("apt-get update && apt-get install -y nodejs npm python3 python3-pip")
   .run("npm install -g skills")
@@ -94,7 +100,7 @@ Flags: `--all` deploys to all detected agents, `-y` non-interactive, `--copy` av
 from tensorlake import Image
 
 image = (
-    Image(name="claude-code-skills", base_image="ubuntu-systemd")
+    Image(name="claude-code-skills", base_image="tensorlake/ubuntu-systemd")
     .run("apt-get update && apt-get install -y git python3 python3-pip")
     .run("git clone https://github.com/tensorlakeai/tensorlake-skills /tmp/tensorlake-skills")
     .run("mkdir -p /root/.claude/skills/tensorlake && cp -r /tmp/tensorlake-skills/SKILL.md /tmp/tensorlake-skills/references /root/.claude/skills/tensorlake/")
@@ -110,7 +116,7 @@ import { Image } from "tensorlake";
 
 const image = new Image({
   name: "claude-code-skills",
-  baseImage: "ubuntu-systemd",
+  baseImage: "tensorlake/ubuntu-systemd",
 })
   .run("apt-get update && apt-get install -y git python3 python3-pip")
   .run("git clone https://github.com/tensorlakeai/tensorlake-skills /tmp/tensorlake-skills")
@@ -249,7 +255,7 @@ A Managed Agent splits into two halves. **Claude is the brain** — the LLM, the
 ### Why Tensorlake fits the "hands" role
 
 - **Sub-second wake.** An agent loop is a tight decide→execute→decide cycle — many short tool calls separated by model think-time. A suspended sandbox resumes from its memory snapshot in **~0.6s** (a restore, not a cold boot), so the hands are ready the instant the brain calls a tool, without keeping a sandbox warm between turns.
-- **Snapshots & fork-from-snapshot.** `sandbox.checkpoint()` then `Sandbox.create(snapshot_id=...)` × N forks N children from one known-good state — the basis for best-of-N tool execution and [parallel sub-agents](sandbox_sdk.md#snapshots).
+- **Snapshots & fork-from-snapshot.** `sandbox.checkpoint()` then `Sandbox.create(snapshot_id=...)` × N forks N children from one known-good state — the basis for best-of-N tool execution and [parallel sub-agents](sandbox_persistence.md#forking-from-a-snapshot).
 - **Suspend / resume.** Named sandboxes suspend when idle and resume with state intact (see [Sandbox as a Dev Environment](#sandbox-as-a-dev-environment) for the same primitive applied to a workstation).
 - **Public port exposure.** `expose_ports(...)` serves a process at `https://{port}-{id}.sandbox.tensorlake.ai` with TLS terminated by Tensorlake's proxy — no reverse proxy of your own (see [Local Tunnels and exposed ports](sandbox_sdk.md#local-tunnels)).
 
@@ -279,6 +285,171 @@ Two SDK facts shape the orchestrator:
 ### Setup shape
 
 The repo README is the source of truth; the four stages are: (1) **Configure** — `uv sync`, copy the `.env` / `.env.local` examples; (2) **Tensorlake** — set `TENSORLAKE_API_KEY`, `uv run tl login`, `make build` the per-session image (keep the SDK key and `tl login` on the *same* project); (3) **Claude Platform** (Console-only, non-default workspace) — `make agent`, create a **Self-hosted** Environment, generate its environment key; (4) **Orchestrator** — pick a mode (for webhook-in-sandbox: `make build-webhook`, register the printed URL as a `Session lifecycle → Run started` webhook with its signing secret in `ANTHROPIC_WEBHOOK_SIGNING_KEY`, *then* `make webhook-sandbox` since the secret is baked in at launch). Drive a session with `make session PROMPT="..."`; success streams `running` / `thinking` / `→ write` / `→ read` ending in `· done`. Common failure modes: import-order 401 (load credentials before importing the SDK), mismatched Tensorlake projects, `workers_polling: 0` in webhook modes.
+
+---
+
+## OpenCode
+
+[OpenCode](https://opencode.ai) is a terminal coding agent. The [`tensorlake-opencode`](https://www.npmjs.com/package/tensorlake-opencode) plugin redirects the agent's **hands** (its file and shell tools) into a Tensorlake sandbox while the TUI, model loop, and session stay local.
+
+**What gets intercepted:**
+
+| OpenCode tool | Runs in the sandbox as |
+|---|---|
+| `bash` | `sandbox.run('sh', { args: ['-c', cmd] })` |
+| `read` | `sandbox.readFile(path)` |
+| `write` | `sandbox.writeFile(path, content)` |
+| `edit` | read + string replace + write |
+| `ls` | `sandbox.listDirectory(path)` |
+| `glob` | `find … -name "pattern"` via bash |
+| `grep` | `grep -rn …` via bash |
+
+`webfetch` and `websearch` are **not** intercepted — they stay local since they don't touch your filesystem.
+
+**Setup.** Add the bare package name to `~/.config/opencode/opencode.json`; OpenCode treats bare names as npm packages and installs them into its own cache (`~/.cache/opencode/packages/`) — you don't run `npm install`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["tensorlake-opencode"]
+}
+```
+
+Then export `TENSORLAKE_API_KEY` in the shell you launch `opencode` from. With a Personal Access Token instead of a project-scoped key, also set `TENSORLAKE_ORGANIZATION_ID` and `TENSORLAKE_PROJECT_ID`.
+
+> **The sandbox is created lazily, on the first intercepted tool call** — not at launch. If you start OpenCode and nothing appears to happen, that's expected; a session that only uses `webfetch`/`websearch` never spins one up. Trigger creation by asking the model to run something (`Run: uname -a` → reports **Linux**, confirming remote execution). Confirm the plugin loaded with `tail -f ~/.local/share/opencode/log/tensorlake.log` (expect `OpenCode started with TensorLake plugin`).
+
+The agent's working directory inside the sandbox is **`/tmp/workspace`**.
+
+**Configuration is entirely by environment variable, read once at sandbox-creation time.** There is no config file for it. Set the variables *before* running `opencode`; changing them in another terminal or after the sandbox exists has no effect on the running session.
+
+| Variable | Default | Controls |
+|---|---|---|
+| `TENSORLAKE_API_KEY` | (required) | Account/project the sandbox is created in |
+| `TENSORLAKE_ORGANIZATION_ID` | (required for PAT keys) | Organization ID |
+| `TENSORLAKE_PROJECT_ID` | (required for PAT keys) | Project ID |
+| `TENSORLAKE_IMAGE` | (platform default) | Registered image the sandbox boots from |
+| `TENSORLAKE_CPUS` | `2` | vCPUs |
+| `TENSORLAKE_MEMORY_MB` | `4096` | RAM in MB |
+| `TENSORLAKE_DISK_MB` | `10240` | Ephemeral disk in MB |
+
+`TENSORLAKE_IMAGE` is the highest-impact setting for real work: bake language runtimes, system packages, and project deps into an image so the agent isn't reinstalling them every session. Put the exports in `~/.zshrc` / `~/.bashrc` to make them persistent.
+
+---
+
+## Crabbox (test suites)
+
+[Crabbox](https://crabbox.sh) is an open-source CLI from OpenClaw whose loop is *warm a box, sync the diff, run the suite*. Its Tensorlake provider delegates the sandbox to the `tensorlake` CLI:
+
+```sh
+crabbox run --provider tensorlake --tensorlake-image tl-crabbox -- pnpm test
+```
+
+`tl-crabbox` is a **public image Tensorlake publishes for Crabbox**: the standard Ubuntu base plus a writable `/workspace` (Crabbox's default workdir) with pnpm preinstalled. It ships `node`, `npm`, `pnpm`, `corepack`, `python3`, and `git`.
+
+Crabbox owns the local workflow (config, repo claims, sync manifests, guardrails); Tensorlake owns the microVM and command transport — under the hood Crabbox shells out to `tensorlake sbx create`, `cp`, `exec`, and `terminate`.
+
+**Setup:**
+
+```sh
+brew install openclaw/tap/crabbox
+curl -fsSL https://tensorlake.ai/install | sh
+export TENSORLAKE_API_KEY=tl_apiKey_...
+```
+
+The `tensorlake` CLI must be on `PATH`, or point Crabbox at it with `--tensorlake-cli`. Crabbox passes the key through the environment — it never appears on the command line. For multi-org/project accounts also set `TENSORLAKE_ORGANIZATION_ID` and `TENSORLAKE_PROJECT_ID`.
+
+`.crabbox.yaml` at the repo root:
+
+```yaml
+provider: tensorlake
+tensorlake:
+  image: tl-crabbox
+```
+
+> **The `image` pin matters.** Crabbox's default workdir is `/workspace/crabbox`, and in Tensorlake's standard images commands run as `tl-user`, which **cannot create `/workspace`**. Without the pin every run fails with `tensorlake exec "mkdir -p '/workspace/crabbox'" exited 1`. To use a standard image instead, set `tensorlake.workdir: /home/tl-user/crabbox`.
+
+**Workflow:**
+
+```sh
+crabbox warmup --provider tensorlake --tensorlake-cpus 2 --tensorlake-memory-mb 2048
+crabbox run --provider tensorlake -- pnpm test
+crabbox run --provider tensorlake --shell 'pnpm install && pnpm test'   # shell pipelines
+crabbox stop --provider tensorlake harbor-barnacle                      # release a warmed sandbox
+```
+
+Warmup creates a named sandbox and prints a friendly slug (e.g. `harbor-barnacle`) reusable across runs with `--id <slug>`. Every `tensorlake.*` config field has a matching `--tensorlake-*` flag and a `CRABBOX_TENSORLAKE_*` environment override. Crabbox syncs **git-tracked files** and streams output live. Forward secrets with `--allow-env API_TOKEN` (injected for the command, removed after). One-off runs lease and auto-terminate a sandbox; `--keep-on-failure` keeps it alive after a failing command.
+
+**Troubleshooting:**
+
+| Error | Cause | Fix |
+|---|---|---|
+| `build sync file list: exit status 128` | Not inside a git repository — Crabbox builds its sync list from `git ls-files` | Run from a repo root (`git init` if needed) |
+| `tensorlake exec "mkdir -p '/workspace/crabbox'" exited 1` | Default workdir isn't writable by `tl-user` in standard images | Pin `tensorlake.image: tl-crabbox`, or set `tensorlake.workdir: /home/tl-user/crabbox` |
+| `Failed to spawn process in <workdir>: No such file or directory` | The executable (e.g. `pnpm`) isn't in the image. The message blames the directory, but it's the missing binary | Pin `tl-crabbox`, use a tool the image has, or register your own image |
+
+---
+
+## Devin Outposts
+
+[Devin Outposts](https://docs.devin.ai/cloud/outposts) runs Devin sessions inside infrastructure you control: the **agent loop stays in Cognition's cloud**, while the **session machine** — where commands run, files change, and repos get checked out — moves into a Tensorlake sandbox you own.
+
+Use an outpost when the agent needs a custom environment: private CA certificates, preinstalled toolchains, pre-cloned repositories, or services only reachable from your network. Because Tensorlake can run on self-hosted compute, the sandboxes can sit inside your network where Devin can read your source, query your databases, and test against the systems it writes code for.
+
+**Architecture.** An **orchestrator** watches Devin's session queue, claims each session, and runs it in a Tensorlake sandbox. The orchestrator itself runs inside a long-lived Tensorlake sandbox, so nothing long-running stays on your laptop. **Each Devin session maps to one sandbox**: idle → suspend, wake → resume the same sandbox, end → terminate. Sandboxes are Linux microVMs, so the outpost is **Linux only**. **Run one orchestrator per outpost.**
+
+Reference implementation: [`tensorlakeai/devin-outposts-tensorlake`](https://github.com/tensorlakeai/devin-outposts-tensorlake), a Python package that is mainly the orchestrator plus CLI commands.
+
+**Setup shape:**
+
+1. **Install** — clone, venv, `pip install -e .`, `cp .env.example .env`, add `TENSORLAKE_API_KEY`.
+2. **Connect the outpost** — `outposts-connect --platform linux`, run on the **same machine as your browser** (the browser returns a one-time code to a temporary `localhost` listener). A Devin org admin confirms and clicks **Connect**; the command exchanges the code for a machine-serving token and writes `DEVIN_OUTPOSTS_TOKEN`, `DEVIN_API_URL`, and `OUTPOST_ID` to `.env`. **The token never passes through the browser.**
+3. **Build the session image** — `build-devin-outposts-image` (installs `git`, `curl`, CA certificates; GitHub CLI and Chromium are **best-effort**, so verify if your sessions need them; `ffmpeg` for screen recording is skipped — add it yourself if you want recordings). Copy the printed name into `IMAGE_NAME`.
+4. **Build the orchestrator image** — `build-devin-outposts-dispatcher-image` (distinct from the session image; build once, rebuild on package updates).
+5. **Launch the orchestrator** — `devin-outposts-orchestrator-sandbox`. **Idempotent**: re-running resumes the sandbox and re-ensures the process.
+6. **Create a session** in the Devin UI or Slack, selecting your outpost.
+
+**Security model.** The launcher reads your local `.env` and injects credentials into the orchestrator **process environment at start** — never baked into the image. Treat the orchestrator sandbox as a trusted control-plane host. **Session sandboxes never receive the machine token or your Tensorlake API key**; each remote gets only its own session's connect token. Each claim pins `devin-remote` (Devin's session binary) **by SHA** and verifies the checksum before executing. The binary dials out over HTTPS, so **the sandbox needs no inbound ports**. Rotate a credential by updating `.env`, then `--terminate` and relaunch.
+
+**Operating it:**
+
+```bash
+devin-outposts-orchestrator-sandbox --status
+devin-outposts-orchestrator-sandbox --logs
+devin-outposts-orchestrator-sandbox --terminate
+```
+
+Outposts is **watch-based**, so the orchestrator runs continuously (not scale-to-zero). Tensorlake suspends a named sandbox after your plan's maximum idle window, and **a suspended orchestrator cannot claim sessions.** Because the launcher is idempotent, schedule it on a cron with an interval **shorter than your plan's idle window**:
+
+```bash
+*/15 * * * * cd /path/to/devin-outposts-tensorlake && set -a && . ./.env && set +a && .venv/bin/devin-outposts-orchestrator-sandbox
+```
+
+The cron host needs the repo, venv, and `.env`, and must be awake when the tick fires — an always-on machine is the better home. On a sleeping laptop the orchestrator can stay suspended and queued sessions wait for the next tick after wake.
+
+**Session logs.** `--logs` shows orchestrator lifecycle events only (claim, sandbox created, serving, released). Per-session tool-call output is written **inside** the serving sandbox to `/tmp/devin-outposts/<session>.log`. The repo's `session_logs.py` helper reads them:
+
+```bash
+python session_logs.py                 # list this outpost's serving sandboxes
+python session_logs.py <dvo-name>      # dump the last 500 lines
+python session_logs.py <dvo-name> -f   # stream live
+```
+
+The sandbox name is the `dvo-...` string logged on claim. Live mode runs `tail -F` over a **PTY WebSocket**, reconnects on idle timeout, waits through suspension and re-attaches on resume, and exits when the sandbox is terminated.
+
+**Configuration (`.env`):**
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `DEVIN_OUTPOSTS_TOKEN` | Yes | Machine-serving token for queue watch/claim/release |
+| `DEVIN_API_URL` | No | Devin API base without `/opbeta`; defaults to `https://api.devin.ai` |
+| `TENSORLAKE_API_KEY` | Yes | Authenticates the Tensorlake SDK for images and sandbox lifecycle |
+| `OUTPOST_ID` | Yes | Your outpost |
+| `IMAGE_NAME` | Yes | Image the orchestrator boots session sandboxes from |
+| `MAX_CONCURRENT_SESSIONS` | No | Concurrent sessions (default `5`) |
+| `SANDBOX_CPUS` / `SANDBOX_MEMORY_MB` / `SANDBOX_DISK_MB` | No | Per-session sizing (2 vCPU, 8 GiB, 10 GiB) |
+| `SANDBOX_TIMEOUT_SECS` | No | Idle seconds before auto-suspend (default `1800`) |
+| `REPOS` / `GIT_USERNAME` / `GIT_TOKEN` | No | Comma-separated clone URLs to pre-clone into each sandbox, plus credentials for private ones — passed to the clone command only, never stored in the image |
 
 ---
 
@@ -806,35 +977,39 @@ Tear down: `tl sbx exec <sandbox-id> -- bash -lc 'sudo -u tl-user pkill -f googl
 
 ## Harbor (evals + RL rollouts)
 
-[Harbor](https://github.com/harbor-framework/harbor) is a framework from the creators of [Terminal-Bench](https://www.tbench.ai/) for evaluating and optimizing agents and language models against curated datasets (Terminal-Bench, SWE-Bench, Aider Polyglot) or your own benchmarks, plus generating rollouts for RL optimization. Harbor abstracts the execution backend behind an `--env` flag; **Tensorlake plugs in as one of those providers** — same Harbor commands, same tasks/agents/evaluators, running on Tensorlake sandboxes.
+[Harbor](https://github.com/harbor-framework/harbor) is a framework from the creators of [Terminal-Bench](https://www.tbench.ai/) for evaluating and optimizing agents and language models. Evaluate arbitrary agents (Claude Code, OpenHands, Codex CLI, others) against curated datasets like Terminal-Bench, SWE-Bench, and Aider Polyglot, build your own benchmarks, run thousands of trials in parallel, and generate rollouts for RL optimization. Harbor abstracts the execution backend behind an `--env` flag; **Tensorlake plugs in as one of those providers** — same Harbor commands, same tasks/agents/evaluators.
+
+New accounts include free credits — per the docs, enough to run a full Terminal-Bench sweep before you pay for anything.
 
 ### Quick start
 
 ```bash
-# install Harbor with the Tensorlake provider
+# install Harbor with the Tensorlake provider (installs the TensorLakeEnvironment provider)
 uv pip install "harbor[tensorlake]"
 # or: pip install "harbor[tensorlake]"
 
 export TENSORLAKE_API_KEY="tl_..."
 export ANTHROPIC_API_KEY="sk-ant-..."   # or another agent provider
 
-# Run a single Terminal-Bench 2.0 task on Tensorlake with Claude Code as the agent
 harbor run --env tensorlake \
-  --include-task-name pytorch-model-cli \
-  --dataset terminal-bench@2.0 \
+  --include-task-name terminal-bench/pytorch-model-cli \
+  --dataset terminal-bench/terminal-bench-2-1 \
   --agent claude-code \
   --model anthropic/claude-sonnet-4-6 \
   --ae ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
 ```
 
-Drop `--include-task-name` to run the full Terminal-Bench 2.0 suite. `--ae KEY=VALUE` forwards an env var from your shell into the sandbox where the agent runs — repeat the flag for any other secrets the agent needs.
+Drop `--include-task-name` to run the full **Terminal-Bench 2.1** suite. `--ae KEY=VALUE` forwards an env var from your shell into the sandbox where the agent runs — repeat for any other secrets.
+
+> Dataset and task identifiers are now slash-namespaced (`terminal-bench/terminal-bench-2-1`, `terminal-bench/pytorch-model-cli`), not the older `terminal-bench@2.0` form.
 
 ### Why Tensorlake for Harbor
 
-- **Per-trial sandboxes** — each task starts on a clean machine and is destroyed at the end. No shared kernel state between trials, which matters for both eval reproducibility and RL reward integrity.
-- **Pre-warmed snapshots** — environments with heavy `apt`/`pip` installs (PyTorch, CUDA, full Linux desktops) can be built once, snapshotted, and restored under a second per trial.
+- **Per-trial sandboxes** — each task starts on a clean machine and is destroyed at the end. No shared kernel state between trials, which matters for eval reproducibility and RL reward integrity.
+- **Full task-environment support** — Tensorlake **imports a task's real Docker image** and converts it into a sandbox image that boots directly, so every trial runs the exact environment the benchmark defines rather than one approximated by replaying a Dockerfile. That closes the environment gap that otherwise quietly skews results.
+- **Pre-warmed snapshots** — environments with heavy `apt`/`pip` installs (PyTorch, CUDA, full Linux desktops) can be built once, snapshotted, and restored **under a second** per trial or rollout.
 - **Independent verification** — Harbor's test script runs inside the sandbox and writes `1.0`/`0.0` to `reward.txt`. The agent never sees or touches the verifier, so "the agent said it worked" is never confused with "the tests pass."
-- **Parallel scale** — Tensorlake schedules thousands of sandboxes concurrently, exactly what RL rollout generation and full benchmark sweeps need.
+- **Parallel scale** — Tensorlake schedules thousands of sandboxes concurrently.
 
 ### Anatomy of a Harbor task
 
@@ -845,18 +1020,18 @@ gcode-to-text/
 │   └── text.gcode.gz
 ├── instruction.md              # prompt the agent receives
 ├── solution/
-│   └── solve.sh                # oracle reference for environment validation
+│   └── solve.sh                # oracle reference for validating the environment itself
 ├── task.toml                   # provisioning config (see below)
 └── tests/
     ├── test_outputs.py
-    └── test.sh                 # runs after the agent finishes; writes reward.txt
+    └── test.sh                 # runs after the agent finishes; produces reward.txt
 ```
 
 ### Tune sandbox resources
 
-`task.toml` controls the sandbox Harbor provisions on Tensorlake. Set resources in the `[environment]` block:
+`task.toml` controls the sandbox Harbor provisions on Tensorlake:
 
-```toml
+```toml task.toml
 [environment]
 cpus = 2
 memory_mb = 4096
@@ -864,16 +1039,67 @@ storage_mb = 20480
 allow_internet = true
 ```
 
-| Field            | Default | Forwarded to Tensorlake   |
-|------------------|---------|---------------------------|
-| `cpus`           | `1`     | `cpus`                    |
-| `memory_mb`      | `2048`  | `memory_mb`               |
-| `storage_mb`     | `10240` | `ephemeral_disk_mb`       |
-| `allow_internet` | `true`  | `allow_internet_access`   |
+| Field | Default | Forwarded to Tensorlake |
+|---|---|---|
+| `cpus` | `1` | `cpus` |
+| `memory_mb` | `2048` | `memory_mb` |
+| `storage_mb` | `10240` | `ephemeral_disk_mb` |
+| `allow_internet` | `true` | `allow_internet_access` |
 
 > **Memory ratio constraint.** Tensorlake requires `memory_mb` to be between 1024 and 8192 MB **per CPU core**.
 
 Rules of thumb: bump `cpus` and `memory_mb` for heavy Dockerfiles (PyTorch, CUDA, full desktops, large datasets) and raise `storage_mb` past image size + working set — underprovisioning shows up as build timeouts or mid-trial OOMs. Set `allow_internet = false` to stop the agent from web-searching for answers; if the verifier needs network access, bake it into the Dockerfile (per-host allowlists are coming).
+
+### Image build & caching
+
+Each trial boots from an image, built or imported **once** and then reused — you only pay on the first trial.
+
+| Source | How to set it | When to use |
+|---|---|---|
+| **Prebuilt image** | `docker_image` in `task.toml` | Fastest start: boot directly from an image with the environment baked in. Terminal-Bench ships these. |
+| **Dockerfile** | `environment/Dockerfile` | No prebuilt image declared. Built once, cached, reused across trials. |
+
+If a task sets both, the prebuilt image wins.
+
+**Prebuilt images.** Harbor looks the image up in Tensorlake by name and boots from it; if it isn't registered yet it imports it once. **The registered name is derived from the reference string**, so the *first* import of a given reference is what every later run boots.
+
+```toml task.toml
+[environment]
+docker_image = "myorg/my-task-env:2025-06"
+```
+
+> **Always publish with an immutable tag, never `latest`.** Because the registered name comes from the reference string and not the image contents, `latest` is captured at first import and then frozen — push new content to `latest` and Harbor keeps booting the old image, never re-pulling. Use an immutable tag or digest so a new build means a new reference. To refresh an already-registered image, point `docker_image` at a new immutable tag/digest, or delete the registered Tensorlake image so the next run re-imports it. **`--force-build` does not re-import** — it builds from the Dockerfile instead.
+
+**Terminal-Bench 2.1 images are already published** publicly, so anyone with Tensorlake access boots straight from them — no build, no import.
+
+**Set org and project context.** Looking an image up by name requires it. Without it Harbor can't find the published image and falls back to importing it fresh (you'll see `Looking up a sandbox image by name requires organization and project context` in the logs):
+
+```bash
+export TENSORLAKE_ORGANIZATION_ID="..."
+export TENSORLAKE_PROJECT_ID="..."
+```
+
+Harbor also reads these from `~/.tensorlake/config.toml` (`organization` and `project`) if present.
+
+**Dockerfile builds** are cached on the Dockerfile **and every file in the build context**, so editing a `requirements.txt` pin or any `COPY`'d file triggers a rebuild automatically. If a build fails, Harbor falls back to replaying the Dockerfile's `RUN`/`COPY` steps on each trial so a trial is never blocked (just slower). That fallback is also an explicit escape hatch while iterating: `--ek use_oci_image_build=false`. Force a fresh rebuild for one run with `--force-build` (doesn't disturb the cache used by later normal runs).
+
+**Dockerfile requirements** — the image builder is stricter than a local `docker build`:
+
+- **`COPY` does not auto-create parent directories** — `COPY x /a/b/c` fails if `/a/b` doesn't exist. Add `RUN mkdir -p /a/b` first.
+- **Don't pin exact apt versions** (`apt-get install curl=8.5.0-2ubuntu10.6`) — drop the pin or pick a version that exists in the target distro.
+- **Use a `FROM` image that ships the Python you need** (e.g. `python:3.10-bookworm`) rather than relying on a non-native version being fetched at build time.
+
+**Sharing images publicly.** Images Harbor builds or imports are **private to your organization** by default. `--ek is_public=true` registers a freshly built or imported image as public. It applies to both Dockerfile builds and prebuilt imports, but automatic boot-from-public by another org is wired through the **prebuilt `docker_image`** path — so prefer a `docker_image` reference if your goal is publishing an environment others boot directly. **Publishing public images is gated to an allow list**; if your account isn't on it the flag is silently ignored and the image stays private. `is_public` only takes effect when the image is **newly registered** — to turn an already-private image public, delete it first (or change the build context so it gets a new name), then rerun.
+
+**Ad-hoc native dependencies.** For a couple of extra apt packages without editing the Dockerfile or maintaining a snapshot:
+
+```bash
+harbor run --env tensorlake \
+  --ek 'preinstall_packages=["build-essential","rustc","cargo"]' \
+  --dataset terminal-bench/terminal-bench-2-1 --agent claude-code --model anthropic/claude-sonnet-4-6
+```
+
+These install at the start of **each** trial — prefer snapshots when the package set is large or reused across many runs.
 
 ### Debugging
 

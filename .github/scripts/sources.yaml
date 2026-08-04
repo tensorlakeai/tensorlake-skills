@@ -23,33 +23,59 @@ sandbox_sdk.md:
     - https://docs.tensorlake.ai/sandboxes/sdk-reference.md
     - https://docs.tensorlake.ai/sandboxes/lifecycle.md
     - https://docs.tensorlake.ai/sandboxes/commands.md
+    - https://docs.tensorlake.ai/sandboxes/process-logs.md
     - https://docs.tensorlake.ai/sandboxes/environment-variables.md
     - https://docs.tensorlake.ai/sandboxes/file-operations.md
     - https://docs.tensorlake.ai/sandboxes/networking.md
+    - https://docs.tensorlake.ai/sandboxes/tensorlake-images.md
     - https://docs.tensorlake.ai/sandboxes/images.md
     - https://docs.tensorlake.ai/sandboxes/pty-sessions.md
     - https://docs.tensorlake.ai/sandboxes/docker.md
     - https://docs.tensorlake.ai/sandboxes/async.md
     - https://docs.tensorlake.ai/sandboxes/tunnels.md
-  sdk_version: "0.5.44"
-  last_verified: "2026-06-16"
+  sdk_version: "0.5.97"
+  last_verified: "2026-08-04"
 
 computer_use.md:
   sources:
     - https://docs.tensorlake.ai/sandboxes/computer-use.md
-  sdk_version: "0.5.44"
-  last_verified: "2026-06-16"
+  sdk_version: "0.5.97"
+  last_verified: "2026-08-04"
 
 sandbox_persistence.md:
   sources:
     - https://docs.tensorlake.ai/sandboxes/lifecycle.md
     - https://docs.tensorlake.ai/sandboxes/snapshots.md
-  sdk_version: "0.5.44"
-  last_verified: "2026-06-16"
+    - https://docs.tensorlake.ai/sandboxes/pools.md
+    - https://docs.tensorlake.ai/api-reference/v2/sandboxes/copy.md
+    - https://docs.tensorlake.ai/api-reference/v2/sandboxes/suspend.md
+  sdk_version: "0.5.97"
+  last_verified: "2026-08-04"
+
+volumes_and_git.md:
+  sources:
+    - https://docs.tensorlake.ai/filesystems/introduction.md
+    - https://docs.tensorlake.ai/filesystems/core-concepts.md
+    - https://docs.tensorlake.ai/filesystems/filesystem-mounts.md
+    - https://docs.tensorlake.ai/filesystems/read-only-mounts.md
+    - https://docs.tensorlake.ai/filesystems/manage-sessions.md
+    - https://docs.tensorlake.ai/filesystems/concurrent-writes.md
+    - https://docs.tensorlake.ai/filesystems/distribute-files.md
+    - https://docs.tensorlake.ai/filesystems/architecture.md
+    - https://docs.tensorlake.ai/git/introduction.md
+    - https://docs.tensorlake.ai/git/git-repositories.md
+    - https://docs.tensorlake.ai/git/workspace-mounts.md
+    - https://docs.tensorlake.ai/git/repository-sdks.md
+    - https://docs.tensorlake.ai/git/merging.md
+    - https://docs.tensorlake.ai/git/authentication.md
+    - https://docs.tensorlake.ai/git/store-generated-code.md
+  sdk_version: "0.5.97"
+  last_verified: "2026-08-04"
 
 applications_sdk.md:
   sources:
     - https://docs.tensorlake.ai/applications/introduction.md
+    - https://docs.tensorlake.ai/applications/overview.md
     - https://docs.tensorlake.ai/applications/quickstart.md
     - https://docs.tensorlake.ai/applications/architecture.md
     - https://docs.tensorlake.ai/applications/concepts.md
@@ -64,6 +90,7 @@ applications_sdk.md:
     - https://docs.tensorlake.ai/applications/retries.md
     - https://docs.tensorlake.ai/applications/secrets.md
     - https://docs.tensorlake.ai/applications/timeouts.md
+    - https://docs.tensorlake.ai/applications/public-endpoints.md
     - https://docs.tensorlake.ai/applications/scale-out-queuing.md
     - https://docs.tensorlake.ai/applications/scaling-agents.md
     - https://docs.tensorlake.ai/applications/observability.md
@@ -72,44 +99,33 @@ applications_sdk.md:
     - https://docs.tensorlake.ai/applications/sandboxes.md
     - https://docs.tensorlake.ai/applications/guides/streaming-progress.md
     - https://docs.tensorlake.ai/applications/guides/logging.md
-  sdk_version: "0.5.44"
-  last_verified: "2026-06-16"
-
-integrations.md:
-  sources:
-    - https://docs.tensorlake.ai/integrations/overview.md
-    - https://docs.tensorlake.ai/integrations/langchain.md
-    - https://docs.tensorlake.ai/integrations/chroma.md
-    - https://docs.tensorlake.ai/integrations/qdrant.md
-    - https://docs.tensorlake.ai/integrations/databricks.md
-    - https://docs.tensorlake.ai/integrations/motherduck.md
-  sdk_version: "0.5.44"
-  last_verified: "2026-06-16"
+  sdk_version: "0.5.97"
+  last_verified: "2026-08-04"
 
 platform.md:
   sources:
+    - https://docs.tensorlake.ai/platform/authentication.md
+    - https://docs.tensorlake.ai/platform/access-control.md
     - https://docs.tensorlake.ai/platform/webhooks/overview.md
     - https://docs.tensorlake.ai/platform/webhooks/configuration.md
+    - https://docs.tensorlake.ai/platform/webhooks/events.md
     - https://docs.tensorlake.ai/platform/webhooks/signature-verification.md
-    - https://docs.tensorlake.ai/platform/webhooks/payloads/document-ingestion.md
-    - https://docs.tensorlake.ai/platform/webhooks/payloads/workflows.md
     - https://docs.tensorlake.ai/platform/webhooks/testing.md
-    - https://docs.tensorlake.ai/platform/access-control.md
-    - https://docs.tensorlake.ai/platform/authentication.md
     - https://docs.tensorlake.ai/platform/eu-data-residency.md
     - https://docs.tensorlake.ai/platform/billing.md
-    - https://docs.tensorlake.ai/platform/playground/overview.md
-    - https://docs.tensorlake.ai/platform/playground/sample-documents.md
     - https://docs.tensorlake.ai/platform/security.md
     - https://docs.tensorlake.ai/platform/sso.md
-  sdk_version: "0.5.44"
-  last_verified: "2026-06-16"
+  sdk_version: "0.5.97"
+  last_verified: "2026-08-04"
 
 sandbox_usecases.md:
   sources:
     - https://docs.tensorlake.ai/sandboxes/skills-in-sandboxes.md
     - https://docs.tensorlake.ai/sandboxes/tool-calls.md
     - https://docs.tensorlake.ai/sandboxes/claude-managed-agents.md
+    - https://docs.tensorlake.ai/sandboxes/opencode.md
+    - https://docs.tensorlake.ai/sandboxes/crabbox.md
+    - https://docs.tensorlake.ai/sandboxes/devin-outposts.md
     - https://docs.tensorlake.ai/sandboxes/data-analysis.md
     - https://docs.tensorlake.ai/sandboxes/cicd-build.md
     - https://docs.tensorlake.ai/sandboxes/agentic-autoresearch.md
@@ -120,14 +136,13 @@ sandbox_usecases.md:
     - https://docs.tensorlake.ai/sandboxes/chrome-cdp.md
     - https://docs.tensorlake.ai/sandboxes/harbor.md
     - https://docs.tensorlake.ai/sandboxes/remote-dev.md
-  sdk_version: "0.5.44"
-  last_verified: "2026-06-16"
+  sdk_version: "0.5.97"
+  last_verified: "2026-08-04"
 
 troubleshooting.md:
   sources:
     - https://docs.tensorlake.ai/applications/overview.md
+    - https://docs.tensorlake.ai/applications/architecture.md
     - https://docs.tensorlake.ai/applications/production/troubleshooting.md
-    - https://docs.tensorlake.ai/document-ingestion/production/integration.md
-    - https://docs.tensorlake.ai/document-ingestion/production/benchmarks.md
-  sdk_version: "0.5.44"
-  last_verified: "2026-06-16"
+  sdk_version: "0.5.97"
+  last_verified: "2026-08-04"
