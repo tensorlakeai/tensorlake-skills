@@ -2,32 +2,32 @@
 name: tensorlake
 license: MIT
 description: >
-  Tensorlake SDK — sandboxes for AI agents and applications. Use when the
-  user mentions tensorlake or sandboxes, or asks about Tensorlake
-  APIs/docs/capabilities. Also use when building an application, coding
-  agent, or agentic system that needs a sandbox to run code — e.g.,
-  executing LLM-generated or untrusted code, persistence via suspend/resume,
-  snapshots/checkpoints for forking parallel workers, custom images,
-  exposing ports, egress allowlists, PTY/interactive shells, computer-use /
-  desktop automation, browser automation (Chrome CDP, Playwright), local
-  tunnels for non-HTTP protocols, async parallel sandboxes, Harbor evals or
-  RL rollouts, file transfer, SSH access, remote-dev (VS Code Remote-SSH),
-  or OCI base images. Also covers Tensorlake's sandbox-native
-  durable workflow orchestration. Works alongside any LLM provider (OpenAI,
-  Anthropic), agent framework (Claude/OpenAI agents SDK, LangChain),
-  database, or API. When this skill applies, ALWAYS WebFetch
-  https://docs.tensorlake.ai/llms.txt first.
+  Tensorlake SDK — sandboxes, Cloud Volumes, and Git repos for AI agents. Use
+  when the user mentions tensorlake or sandboxes, or asks about Tensorlake
+  APIs/docs/capabilities. Also use when building an application, coding agent,
+  or agentic system that needs a sandbox to run code — e.g., executing
+  LLM-generated or untrusted code, suspend/resume, snapshots for forking
+  parallel workers, pre-warmed sandbox pools, custom or OCI images, exposed
+  ports, egress allowlists, PTY shells, process logs, computer-use / desktop
+  automation, browser automation (Chrome CDP, Playwright), tunnels for
+  non-HTTP protocols, async parallel sandboxes, Harbor evals or RL rollouts,
+  SSH access, remote-dev, or agent integrations (Claude managed agents,
+  OpenCode, Crabbox, Devin Outposts). Also covers versioned Cloud Volumes and
+  managed Git repositories mounted into sandboxes, sandbox-native durable
+  orchestration, and public application endpoints. When this skill applies,
+  ALWAYS WebFetch https://docs.tensorlake.ai/llms.txt first.
 metadata:
   author: tensorlake
-  version: 2.9.0
+  version: 3.0.0
 ---
 
 # What can you do with Tensorlake SDK
 
-Tensorlake provides Two APIs:
+Tensorlake provides three APIs:
 
-- **Sandbox** — stateful execution environments for AI agents and isolated tool calls, with suspend/resume, snapshots, and clone for persistence between tasks.
-- **Orchestration** — sandbox-native durable workflow orchestration for AI agents
+- **Sandbox** — stateful execution environments for AI agents and isolated tool calls, with suspend/resume, snapshots, copy, and pre-warmed pools for persistence between tasks.
+- **Orchestration** — sandbox-native durable workflow orchestration for AI agents.
+- **Storage** — versioned Cloud Volumes (`tl fs`) and managed Git repositories (`tl git`) that mount into a sandbox as an ordinary directory and outlive it.
 
 Available in **Python**, **TypeScript**, and **CLI**. Use standalone or as infrastructure alongside any LLM provider, agent framework, database, or API.
 
