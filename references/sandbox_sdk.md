@@ -1168,9 +1168,9 @@ wscat -H "Authorization: Bearer $TENSORLAKE_API_KEY" \
 
 | Parameter | TypeScript | Type | Default | Description |
 |---|---|---|---|---|
-| `allow_internet_access` | `allowInternetAccess` | `bool` | `true` | Allows internet access, including DNS. If `false`, all outbound traffic except destinations in `allow_out` is blocked, **including DNS**. If `allow_out` is non-empty and this is `true`, **only** the listed destinations and DNS are allowed. |
-| `allow_out` | `allowOut` | `list[str]` | `[]` | Allowed **domains, IPv4 addresses, or IPv4 CIDRs**. A non-empty list allows the listed destinations and DNS when `allow_internet_access` is `true`. |
-| `deny_out` | `denyOut` | `list[str]` | `[]` | Denied domains, IPv4 addresses, or IPv4 CIDRs. |
+| `allow_internet_access` | `allowInternetAccess` | `bool` | `true` | Allows internet access, including DNS. If `false`, all outbound traffic except destinations in `allow_out` is blocked, **including DNS** — and DNS stays blocked even when `allow_out` is non-empty. |
+| `allow_out` | `allowOut` | `list[str]` | `[]` | Egress allowlist. A non-empty list narrows egress to **only** these destinations, even with `allow_internet_access=True`. Accepts **domains, IPv4 addresses, or IPv4 CIDRs**, but domain entries only work when `allow_internet_access` is `true` (they need DNS). |
+| `deny_out` | `denyOut` | `list[str]` | `[]` | Denied domains, IPv4 addresses, or IPv4 CIDRs. Evaluated **after** `allow_out`, so an `allow_out` entry wins over an overlapping `deny_out` entry. |
 | `exposed_ports` | `exposedPorts` | `list[int] \| null` | `null` | User ports the proxy may route to. |
 | `allow_unauthenticated_access` | `allowUnauthenticatedAccess` | `bool` | `false` | Skip TensorLake auth for exposed user ports. Never applies to `9501`. |
 
@@ -1178,17 +1178,41 @@ wscat -H "Authorization: Bearer $TENSORLAKE_API_KEY" \
 # Disable outbound internet entirely (good for untrusted code)
 sandbox = Sandbox.create(allow_internet_access=False)
 
-# Allowlist specific destinations — note this narrows egress even with internet access on
+# Domain allowlist — keep allow_internet_access=True so DNS still resolves.
+# A non-empty allow_out narrows egress to just these destinations.
 sandbox = Sandbox.create(
     allow_internet_access=True,
-    allow_out=["example.com", "203.0.113.10", "10.0.0.0/8"],
+    allow_out=["api.openai.com", "203.0.113.10", "10.0.0.0/8"],
+)
+
+# IP/CIDR-only allowlist with DNS also blocked (strictest form)
+sandbox = Sandbox.create(
+    allow_internet_access=False,
+    allow_out=["203.0.113.10", "10.0.0.0/8"],
 )
 
 # Internet on, but block specific destinations
 sandbox = Sandbox.create(deny_out=["example.com"])
 ```
 
-`allow_out` rules are evaluated before `deny_out`. Over HTTP these are nested under a `network` object: `{"network": {"allow_internet_access": false}}`. Not supported in the CLI.
+> **`allow_internet_access=False` + a domain in `allow_out` silently blocks everything.** Turning internet access off blocks DNS, and a non-empty `allow_out` does *not* re-open it, so the sandbox can never resolve the domain you allowlisted — every request fails with `Could not resolve host`. For a **domain** allowlist leave `allow_internet_access=True` and rely on `allow_out` to narrow egress; only use `allow_internet_access=False` when every `allow_out` entry is an IP or CIDR.
+
+> **The SDK docstring on `NetworkConfig` is wrong about this.** It claims that with `allow_internet_access=True` "all outbound traffic is allowed unless explicitly denied by `deny_out`", implying `allow_out` is a no-op when internet access is on. It is not — a non-empty `allow_out` restricts egress to the listed destinations in both modes. Trust the table above over the docstring / IDE hint.
+
+Over HTTP these are nested under a `network` object: `{"network": {"allow_internet_access": false}}`. Not supported in the CLI.
+
+Verified live against SDK 0.5.97 (each row a separate sandbox, probing `https://example.com`, `https://1.1.1.1`, and `getent hosts example.com`):
+
+| Config | example.com | 1.1.1.1 | DNS |
+|---|---|---|---|
+| defaults (internet on) | `200` | `301` | resolves |
+| `allow_internet_access=True, allow_out=["example.com"]` | `200` | blocked | resolves |
+| `allow_internet_access=True, allow_out=["1.1.1.1"]` | blocked | `301` | resolves |
+| `allow_internet_access=False, allow_out=["1.1.1.1"]` | blocked (no DNS) | `301` | blocked |
+| `allow_internet_access=False, allow_out=["example.com"]` | blocked (no DNS) | blocked | blocked |
+| `allow_internet_access=False` | blocked | blocked | blocked |
+| `deny_out=["example.com"]` | blocked | `301` | resolves |
+| `allow_out=["1.1.1.1"], deny_out=["1.0.0.0/8"]` | blocked | `301` (allow wins) | resolves |
 
 ### Local Tunnels
 

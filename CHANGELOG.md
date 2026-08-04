@@ -2,6 +2,11 @@
 
 All notable changes to the TensorLake skill are documented here.
 
+## [3.0.1] — SDK 0.5.97 — 2026-08-04
+
+### Fixed
+- **`references/sandbox_sdk.md`** — `allow_out` / `allow_internet_access` semantics corrected against **live sandbox tests**, not just the docs page. The upstream docs claim a non-empty `allow_out` "allows the listed destinations **and DNS**" — but with `allow_internet_access=False`, DNS stays blocked even when `allow_out` is non-empty, so a **domain** entry in `allow_out` can never resolve and every request fails with `Could not resolve host`. The Networking section now flags that trap, splits the examples into a domain allowlist (`allow_internet_access=True`) and an IP/CIDR-only strict form (`allow_internet_access=False`), documents that `allow_out` wins over an overlapping `deny_out`, and adds a verified behavior matrix covering all eight configurations. Also notes that the SDK's own `NetworkConfig` docstring is **wrong** — it says internet-on means all traffic is allowed unless denied, implying `allow_out` is a no-op with internet on; live tests confirm `allow_out` narrows egress in both modes.
+
 ## [3.0.0] — SDK 0.5.97 — 2026-08-04
 
 Full re-verification of every reference file against the live docs. Two whole product areas were added upstream (Cloud Volumes, Git repositories) and two were removed (Document Ingestion, integrations), so this is a breaking restructure of `references/`.

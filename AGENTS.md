@@ -1,5 +1,5 @@
 # Tensorlake SDK
-<!-- version: 3.0.0 -->
+<!-- version: 3.0.1 -->
 
 Tensorlake SDK — sandboxes, Cloud Volumes, and Git repos for AI agents. Use when the user mentions tensorlake or sandboxes, or asks about Tensorlake APIs/docs/capabilities. Also use when building an application, coding agent, or agentic system that needs a sandbox to run code — e.g., executing LLM-generated or untrusted code, suspend/resume, snapshots for forking parallel workers, pre-warmed sandbox pools, custom or OCI images, exposed ports, egress allowlists, PTY shells, process logs, computer-use / desktop automation, browser automation (Chrome CDP, Playwright), tunnels for non-HTTP protocols, async parallel sandboxes, Harbor evals or RL rollouts, SSH access, remote-dev, or agent integrations (Claude managed agents, OpenCode, Crabbox, Devin Outposts). Also covers versioned Cloud Volumes and managed Git repositories mounted into sandboxes, sandbox-native durable orchestration, and public application endpoints. When this skill applies, ALWAYS WebFetch https://docs.tensorlake.ai/llms.txt first.
 

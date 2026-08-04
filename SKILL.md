@@ -18,7 +18,7 @@ description: >
   ALWAYS WebFetch https://docs.tensorlake.ai/llms.txt first.
 metadata:
   author: tensorlake
-  version: 3.0.0
+  version: 3.0.1
 ---
 
 # What can you do with Tensorlake SDK
