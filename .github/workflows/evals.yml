@@ -35,7 +35,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Pick evals to run
         id: filter
@@ -68,7 +68,17 @@ jobs:
 
       - name: Install Claude Code
         if: steps.filter.outputs.skip == 'false'
-        run: npm install -g @anthropic-ai/claude-code
+        run: |
+          npm install --global --ignore-scripts pnpm@11.28.5
+          pnpm --global-dir /usr/local/lib/pnpm --global-bin-dir /usr/local/bin \
+            --config.minimumReleaseAge=1440 --config.minimumReleaseAgeStrict=true \
+            --config.minimumReleaseAgeIgnoreMissingTime=false --config.trustLockfile=false \
+            --config.blockExoticSubdeps=true --config.optimisticRepeatInstall=false \
+            add --global --ignore-scripts --save-exact @anthropic-ai/claude-code@2.1.294
+          claude_dir=$(find /usr/local/lib/pnpm/v11 -path '*/node_modules/@anthropic-ai/claude-code/install.cjs' -print -quit)
+          test -n "$claude_dir"
+          node "$claude_dir"
+          claude --version
 
       - name: Install tensorlake skill
         if: steps.filter.outputs.skip == 'false'
